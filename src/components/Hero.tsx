@@ -47,11 +47,19 @@ export const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
         {/* Social Proof */}
         <div className="pt-8">
           <p className="text-sm text-gray-500 mb-4">Trusted by 10,000+ families across the UK</p>
-          <div className="flex justify-center items-center space-x-8 opacity-60">
+          <div className="flex justify-center items-center flex-wrap gap-6 opacity-60">
             <span className="text-2xl">🛒 Tesco</span>
             <span className="text-2xl">🛍️ Sainsbury's</span>
             <span className="text-2xl">🏪 Asda</span>
             <span className="text-2xl">🥬 Morrisons</span>
+            <span className="text-2xl">🌟 Waitrose</span>
+            <span className="text-2xl">📦 Amazon Fresh</span>
+            <span className="text-2xl">🚚 Ocado</span>
+            <span className="text-2xl">🛍️ M&S Food</span>
+            <span className="text-2xl">🥕 Aldi</span>
+            <span className="text-2xl">💝 Lidl</span>
+            <span className="text-2xl">🏪 Co-op</span>
+            <span className="text-2xl">🌟 Iceland</span>
           </div>
         </div>
 
@@ -91,7 +99,7 @@ export const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
             <div className="text-sm text-gray-600">Personalized Recipes</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">4</div>
+            <div className="text-2xl font-bold text-orange-600">12</div>
             <div className="text-sm text-gray-600">Connected Stores</div>
           </div>
         </div>

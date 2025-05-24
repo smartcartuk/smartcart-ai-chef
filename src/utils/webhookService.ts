@@ -57,6 +57,13 @@ const WEBHOOK_URL = 'https://proj3cts.app.n8n.cloud/webhook-test/e7d77626-7f71-4
 
 export const sendUserPreferences = async (profile: WebhookUserProfile): Promise<WebhookResponse> => {
   console.log('Sending user preferences to webhook:', WEBHOOK_URL);
+  console.log('Profile data:', {
+    householdSize: profile.householdSize,
+    weeklyBudget: profile.weeklyBudget,
+    dietaryPreferences: profile.dietaryPreferences,
+    allergies: profile.allergies,
+    connectedStores: profile.connectedStores.map(store => store.name)
+  });
   
   try {
     const response = await fetch(WEBHOOK_URL, {
@@ -65,7 +72,18 @@ export const sendUserPreferences = async (profile: WebhookUserProfile): Promise<
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        user_profile: profile,
+        user_profile: {
+          ...profile,
+          // Ensure all key data is included for meal planning
+          household_size: profile.householdSize,
+          weekly_budget: profile.weeklyBudget,
+          dietary_preferences: profile.dietaryPreferences,
+          allergies: profile.allergies,
+          connected_stores: profile.connectedStores.map(store => ({
+            name: store.name,
+            has_loyalty_card: Boolean(store.credentials.loyaltyCard)
+          }))
+        },
         timestamp: new Date().toISOString(),
         source: 'smartcart_onboarding'
       }),

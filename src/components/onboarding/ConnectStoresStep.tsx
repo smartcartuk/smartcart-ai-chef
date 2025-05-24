@@ -47,6 +47,20 @@ export const ConnectStoresStep: React.FC<ConnectStoresStepProps> = ({
       website: 'morrisons.com'
     },
     { 
+      name: 'Waitrose', 
+      logo: '🌟', 
+      description: 'Quality & sustainability',
+      loyaltyCard: 'myWaitrose',
+      website: 'waitrose.com'
+    },
+    { 
+      name: 'M&S Food', 
+      logo: '🛍️', 
+      description: 'Premium groceries',
+      loyaltyCard: 'Sparks Card',
+      website: 'marksandspencer.com/food'
+    },
+    { 
       name: 'Amazon Fresh', 
       logo: '📦', 
       description: 'Prime delivery',
@@ -61,18 +75,32 @@ export const ConnectStoresStep: React.FC<ConnectStoresStepProps> = ({
       website: 'ocado.com'
     },
     { 
-      name: 'Waitrose', 
-      logo: '🌟', 
-      description: 'Quality & sustainability',
-      loyaltyCard: 'myWaitrose',
-      website: 'waitrose.com'
+      name: 'Aldi', 
+      logo: '🥕', 
+      description: 'Special buys',
+      loyaltyCard: 'None',
+      website: 'aldi.co.uk'
     },
     { 
-      name: 'M&S Food', 
-      logo: '🛍️', 
-      description: 'Premium groceries',
-      loyaltyCard: 'Sparks Card',
-      website: 'marksandspencer.com/food'
+      name: 'Lidl', 
+      logo: '💝', 
+      description: 'Lidl Plus rewards',
+      loyaltyCard: 'Lidl Plus',
+      website: 'lidl.co.uk'
+    },
+    { 
+      name: 'Co-op', 
+      logo: '🏪', 
+      description: 'Member rewards',
+      loyaltyCard: 'Co-op Membership',
+      website: 'coop.co.uk'
+    },
+    { 
+      name: 'Iceland', 
+      logo: '🌟', 
+      description: 'Frozen specialist',
+      loyaltyCard: 'Bonus Card',
+      website: 'iceland.co.uk'
     }
   ];
 
@@ -83,7 +111,7 @@ export const ConnectStoresStep: React.FC<ConnectStoresStepProps> = ({
         <p className="text-gray-600">Link your supermarket accounts to compare prices and apply discounts</p>
       </div>
       
-      <div className="grid gap-4">
+      <div className="grid gap-4 max-h-96 overflow-y-auto">
         {storeOptions.map((store) => {
           const isConnected = profile.connectedStores.some(s => s.name === store.name);
           const storeData = profile.connectedStores.find(s => s.name === store.name);
@@ -114,7 +142,7 @@ export const ConnectStoresStep: React.FC<ConnectStoresStepProps> = ({
                 </div>
               </div>
 
-              {isConnected && (
+              {isConnected && store.loyaltyCard !== 'None' && (
                 <Card className="p-4 bg-blue-50 border-blue-200">
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
