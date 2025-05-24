@@ -1,12 +1,13 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { WebhookResponse } from '@/utils/webhookService';
 
 interface PriceComparisonProps {
   userProfile: any;
+  generatedData?: WebhookResponse | null;
 }
 
 const mockComparisons = [
@@ -46,16 +47,19 @@ const storeLogos = {
   'Morrisons': '🟣'
 };
 
-export const PriceComparison: React.FC<PriceComparisonProps> = ({ userProfile }) => {
+export const PriceComparison: React.FC<PriceComparisonProps> = ({ userProfile, generatedData }) => {
   const [sortBy, setSortBy] = useState<'price' | 'savings'>('price');
 
-  const totalPotentialSavings = mockComparisons.reduce((sum, item) => {
+  // Use generated price comparisons if available, otherwise use mock data
+  const comparisons = generatedData?.priceComparisons || mockComparisons;
+
+  const totalPotentialSavings = comparisons.reduce((sum, item) => {
     const bestPrice = Math.min(...item.prices.map(p => p.price - p.savings));
     const worstPrice = Math.max(...item.prices.map(p => p.price));
     return sum + (worstPrice - bestPrice);
   }, 0);
 
-  const totalOptimizedCost = mockComparisons.reduce((sum, item) => {
+  const totalOptimizedCost = comparisons.reduce((sum, item) => {
     const bestPrice = Math.min(...item.prices.map(p => p.price - p.savings));
     return sum + bestPrice;
   }, 0);
@@ -101,7 +105,7 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({ userProfile })
 
       {/* Price Comparison Items */}
       <div className="space-y-6">
-        {mockComparisons.map((comparison, index) => (
+        {comparisons.map((comparison, index) => (
           <Card key={index} className="p-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">

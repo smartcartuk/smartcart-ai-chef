@@ -1,12 +1,13 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { WebhookResponse } from '@/utils/webhookService';
 
 interface ShoppingListProps {
   userProfile: any;
+  generatedData?: WebhookResponse | null;
 }
 
 const mockShoppingItems = {
@@ -36,9 +37,14 @@ const mockShoppingItems = {
   ]
 };
 
-export const ShoppingList: React.FC<ShoppingListProps> = ({ userProfile }) => {
+export const ShoppingList: React.FC<ShoppingListProps> = ({ userProfile, generatedData }) => {
   const [checkedItems, setCheckedItems] = useState<{[key: string]: boolean}>({});
   const [selectedStore, setSelectedStore] = useState<string>('all');
+
+  // Use generated shopping list if available, otherwise use mock data
+  const shoppingItems = generatedData?.shoppingList ? 
+    generateShoppingItemsFromData(generatedData.shoppingList) : 
+    mockShoppingItems;
 
   const handleItemCheck = (category: string, index: number) => {
     const key = `${category}-${index}`;
@@ -55,11 +61,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ userProfile }) => {
     return colors[store as keyof typeof colors] || 'bg-gray-100 text-gray-700';
   };
 
-  const totalCost = Object.values(mockShoppingItems)
+  const totalCost = Object.values(shoppingItems)
     .flat()
     .reduce((sum, item) => sum + item.price, 0);
 
-  const storeBreakdown = Object.values(mockShoppingItems)
+  const storeBreakdown = Object.values(shoppingItems)
     .flat()
     .reduce((acc, item) => {
       acc[item.store] = (acc[item.store] || 0) + item.price;
@@ -130,7 +136,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ userProfile }) => {
 
       {/* Shopping List Items */}
       <div className="space-y-6">
-        {Object.entries(mockShoppingItems).map(([category, items]) => (
+        {Object.entries(shoppingItems).map(([category, items]) => (
           <Card key={category} className="p-6">
             <h3 className="font-semibold text-lg mb-4 flex items-center space-x-2">
               <span>{category}</span>
@@ -194,4 +200,25 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ userProfile }) => {
       </div>
     </div>
   );
+};
+
+// Helper function to convert webhook shopping list to component format
+const generateShoppingItemsFromData = (shoppingList: any[]) => {
+  const categorized: {[key: string]: any[]} = {};
+  
+  shoppingList.forEach(item => {
+    const category = item.category || 'Other';
+    if (!categorized[category]) {
+      categorized[category] = [];
+    }
+    categorized[category].push({
+      name: item.item,
+      quantity: item.quantity,
+      price: item.estimated_cost,
+      store: 'Tesco', // Default store, could be enhanced
+      checked: false
+    });
+  });
+  
+  return categorized;
 };
