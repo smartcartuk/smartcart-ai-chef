@@ -170,7 +170,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
                     <div className="flex items-center space-x-3">
                       <Checkbox 
                         checked={profile.dietaryPreferences.includes(option)}
-                        readOnly
+                        disabled={true}
                       />
                       <span className="font-medium">{option}</span>
                     </div>
@@ -228,7 +228,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
                       </div>
                       <Checkbox 
                         checked={profile.connectedStores.includes(store.name)}
-                        readOnly
+                        disabled={true}
                       />
                     </div>
                   </div>
