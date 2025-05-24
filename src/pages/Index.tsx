@@ -1,12 +1,51 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React, { useState } from 'react';
+import { Header } from '@/components/Header';
+import { Hero } from '@/components/Hero';
+import { OnboardingWizard } from '@/components/OnboardingWizard';
+import { MealPlanDashboard } from '@/components/MealPlanDashboard';
+import { Toaster } from '@/components/ui/toaster';
 
 const Index = () => {
+  const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
+  const [userProfile, setUserProfile] = useState(null);
+
+  const handleGetStarted = () => {
+    setCurrentView('onboarding');
+  };
+
+  const handleOnboardingComplete = (profile: any) => {
+    setUserProfile(profile);
+    setCurrentView('dashboard');
+  };
+
+  const handleBackToLanding = () => {
+    setCurrentView('landing');
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
+      <Header 
+        currentView={currentView} 
+        onBackToLanding={handleBackToLanding}
+        userProfile={userProfile}
+      />
+      
+      {currentView === 'landing' && (
+        <>
+          <Hero onGetStarted={handleGetStarted} />
+        </>
+      )}
+      
+      {currentView === 'onboarding' && (
+        <OnboardingWizard onComplete={handleOnboardingComplete} />
+      )}
+      
+      {currentView === 'dashboard' && (
+        <MealPlanDashboard userProfile={userProfile} />
+      )}
+      
+      <Toaster />
     </div>
   );
 };
