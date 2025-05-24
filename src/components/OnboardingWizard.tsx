@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -15,8 +14,17 @@ interface OnboardingWizardProps {
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }) => {
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState({
+    // Personal details
     name: '',
     email: '',
+    password: '',
+    address: {
+      street: '',
+      city: '',
+      postcode: '',
+      country: 'United Kingdom'
+    },
+    // Existing fields
     dietaryPreferences: [] as string[],
     allergies: [] as string[],
     householdSize: 2,
@@ -42,7 +50,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
   ];
 
   const handleNext = () => {
-    if (step < 4) {
+    if (step < 6) {
       setStep(step + 1);
     } else {
       toast({
@@ -69,19 +77,32 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
     }));
   };
 
+  const updateAddress = (field: string, value: string) => {
+    setProfile(prev => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        [field]: value
+      }
+    }));
+  };
+
+  const isStep1Valid = profile.name && profile.email && profile.password && 
+                       profile.address.street && profile.address.city && profile.address.postcode;
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-2xl mx-auto">
         {/* Progress bar */}
         <div className="mb-8">
           <div className="flex justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Step {step} of 4</span>
-            <span className="text-sm text-gray-500">{Math.round((step / 4) * 100)}% complete</span>
+            <span className="text-sm font-medium text-gray-700">Step {step} of 6</span>
+            <span className="text-sm text-gray-500">{Math.round((step / 6) * 100)}% complete</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
               className="bg-gradient-to-r from-emerald-500 to-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(step / 4) * 100}%` }}
+              style={{ width: `${(step / 6) * 100}%` }}
             ></div>
           </div>
         </div>
@@ -90,8 +111,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
           {step === 1 && (
             <div className="space-y-6">
               <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold text-gray-900">Welcome! Let's get started</h2>
-                <p className="text-gray-600">Tell us a bit about yourself to personalize your experience</p>
+                <h2 className="text-3xl font-bold text-gray-900">Create Your Account</h2>
+                <p className="text-gray-600">Let's start with your personal details</p>
               </div>
               
               <div className="space-y-4">
@@ -118,31 +139,82 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={profile.password}
+                    onChange={(e) => setProfile(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Create a secure password"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Your Address</h3>
+                  
                   <div>
-                    <Label htmlFor="household">Household Size</Label>
+                    <Label htmlFor="street">Street Address</Label>
                     <Input
-                      id="household"
-                      type="number"
-                      min="1"
-                      max="8"
-                      value={profile.householdSize}
-                      onChange={(e) => setProfile(prev => ({ ...prev, householdSize: parseInt(e.target.value) }))}
+                      id="street"
+                      value={profile.address.street}
+                      onChange={(e) => updateAddress('street', e.target.value)}
+                      placeholder="Enter your street address"
                       className="mt-1"
                     />
                   </div>
-                  
-                  <div>
-                    <Label htmlFor="budget">Weekly Budget (£)</Label>
-                    <Input
-                      id="budget"
-                      type="number"
-                      min="20"
-                      max="200"
-                      value={profile.weeklyBudget}
-                      onChange={(e) => setProfile(prev => ({ ...prev, weeklyBudget: parseInt(e.target.value) }))}
-                      className="mt-1"
-                    />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        value={profile.address.city}
+                        onChange={(e) => updateAddress('city', e.target.value)}
+                        placeholder="City"
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="postcode">Postcode</Label>
+                      <Input
+                        id="postcode"
+                        value={profile.address.postcode}
+                        onChange={(e) => updateAddress('postcode', e.target.value)}
+                        placeholder="SW1A 1AA"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="household">Household Size</Label>
+                      <Input
+                        id="household"
+                        type="number"
+                        min="1"
+                        max="8"
+                        value={profile.householdSize}
+                        onChange={(e) => setProfile(prev => ({ ...prev, householdSize: parseInt(e.target.value) }))}
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="budget">Weekly Budget (£)</Label>
+                      <Input
+                        id="budget"
+                        type="number"
+                        min="20"
+                        max="200"
+                        value={profile.weeklyBudget}
+                        onChange={(e) => setProfile(prev => ({ ...prev, weeklyBudget: parseInt(e.target.value) }))}
+                        className="mt-1"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -246,25 +318,91 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
           {step === 4 && (
             <div className="space-y-6 text-center">
               <div className="space-y-2">
-                <h2 className="text-3xl font-bold text-gray-900">You're all set! 🎉</h2>
-                <p className="text-gray-600">AI is analyzing your preferences to create the perfect meal plan</p>
+                <h2 className="text-3xl font-bold text-gray-900">Weekly Plan Overview</h2>
+                <p className="text-gray-600">AI is creating your personalized meal plan</p>
               </div>
               
               <div className="space-y-4">
                 <div className="bg-gradient-to-r from-emerald-50 to-blue-50 p-6 rounded-lg">
-                  <h3 className="font-semibold mb-3">What happens next:</h3>
+                  <h3 className="font-semibold mb-3">Your weekly plan will include:</h3>
                   <div className="space-y-2 text-left">
                     <div className="flex items-center space-x-3">
                       <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                      <span className="text-sm">AI curates personalized recipes based on your preferences</span>
+                      <span className="text-sm">7 personalized recipes matching your dietary preferences</span>
                     </div>
                     <div className="flex items-center space-x-3">
                       <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-sm">Smart shopping list with price comparisons across stores</span>
+                      <span className="text-sm">Consolidated shopping list with exact quantities</span>
                     </div>
                     <div className="flex items-center space-x-3">
                       <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                      <span className="text-sm">Weekly savings report and optimization suggestions</span>
+                      <span className="text-sm">Nutritional information and calorie counts</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 5 && (
+            <div className="space-y-6 text-center">
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold text-gray-900">Optimize & Compare</h2>
+                <p className="text-gray-600">Smart price comparison across your connected stores</p>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg">
+                  <h3 className="font-semibold mb-3">Price optimization features:</h3>
+                  <div className="space-y-2 text-left">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-sm">Compare prices across all your connected stores</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                      <span className="text-sm">Apply loyalty card discounts automatically</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                      <span className="text-sm">Suggest cheaper alternatives for expensive items</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
+                      <span className="text-sm">Split shopping across stores for maximum savings</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 6 && (
+            <div className="space-y-6 text-center">
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold text-gray-900">Export & Shop</h2>
+                <p className="text-gray-600">Your SmartCart is ready! Choose how you'd like to shop</p>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
+                  <h3 className="font-semibold mb-3">Shopping options:</h3>
+                  <div className="space-y-2 text-left">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-sm">Export shopping list to email or PDF</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      <span className="text-sm">Auto-fill baskets on supermarket websites</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                      <span className="text-sm">Schedule weekly delivery or collection</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
+                      <span className="text-sm">Track your weekly savings progress</span>
                     </div>
                   </div>
                 </div>
@@ -283,9 +421,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
             <Button
               onClick={handleNext}
               className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
-              disabled={step === 1 && (!profile.name || !profile.email)}
+              disabled={step === 1 && !isStep1Valid}
             >
-              {step === 4 ? 'Start Planning' : 'Continue'}
+              {step === 6 ? 'Start Planning' : 'Continue'}
             </Button>
           </div>
         </Card>
