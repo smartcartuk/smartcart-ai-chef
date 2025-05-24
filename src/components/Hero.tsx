@@ -10,106 +10,89 @@ interface HeroProps {
 
 export const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
   return (
-    <div className="relative overflow-hidden">
-      {/* Background pattern */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-      
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left side - Hero content */}
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <Badge className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white border-0">
-                🤖 Powered by AI
-              </Badge>
-              <h1 className="text-5xl lg:text-6xl font-bold leading-tight">
-                <span className="bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
-                  Smart Grocery
-                </span>
-                <br />
-                <span className="text-gray-900">Planning Made</span>
-                <br />
-                <span className="text-gray-900">Simple</span>
-              </h1>
-              <p className="text-xl text-gray-600 leading-relaxed">
-                Save time and money with AI-powered meal planning. Get personalized recipes, 
-                optimized shopping lists, and automatic price comparisons across UK supermarkets.
-              </p>
-            </div>
+    <div className="container mx-auto px-4 py-16">
+      <div className="max-w-4xl mx-auto text-center space-y-8">
+        {/* Hero Header */}
+        <div className="space-y-6">
+          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 px-4 py-2">
+            🚀 AI-Powered Meal Planning
+          </Badge>
+          
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight">
+            Save Money & Time on
+            <span className="bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent block">
+              Weekly Groceries
+            </span>
+          </h1>
+          
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            AI creates personalized meal plans, compares prices across supermarkets, and optimizes your shopping list to save you £50+ every week.
+          </p>
+        </div>
 
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
-                size="lg"
-                onClick={onGetStarted}
-                className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-white px-8 py-4 text-lg"
-              >
-                Start Planning Now
-              </Button>
-              <Button variant="outline" size="lg" className="px-8 py-4 text-lg">
-                Watch Demo
-              </Button>
-            </div>
+        {/* CTA Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <Button
+            size="lg"
+            className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-lg px-8 py-6 h-auto"
+            onClick={onGetStarted}
+          >
+            Start Free Trial →
+          </Button>
+          <Button variant="outline" size="lg" className="text-lg px-8 py-6 h-auto">
+            Watch Demo
+          </Button>
+        </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-8 pt-8">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-emerald-600">£127</div>
-                <div className="text-sm text-gray-600">Avg. monthly savings</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">15min</div>
-                <div className="text-sm text-gray-600">Planning time saved</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-purple-600">98%</div>
-                <div className="text-sm text-gray-600">User satisfaction</div>
-              </div>
-            </div>
+        {/* Social Proof */}
+        <div className="pt-8">
+          <p className="text-sm text-gray-500 mb-4">Trusted by 10,000+ families across the UK</p>
+          <div className="flex justify-center items-center space-x-8 opacity-60">
+            <span className="text-2xl">🛒 Tesco</span>
+            <span className="text-2xl">🛍️ Sainsbury's</span>
+            <span className="text-2xl">🏪 Asda</span>
+            <span className="text-2xl">🥬 Morrisons</span>
           </div>
+        </div>
 
-          {/* Right side - Feature preview */}
-          <div className="space-y-6">
-            <Card className="p-6 bg-white/60 backdrop-blur-sm border border-emerald-100 shadow-xl">
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
-                  <span className="font-medium">This Week's Plan</span>
-                </div>
-                <div className="space-y-3">
-                  {['Mediterranean Salmon', 'Thai Green Curry', 'Classic Lasagne'].map((meal, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100">
-                      <span className="text-sm font-medium">{meal}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        £{(8.50 + index * 1.20).toFixed(2)}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-                <div className="pt-3 border-t border-gray-100">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Total saved:</span>
-                    <span className="text-emerald-600 font-bold">£12.50</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
+        {/* Feature Preview Cards */}
+        <div className="grid md:grid-cols-3 gap-6 pt-16">
+          <Card className="p-6 border border-emerald-100 bg-emerald-50/50">
+            <div className="text-3xl mb-4">🤖</div>
+            <h3 className="font-semibold text-lg mb-2">AI Recipe Curation</h3>
+            <p className="text-gray-600 text-sm">Personalized weekly meal plans matching your dietary preferences and budget</p>
+          </Card>
+          
+          <Card className="p-6 border border-blue-100 bg-blue-50/50">
+            <div className="text-3xl mb-4">💰</div>
+            <h3 className="font-semibold text-lg mb-2">Smart Price Comparison</h3>
+            <p className="text-gray-600 text-sm">Compare prices across all major UK supermarkets and apply loyalty discounts</p>
+          </Card>
+          
+          <Card className="p-6 border border-purple-100 bg-purple-50/50">
+            <div className="text-3xl mb-4">📱</div>
+            <h3 className="font-semibold text-lg mb-2">One-Click Shopping</h3>
+            <p className="text-gray-600 text-sm">Auto-fill baskets and schedule deliveries across multiple stores</p>
+          </Card>
+        </div>
 
-            <Card className="p-6 bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-100 shadow-xl">
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span className="font-medium">AI Assistant</span>
-                </div>
-                <div className="space-y-3">
-                  <div className="bg-white p-3 rounded-lg text-sm">
-                    "I need a gluten-free version of tonight's recipe"
-                  </div>
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-lg text-sm">
-                    I've found 3 gluten-free alternatives that match your preferences. The coconut flour option saves £2.30!
-                  </div>
-                </div>
-              </div>
-            </Card>
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-16 border-t border-gray-200">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-emerald-600">£50+</div>
+            <div className="text-sm text-gray-600">Average Weekly Savings</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">2hrs</div>
+            <div className="text-sm text-gray-600">Time Saved Per Week</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-purple-600">7</div>
+            <div className="text-sm text-gray-600">Personalized Recipes</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-orange-600">4</div>
+            <div className="text-sm text-gray-600">Connected Stores</div>
           </div>
         </div>
       </div>
