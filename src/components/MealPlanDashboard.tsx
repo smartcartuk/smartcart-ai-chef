@@ -8,13 +8,23 @@ import { WeeklyPlan } from '@/components/WeeklyPlan';
 import { ShoppingList } from '@/components/ShoppingList';
 import { PriceComparison } from '@/components/PriceComparison';
 import { AIAssistant } from '@/components/AIAssistant';
+import { WebhookResponse } from '@/utils/webhookService';
 
 interface MealPlanDashboardProps {
   userProfile: any;
+  generatedData?: WebhookResponse | null;
 }
 
-export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({ userProfile }) => {
+export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({ 
+  userProfile, 
+  generatedData 
+}) => {
   const [activeTab, setActiveTab] = useState('plan');
+
+  // Calculate stats from generated data if available
+  const totalCost = generatedData?.meals?.reduce((sum, meal) => sum + meal.cost, 0) || 46.95;
+  const totalMeals = generatedData?.meals?.length || 7;
+  const avgSavings = generatedData ? 12.50 : 12.50; // You might want to calculate this from price comparisons
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -32,6 +42,11 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({ userProfil
                 year: 'numeric' 
               })}
             </p>
+            {generatedData && (
+              <Badge variant="secondary" className="mt-2 bg-green-100 text-green-700">
+                ✨ AI Generated Plan
+              </Badge>
+            )}
           </div>
           
           <div className="flex items-center space-x-4">
@@ -50,7 +65,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({ userProfil
           <Card className="p-6 bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
             <div className="space-y-2">
               <div className="text-2xl">💰</div>
-              <div className="text-2xl font-bold text-emerald-700">£12.50</div>
+              <div className="text-2xl font-bold text-emerald-700">£{avgSavings.toFixed(2)}</div>
               <div className="text-sm text-emerald-600">Weekly Savings</div>
             </div>
           </Card>
@@ -58,7 +73,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({ userProfil
           <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
             <div className="space-y-2">
               <div className="text-2xl">🍽️</div>
-              <div className="text-2xl font-bold text-blue-700">7</div>
+              <div className="text-2xl font-bold text-blue-700">{totalMeals}</div>
               <div className="text-sm text-blue-600">Meals Planned</div>
             </div>
           </Card>
@@ -66,8 +81,8 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({ userProfil
           <Card className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
             <div className="space-y-2">
               <div className="text-2xl">📱</div>
-              <div className="text-2xl font-bold text-purple-700">3</div>
-              <div className="text-sm text-purple-600">Stores Compared</div>
+              <div className="text-2xl font-bold text-purple-700">{userProfile?.connectedStores?.length || 3}</div>
+              <div className="text-sm text-purple-600">Stores Connected</div>
             </div>
           </Card>
           
@@ -102,15 +117,15 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({ userProfil
           </TabsList>
 
           <TabsContent value="plan" className="space-y-6">
-            <WeeklyPlan userProfile={userProfile} />
+            <WeeklyPlan userProfile={userProfile} generatedData={generatedData} />
           </TabsContent>
 
           <TabsContent value="shopping" className="space-y-6">
-            <ShoppingList userProfile={userProfile} />
+            <ShoppingList userProfile={userProfile} generatedData={generatedData} />
           </TabsContent>
 
           <TabsContent value="prices" className="space-y-6">
-            <PriceComparison userProfile={userProfile} />
+            <PriceComparison userProfile={userProfile} generatedData={generatedData} />
           </TabsContent>
 
           <TabsContent value="assistant" className="space-y-6">

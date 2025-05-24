@@ -10,14 +10,16 @@ import { ConnectStoresStep } from './onboarding/ConnectStoresStep';
 import { WeeklyPlanOverviewStep } from './onboarding/WeeklyPlanOverviewStep';
 import { OptimizeCompareStep } from './onboarding/OptimizeCompareStep';
 import { ExportShopStep } from './onboarding/ExportShopStep';
+import { sendUserPreferences, WebhookResponse } from '@/utils/webhookService';
 
 interface OnboardingWizardProps {
-  onComplete: (profile: any) => void;
+  onComplete: (profile: any, generatedData?: WebhookResponse) => void;
 }
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }) => {
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [profile, setProfile] = useState({
     // Personal details
     name: '',
@@ -53,22 +55,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
     selectAddress(address, updateAddress);
   };
 
-  const handleNext = () => {
-    if (step < 6) {
-      setStep(step + 1);
-    } else {
-      toast({
-        title: "Welcome to SmartCart! 🎉",
-        description: "Your AI-powered meal planning journey begins now.",
-      });
-      onComplete(profile);
-    }
-  };
-
-  const handleBack = () => {
-    if (step > 1) setStep(step - 1);
-  };
-
   const togglePreference = (item: string, type: 'dietary' | 'allergies') => {
     const key = type === 'dietary' ? 'dietaryPreferences' : 'allergies';
     
@@ -101,6 +87,46 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
           : store
       )
     }));
+  };
+
+  const handleNext = async () => {
+    if (step < 6) {
+      setStep(step + 1);
+    } else {
+      setIsGenerating(true);
+      
+      try {
+        toast({
+          title: "Generating your meal plan... 🤖",
+          description: "AI is analyzing your preferences and comparing prices.",
+        });
+
+        const generatedData = await sendUserPreferences(profile);
+        
+        toast({
+          title: "Welcome to SmartCart! 🎉",
+          description: "Your personalized meal plan is ready!",
+        });
+        
+        onComplete(profile, generatedData);
+      } catch (error) {
+        console.error('Error generating meal plan:', error);
+        toast({
+          title: "Generation failed",
+          description: "Using default meal plan. You can regenerate later.",
+          variant: "destructive",
+        });
+        
+        // Fall back to completing without generated data
+        onComplete(profile);
+      } finally {
+        setIsGenerating(false);
+      }
+    }
+  };
+
+  const handleBack = () => {
+    if (step > 1) setStep(step - 1);
   };
 
   const isStep1Valid = profile.name && profile.email && profile.password && 
@@ -159,16 +185,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
             <Button
               variant="outline"
               onClick={handleBack}
-              disabled={step === 1}
+              disabled={step === 1 || isGenerating}
             >
               Back
             </Button>
             <Button
               onClick={handleNext}
               className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
-              disabled={step === 1 && !isStep1Valid}
+              disabled={(step === 1 && !isStep1Valid) || isGenerating}
             >
-              {step === 6 ? 'Start Planning' : 'Continue'}
+              {isGenerating ? 'Generating...' : (step === 6 ? 'Start Planning' : 'Continue')}
             </Button>
           </div>
         </Card>

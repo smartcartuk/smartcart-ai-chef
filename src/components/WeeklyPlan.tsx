@@ -1,11 +1,12 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { WebhookResponse } from '@/utils/webhookService';
 
 interface WeeklyPlanProps {
   userProfile: any;
+  generatedData?: WebhookResponse | null;
 }
 
 const mockMeals = [
@@ -95,11 +96,14 @@ const mockMeals = [
   }
 ];
 
-export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile }) => {
+export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedData }) => {
   const [selectedMeal, setSelectedMeal] = useState<number | null>(null);
 
-  const totalCost = mockMeals.reduce((sum, meal) => sum + meal.cost, 0);
-  const avgCalories = Math.round(mockMeals.reduce((sum, meal) => sum + meal.calories, 0) / mockMeals.length);
+  // Use generated meals if available, otherwise use mock data
+  const meals = generatedData?.meals || mockMeals;
+  
+  const totalCost = meals.reduce((sum, meal) => sum + meal.cost, 0);
+  const avgCalories = Math.round(meals.reduce((sum, meal) => sum + meal.calories, 0) / meals.length);
 
   return (
     <div className="space-y-6">
@@ -111,6 +115,11 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile }) => {
             <p className="text-gray-600 mt-1">
               Personalized for {userProfile?.householdSize || 2} people • {userProfile?.dietaryPreferences?.join(', ') || 'Balanced diet'}
             </p>
+            {generatedData && (
+              <Badge variant="secondary" className="mt-2 bg-purple-100 text-purple-700">
+                🤖 AI Optimized
+              </Badge>
+            )}
           </div>
           <div className="flex items-center space-x-6">
             <div className="text-center">
@@ -127,7 +136,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile }) => {
 
       {/* Meal Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {mockMeals.map((meal) => (
+        {meals.map((meal) => (
           <Card 
             key={meal.id}
             className={`p-6 cursor-pointer transition-all duration-200 hover:shadow-lg ${
@@ -204,7 +213,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile }) => {
           <div>
             <h3 className="font-semibold text-lg">Weekly Summary</h3>
             <p className="text-gray-600 text-sm">
-              Based on your preferences and connected store discounts
+              {generatedData ? 'AI-optimized based on your preferences and store discounts' : 'Based on your preferences and connected store discounts'}
             </p>
           </div>
           
