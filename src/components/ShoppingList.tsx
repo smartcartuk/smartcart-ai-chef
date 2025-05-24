@@ -10,6 +10,14 @@ interface ShoppingListProps {
   generatedData?: WebhookResponse | null;
 }
 
+interface ShoppingItem {
+  name: string;
+  quantity: string;
+  price: number;
+  store: string;
+  checked: boolean;
+}
+
 const mockShoppingItems = {
   'Fresh Produce': [
     { name: 'Salmon Fillets', quantity: '4 portions', price: 12.99, store: 'Tesco', checked: false },
@@ -63,14 +71,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ userProfile, generat
 
   const totalCost = Object.values(shoppingItems)
     .flat()
-    .reduce((sum, item) => sum + item.price, 0);
+    .reduce((sum: number, item: ShoppingItem) => sum + item.price, 0);
 
   const storeBreakdown = Object.values(shoppingItems)
     .flat()
-    .reduce((acc, item) => {
+    .reduce((acc: {[key: string]: number}, item: ShoppingItem) => {
       acc[item.store] = (acc[item.store] || 0) + item.price;
       return acc;
-    }, {} as {[key: string]: number});
+    }, {});
 
   return (
     <div className="space-y-6">
@@ -203,8 +211,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ userProfile, generat
 };
 
 // Helper function to convert webhook shopping list to component format
-const generateShoppingItemsFromData = (shoppingList: any[]) => {
-  const categorized: {[key: string]: any[]} = {};
+const generateShoppingItemsFromData = (shoppingList: any[]): {[key: string]: ShoppingItem[]} => {
+  const categorized: {[key: string]: ShoppingItem[]} = {};
   
   shoppingList.forEach(item => {
     const category = item.category || 'Other';
@@ -214,7 +222,7 @@ const generateShoppingItemsFromData = (shoppingList: any[]) => {
     categorized[category].push({
       name: item.item,
       quantity: item.quantity,
-      price: item.estimated_cost,
+      price: Number(item.estimated_cost) || 0, // Ensure it's a number
       store: 'Tesco', // Default store, could be enhanced
       checked: false
     });
