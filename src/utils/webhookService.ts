@@ -53,10 +53,10 @@ export interface WebhookResponse {
   }>;
 }
 
-const WEBHOOK_URL = 'https://proj3cts.app.n8n.cloud/webhook-test/e7d77626-7f71-41da-8a12-0945a59df666';
+const WEBHOOK_URL = 'https://proj3cts.app.n8n.cloud/webhook-test/generate-meal-plan';
 
 export const sendUserPreferences = async (profile: WebhookUserProfile): Promise<WebhookResponse> => {
-  console.log('Sending user preferences to webhook:', WEBHOOK_URL);
+  console.log('Sending user preferences to n8n webhook:', WEBHOOK_URL);
   console.log('Profile data:', {
     householdSize: profile.householdSize,
     weeklyBudget: profile.weeklyBudget,
@@ -72,9 +72,9 @@ export const sendUserPreferences = async (profile: WebhookUserProfile): Promise<
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        user_profile: {
+        userId: `user_${Date.now()}`, // Generate a unique user ID
+        userProfile: {
           ...profile,
-          // Ensure all key data is included for meal planning
           household_size: profile.householdSize,
           weekly_budget: profile.weeklyBudget,
           dietary_preferences: profile.dietaryPreferences,
@@ -94,11 +94,11 @@ export const sendUserPreferences = async (profile: WebhookUserProfile): Promise<
     }
 
     const data = await response.json();
-    console.log('Webhook response received:', data);
+    console.log('n8n webhook response received:', data);
     
     return data;
   } catch (error) {
-    console.error('Error calling webhook:', error);
+    console.error('Error calling n8n webhook:', error);
     throw error;
   }
 };
