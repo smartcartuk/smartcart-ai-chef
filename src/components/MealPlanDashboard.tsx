@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -7,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WeeklyPlan } from '@/components/WeeklyPlan';
 import { ShoppingList } from '@/components/ShoppingList';
 import { PriceComparison } from '@/components/PriceComparison';
+import { PriceResults } from '@/components/PriceResults';
 import { AIAssistant } from '@/components/AIAssistant';
 import { WebhookResponse } from '@/utils/webhookService';
 
@@ -94,6 +94,9 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
             </div>
           </Card>
         </div>
+
+        {/* Price Results Component */}
+        <PriceResults userProfile={userProfile} />
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
