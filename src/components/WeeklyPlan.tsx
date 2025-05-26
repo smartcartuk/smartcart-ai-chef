@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
@@ -6,6 +5,7 @@ import { RecipeCard } from '@/components/RecipeCard';
 import { WeeklyPlanHeader } from '@/components/WeeklyPlanHeader';
 import { PriceComparisonSection } from '@/components/PriceComparisonSection';
 import { WebhookResponse } from '@/utils/webhookService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WeeklyPlanProps {
   userProfile: any;
@@ -41,26 +41,25 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedDa
       // Fetch 7 recipes, one for each day
       for (let i = 0; i < DAYS_OF_WEEK.length; i++) {
         const day = DAYS_OF_WEEK[i];
-        const response = await fetch('https://proj3cts.app.n8n.cloud/webhook-test/generate-recipes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+        
+        // Use Supabase Edge Function as proxy instead of direct n8n call
+        const { data, error } = await supabase.functions.invoke('proxy-generate-recipes', {
+          body: { 
             preferences: `Recipe for ${day}`,
             userProfile: userProfile 
-          })
+          }
         });
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch recipe for ${day}`);
+        if (error) {
+          throw new Error(`Failed to fetch recipe for ${day}: ${error.message}`);
         }
 
-        const recipeData = await response.json();
         weeklyRecipes.push({
           day,
-          recipe_name: recipeData.recipe_name,
-          ingredients: recipeData.ingredients,
-          instructions: recipeData.instructions,
-          image: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=300&h=200&fit=crop' // Placeholder food image
+          recipe_name: data.recipe_name,
+          ingredients: data.ingredients,
+          instructions: data.instructions,
+          image: `https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=300&h=200&fit=crop&seed=${i}` // Unique image per recipe
         });
       }
       
