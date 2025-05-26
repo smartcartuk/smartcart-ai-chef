@@ -9,6 +9,7 @@ interface Recipe {
   recipe_name: string;
   ingredients: string[];
   instructions: string;
+  estimated_price?: number;
   image?: string;
 }
 
@@ -18,6 +19,7 @@ interface RecipeCardProps {
   isExpanded: boolean;
   onToggleDetails: (index: number) => void;
   onAddToPlan: (recipe: Recipe) => void;
+  estimatedPrice?: number;
 }
 
 export const RecipeCard: React.FC<RecipeCardProps> = ({
@@ -25,7 +27,8 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   index,
   isExpanded,
   onToggleDetails,
-  onAddToPlan
+  onAddToPlan,
+  estimatedPrice
 }) => {
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -39,9 +42,16 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
       
       <div className="p-4 space-y-3">
         <div>
-          <Badge variant="outline" className="mb-2">
-            {recipe.day}
-          </Badge>
+          <div className="flex items-center justify-between mb-2">
+            <Badge variant="outline">
+              {recipe.day}
+            </Badge>
+            {estimatedPrice !== undefined && (
+              <Badge variant="secondary" className="bg-green-100 text-green-700">
+                £{estimatedPrice.toFixed(2)}
+              </Badge>
+            )}
+          </div>
           <h3 className="font-bold text-lg">{recipe.recipe_name}</h3>
         </div>
 
