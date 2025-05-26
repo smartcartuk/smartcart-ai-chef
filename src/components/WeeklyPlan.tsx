@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Loader2 } from 'lucide-react';
 import { WebhookResponse } from '@/utils/webhookService';
 
 interface WeeklyPlanProps {
@@ -9,196 +11,216 @@ interface WeeklyPlanProps {
   generatedData?: WebhookResponse | null;
 }
 
-const mockMeals = [
-  {
-    id: 1,
-    day: 'Monday',
-    name: 'Mediterranean Salmon Bowl',
-    image: '🐟',
-    cookTime: '25 min',
-    difficulty: 'Easy',
-    calories: 420,
-    cost: 8.50,
-    tags: ['Healthy', 'High Protein', 'Omega-3'],
-    description: 'Fresh salmon with quinoa, cherry tomatoes, cucumber, and tahini dressing'
-  },
-  {
-    id: 2,
-    day: 'Tuesday', 
-    name: 'Thai Green Curry',
-    image: '🍛',
-    cookTime: '30 min',
-    difficulty: 'Medium',
-    calories: 380,
-    cost: 6.75,
-    tags: ['Vegan', 'Spicy', 'Coconut'],
-    description: 'Aromatic curry with seasonal vegetables and jasmine rice'
-  },
-  {
-    id: 3,
-    day: 'Wednesday',
-    name: 'Classic Beef Lasagne', 
-    image: '🍝',
-    cookTime: '45 min',
-    difficulty: 'Medium',
-    calories: 520,
-    cost: 9.20,
-    tags: ['Comfort Food', 'Family Favorite'],
-    description: 'Layers of pasta, rich meat sauce, and creamy bechamel'
-  },
-  {
-    id: 4,
-    day: 'Thursday',
-    name: 'Lemon Herb Chicken',
-    image: '🍗',
-    cookTime: '35 min', 
-    difficulty: 'Easy',
-    calories: 340,
-    cost: 7.30,
-    tags: ['Gluten-Free', 'Low Carb'],
-    description: 'Roasted chicken breast with roasted vegetables and herbs'
-  },
-  {
-    id: 5,
-    day: 'Friday',
-    name: 'Mushroom Risotto',
-    image: '🍄',
-    cookTime: '40 min',
-    difficulty: 'Medium',
-    calories: 460,
-    cost: 5.90,
-    tags: ['Vegetarian', 'Creamy', 'Comfort'],
-    description: 'Creamy arborio rice with wild mushrooms and parmesan'
-  },
-  {
-    id: 6,
-    day: 'Saturday',
-    name: 'Fish & Chips',
-    image: '🍟',
-    cookTime: '25 min',
-    difficulty: 'Easy',
-    calories: 580,
-    cost: 8.80,
-    tags: ['Weekend Treat', 'British Classic'],
-    description: 'Beer-battered cod with triple-cooked chips and mushy peas'
-  },
-  {
-    id: 7,
-    day: 'Sunday',
-    name: 'Roast Beef Sunday Dinner',
-    image: '🥩',
-    cookTime: '90 min',
-    difficulty: 'Hard',
-    calories: 650,
-    cost: 12.40,
-    tags: ['Sunday Roast', 'Family Meal'],
-    description: 'Slow-roasted beef with Yorkshire pudding and all the trimmings'
-  }
-];
+interface Recipe {
+  day: string;
+  recipe_name: string;
+  ingredients: string[];
+  instructions: string;
+  image?: string;
+}
+
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedData }) => {
-  const [selectedMeal, setSelectedMeal] = useState<number | null>(null);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
+  const [expandedRecipes, setExpandedRecipes] = useState<Set<number>>(new Set());
+  const [isComparingPrices, setIsComparingPrices] = useState(false);
+  const [priceComparisonResult, setPriceComparisonResult] = useState<any>(null);
 
-  // Use generated meals if available, otherwise use mock data
-  const meals = generatedData?.meals || mockMeals;
-  
-  const totalCost = meals.reduce((sum, meal) => sum + meal.cost, 0);
-  const avgCalories = Math.round(meals.reduce((sum, meal) => sum + meal.calories, 0) / meals.length);
+  const fetchWeeklyRecipes = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const weeklyRecipes: Recipe[] = [];
+      
+      // Fetch 7 recipes, one for each day
+      for (let i = 0; i < DAYS_OF_WEEK.length; i++) {
+        const day = DAYS_OF_WEEK[i];
+        const response = await fetch('https://proj3cts.app.n8n.cloud/webhook-test/generate-recipes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            preferences: `Recipe for ${day}`,
+            userProfile: userProfile 
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch recipe for ${day}`);
+        }
+
+        const recipeData = await response.json();
+        weeklyRecipes.push({
+          day,
+          recipe_name: recipeData.recipe_name,
+          ingredients: recipeData.ingredients,
+          instructions: recipeData.instructions,
+          image: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=300&h=200&fit=crop' // Placeholder food image
+        });
+      }
+      
+      setRecipes(weeklyRecipes);
+    } catch (err) {
+      console.error('Error fetching weekly recipes:', err);
+      setError('Failed to fetch weekly recipes. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWeeklyRecipes();
+  }, [userProfile]);
+
+  const toggleRecipeDetails = (index: number) => {
+    const newExpanded = new Set(expandedRecipes);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedRecipes(newExpanded);
+  };
+
+  const addToPlan = (recipe: Recipe) => {
+    setSelectedIngredients(prev => [...prev, ...recipe.ingredients]);
+    console.log(`${recipe.recipe_name} added to plan`);
+  };
+
+  const compareSelectedPrices = async () => {
+    if (selectedIngredients.length === 0) {
+      setError('No ingredients selected. Please add some recipes to your plan first.');
+      return;
+    }
+
+    setIsComparingPrices(true);
+    setError(null);
+
+    try {
+      const response = await fetch('https://proj3cts.app.n8n.cloud/webhook-test/compare-prices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingredients: selectedIngredients })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to compare prices');
+      }
+
+      const priceData = await response.json();
+      setPriceComparisonResult(priceData);
+      console.log('Price comparison result:', priceData);
+    } catch (err) {
+      console.error('Error comparing prices:', err);
+      setError('Failed to compare prices. Please try again.');
+    } finally {
+      setIsComparingPrices(false);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIngredients([]);
+    setPriceComparisonResult(null);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+        <span className="ml-3 text-lg">Generating your weekly meal plan...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Plan Overview */}
+      {/* Header */}
       <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">This Week's Meal Plan</h2>
+            <h2 className="text-2xl font-bold text-gray-900">AI-Generated Weekly Meal Plan</h2>
             <p className="text-gray-600 mt-1">
-              Personalized for {userProfile?.householdSize || 2} people • {userProfile?.dietaryPreferences?.join(', ') || 'Balanced diet'}
+              Personalized recipes for {userProfile?.householdSize || 2} people
             </p>
-            {generatedData && (
-              <Badge variant="secondary" className="mt-2 bg-purple-100 text-purple-700">
-                🤖 AI Optimized
-              </Badge>
-            )}
           </div>
-          <div className="flex items-center space-x-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-emerald-600">£{totalCost.toFixed(2)}</div>
-              <div className="text-sm text-gray-600">Total Cost</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{avgCalories}</div>
-              <div className="text-sm text-gray-600">Avg Calories</div>
-            </div>
+          <div className="flex items-center space-x-4">
+            <Button onClick={fetchWeeklyRecipes} variant="outline">
+              Regenerate Plan
+            </Button>
+            {selectedIngredients.length > 0 && (
+              <Button onClick={clearSelection} variant="outline">
+                Clear Selection ({selectedIngredients.length} ingredients)
+              </Button>
+            )}
           </div>
         </div>
       </Card>
 
-      {/* Meal Cards Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {meals.map((meal) => (
-          <Card 
-            key={meal.id}
-            className={`p-6 cursor-pointer transition-all duration-200 hover:shadow-lg ${
-              selectedMeal === meal.id ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'hover:shadow-md'
-            }`}
-            onClick={() => setSelectedMeal(selectedMeal === meal.id ? null : meal.id)}
-          >
-            <div className="space-y-4">
-              {/* Meal Header */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="text-4xl">{meal.image}</div>
+      {error && (
+        <Card className="p-4 bg-red-50 border-red-200">
+          <p className="text-red-700">⚠️ {error}</p>
+        </Card>
+      )}
+
+      {/* Recipe Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {recipes.map((recipe, index) => (
+          <Card key={index} className="overflow-hidden hover:shadow-lg transition-shadow">
+            <div className="aspect-video overflow-hidden">
+              <img 
+                src={recipe.image} 
+                alt={recipe.recipe_name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            
+            <div className="p-4 space-y-3">
+              <div>
+                <Badge variant="outline" className="mb-2">
+                  {recipe.day}
+                </Badge>
+                <h3 className="font-bold text-lg">{recipe.recipe_name}</h3>
+              </div>
+
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={() => toggleRecipeDetails(index)}
+                  variant="outline" 
+                  size="sm"
+                  className="flex-1"
+                >
+                  {expandedRecipes.has(index) ? 'Hide Details' : 'View Recipe'}
+                </Button>
+                <Button 
+                  onClick={() => addToPlan(recipe)}
+                  size="sm"
+                  className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600"
+                >
+                  Add to Plan
+                </Button>
+              </div>
+
+              {expandedRecipes.has(index) && (
+                <div className="pt-3 border-t border-gray-100 space-y-3">
                   <div>
-                    <Badge variant="outline" className="text-xs mb-2">
-                      {meal.day}
-                    </Badge>
-                    <h3 className="font-bold text-lg text-gray-900">{meal.name}</h3>
-                    <p className="text-sm text-gray-600">{meal.description}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-emerald-600">£{meal.cost.toFixed(2)}</div>
-                  <div className="text-xs text-gray-500">{meal.calories} cal</div>
-                </div>
-              </div>
-
-              {/* Meal Details */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <span>⏱️ {meal.cookTime}</span>
-                  <span>👨‍🍳 {meal.difficulty}</span>
-                </div>
-                <div className="flex space-x-1">
-                  {meal.tags.slice(0, 2).map((tag) => (
-                    <Badge key={tag} variant="secondary" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* Expanded Details */}
-              {selectedMeal === meal.id && (
-                <div className="pt-4 border-t border-gray-100 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button variant="outline" size="sm" className="w-full">
-                      View Recipe
-                    </Button>
-                    <Button size="sm" className="w-full bg-gradient-to-r from-emerald-500 to-blue-600">
-                      Swap Meal
-                    </Button>
+                    <h4 className="font-semibold text-sm mb-2">Ingredients:</h4>
+                    <ul className="text-sm space-y-1">
+                      {recipe.ingredients.map((ingredient, idx) => (
+                        <li key={idx} className="flex items-center">
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2"></div>
+                          {ingredient}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                   
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm">All Tags:</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {meal.tags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">Instructions:</h4>
+                    <p className="text-sm text-gray-600">{recipe.instructions}</p>
                   </div>
                 </div>
               )}
@@ -207,27 +229,48 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedDa
         ))}
       </div>
 
-      {/* Weekly Summary */}
-      <Card className="p-6 bg-white border border-gray-200">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-          <div>
-            <h3 className="font-semibold text-lg">Weekly Summary</h3>
-            <p className="text-gray-600 text-sm">
-              {generatedData ? 'AI-optimized based on your preferences and store discounts' : 'Based on your preferences and connected store discounts'}
-            </p>
-          </div>
-          
-          <div className="flex items-center space-x-6">
-            <div className="text-center">
-              <div className="text-sm text-gray-600">vs. Last Week</div>
-              <div className="text-lg font-bold text-green-600">-£4.20</div>
+      {/* Price Comparison Section */}
+      {selectedIngredients.length > 0 && (
+        <Card className="p-6 bg-yellow-50 border-yellow-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+            <div>
+              <h3 className="font-semibold text-lg">Ready to Compare Prices?</h3>
+              <p className="text-gray-600">
+                You have {selectedIngredients.length} ingredients selected from your meal plan
+              </p>
             </div>
-            <Button className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700">
-              Generate Shopping List
+            <Button 
+              onClick={compareSelectedPrices}
+              disabled={isComparingPrices}
+              className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
+            >
+              {isComparingPrices ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Comparing...
+                </>
+              ) : (
+                'Compare Prices for Selected Meals'
+              )}
             </Button>
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
+
+      {/* Price Comparison Results */}
+      {priceComparisonResult && (
+        <Card className="p-6 bg-green-50 border-green-200">
+          <h3 className="font-semibold text-lg mb-4">Price Comparison Results</h3>
+          <div className="bg-white p-4 rounded-lg">
+            <pre className="text-sm overflow-auto">
+              {JSON.stringify(priceComparisonResult, null, 2)}
+            </pre>
+          </div>
+          <p className="text-sm text-gray-600 mt-2">
+            Detailed price comparison results displayed above. Integration with store data coming soon!
+          </p>
+        </Card>
+      )}
     </div>
   );
 };
