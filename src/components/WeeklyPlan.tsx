@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
+import { RecipeCard } from '@/components/RecipeCard';
+import { WeeklyPlanHeader } from '@/components/WeeklyPlanHeader';
+import { PriceComparisonSection } from '@/components/PriceComparisonSection';
 import { WebhookResponse } from '@/utils/webhookService';
 
 interface WeeklyPlanProps {
@@ -138,27 +139,12 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedDa
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">AI-Generated Weekly Meal Plan</h2>
-            <p className="text-gray-600 mt-1">
-              Personalized recipes for {userProfile?.householdSize || 2} people
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Button onClick={fetchWeeklyRecipes} variant="outline">
-              Regenerate Plan
-            </Button>
-            {selectedIngredients.length > 0 && (
-              <Button onClick={clearSelection} variant="outline">
-                Clear Selection ({selectedIngredients.length} ingredients)
-              </Button>
-            )}
-          </div>
-        </div>
-      </Card>
+      <WeeklyPlanHeader
+        userProfile={userProfile}
+        selectedIngredientsCount={selectedIngredients.length}
+        onRegeneratePlan={fetchWeeklyRecipes}
+        onClearSelection={clearSelection}
+      />
 
       {error && (
         <Card className="p-4 bg-red-50 border-red-200">
@@ -169,108 +155,23 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedDa
       {/* Recipe Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {recipes.map((recipe, index) => (
-          <Card key={index} className="overflow-hidden hover:shadow-lg transition-shadow">
-            <div className="aspect-video overflow-hidden">
-              <img 
-                src={recipe.image} 
-                alt={recipe.recipe_name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            
-            <div className="p-4 space-y-3">
-              <div>
-                <Badge variant="outline" className="mb-2">
-                  {recipe.day}
-                </Badge>
-                <h3 className="font-bold text-lg">{recipe.recipe_name}</h3>
-              </div>
-
-              <div className="flex space-x-2">
-                <Button 
-                  onClick={() => toggleRecipeDetails(index)}
-                  variant="outline" 
-                  size="sm"
-                  className="flex-1"
-                >
-                  {expandedRecipes.has(index) ? 'Hide Details' : 'View Recipe'}
-                </Button>
-                <Button 
-                  onClick={() => addToPlan(recipe)}
-                  size="sm"
-                  className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600"
-                >
-                  Add to Plan
-                </Button>
-              </div>
-
-              {expandedRecipes.has(index) && (
-                <div className="pt-3 border-t border-gray-100 space-y-3">
-                  <div>
-                    <h4 className="font-semibold text-sm mb-2">Ingredients:</h4>
-                    <ul className="text-sm space-y-1">
-                      {recipe.ingredients.map((ingredient, idx) => (
-                        <li key={idx} className="flex items-center">
-                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2"></div>
-                          {ingredient}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-semibold text-sm mb-2">Instructions:</h4>
-                    <p className="text-sm text-gray-600">{recipe.instructions}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
+          <RecipeCard
+            key={index}
+            recipe={recipe}
+            index={index}
+            isExpanded={expandedRecipes.has(index)}
+            onToggleDetails={toggleRecipeDetails}
+            onAddToPlan={addToPlan}
+          />
         ))}
       </div>
 
-      {/* Price Comparison Section */}
-      {selectedIngredients.length > 0 && (
-        <Card className="p-6 bg-yellow-50 border-yellow-200">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-            <div>
-              <h3 className="font-semibold text-lg">Ready to Compare Prices?</h3>
-              <p className="text-gray-600">
-                You have {selectedIngredients.length} ingredients selected from your meal plan
-              </p>
-            </div>
-            <Button 
-              onClick={compareSelectedPrices}
-              disabled={isComparingPrices}
-              className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
-            >
-              {isComparingPrices ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Comparing...
-                </>
-              ) : (
-                'Compare Prices for Selected Meals'
-              )}
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Price Comparison Results */}
-      {priceComparisonResult && (
-        <Card className="p-6 bg-green-50 border-green-200">
-          <h3 className="font-semibold text-lg mb-4">Price Comparison Results</h3>
-          <div className="bg-white p-4 rounded-lg">
-            <pre className="text-sm overflow-auto">
-              {JSON.stringify(priceComparisonResult, null, 2)}
-            </pre>
-          </div>
-          <p className="text-sm text-gray-600 mt-2">
-            Detailed price comparison results displayed above. Integration with store data coming soon!
-          </p>
-        </Card>
-      )}
+      <PriceComparisonSection
+        selectedIngredientsCount={selectedIngredients.length}
+        isComparingPrices={isComparingPrices}
+        priceComparisonResult={priceComparisonResult}
+        onCompareSelectedPrices={compareSelectedPrices}
+      />
     </div>
   );
 };
