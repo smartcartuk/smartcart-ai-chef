@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,12 +40,67 @@ interface ComparisonResult {
   };
 }
 
+interface Recipe {
+  recipe_name: string;
+  ingredients: string[];
+  instructions: string;
+}
+
 export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
   const [priceData, setPriceData] = useState<PriceItem[]>([]);
   const [comparisonData, setComparisonData] = useState<ComparisonResult | null>(null);
+  const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ingredientInput, setIngredientInput] = useState("pasta, onion, chopped tomatoes");
+  const [recipePreference, setRecipePreference] = useState("");
+
+  const generateRecipe = async () => {
+    if (!recipePreference.trim()) {
+      setError("Please enter what you'd like to cook");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setRecipe(null);
+    
+    try {
+      const response = await fetch("https://proj3cts.app.n8n.cloud/webhook-test/generate-recipes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          preferences: recipePreference,
+          userProfile: userProfile 
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Recipe generated:", data);
+      
+      setRecipe(data);
+      // Set ingredients for price comparison
+      setIngredientInput(data.ingredients.join(", "));
+    } catch (err) {
+      console.error("Error generating recipe:", err);
+      setError("Failed to generate recipe. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startComparison = async () => {
+    if (!recipe?.ingredients) {
+      setError("No recipe ingredients available for comparison");
+      return;
+    }
+
+    await getPriceComparison();
+  };
 
   const fetchPrices = async () => {
     const ingredients = ingredientInput.split(",").map(x => x.trim()).filter(x => x.length > 0);
@@ -210,13 +264,73 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
     <Card className="p-6">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Meal Plan Prices</h3>
+          <h3 className="text-lg font-semibold">Recipe Generator & Price Comparison</h3>
         </div>
 
+        {/* Recipe Generation Section */}
+        <div className="space-y-4 p-4 border border-gray-200 rounded-lg bg-blue-50">
+          <div>
+            <Label htmlFor="recipe-preference" className="text-sm font-medium">
+              What would you like to cook?
+            </Label>
+            <Input
+              id="recipe-preference"
+              type="text"
+              placeholder="e.g. Vegetarian pasta, Italian dinner, quick breakfast"
+              value={recipePreference}
+              onChange={(e) => setRecipePreference(e.target.value)}
+              className="mt-2"
+            />
+          </div>
+          <Button 
+            onClick={generateRecipe} 
+            disabled={isLoading}
+            className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              "Generate Recipe"
+            )}
+          </Button>
+        </div>
+
+        {/* Generated Recipe Display */}
+        {recipe && (
+          <div className="p-4 border border-green-200 rounded-lg bg-green-50">
+            <h4 className="text-lg font-semibold text-green-800 mb-3">{recipe.recipe_name}</h4>
+            <div className="space-y-3">
+              <div>
+                <strong className="text-green-700">Ingredients:</strong>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  {recipe.ingredients.map((ingredient, index) => (
+                    <li key={index} className="text-green-700">{ingredient}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <strong className="text-green-700">Instructions:</strong>
+                <p className="text-green-700 mt-1">{recipe.instructions}</p>
+              </div>
+              <Button 
+                onClick={startComparison} 
+                disabled={isLoading}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Compare Prices for This Recipe
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Ingredient Input Section */}
         <div className="space-y-4 p-4 border border-gray-200 rounded-lg">
           <div>
             <Label htmlFor="ingredient-input" className="text-sm font-medium">
-              Enter your ingredients (comma separated):
+              Or enter your ingredients manually (comma separated):
             </Label>
             <Input
               id="ingredient-input"
@@ -300,7 +414,7 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
             <div className="flex items-center justify-center h-32 text-gray-500">
               <div className="text-center">
                 <p>No price data available</p>
-                <p className="text-sm mt-1">Enter ingredients above and click "Get Prices" or "Compare Stores"</p>
+                <p className="text-sm mt-1">Generate a recipe above or enter ingredients manually and click "Get Prices" or "Compare Stores"</p>
               </div>
             </div>
           )}
