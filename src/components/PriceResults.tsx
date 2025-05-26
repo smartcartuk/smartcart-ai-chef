@@ -18,8 +18,32 @@ interface PriceItem {
   store?: string;
 }
 
+interface ComparisonResult {
+  best_single_store: {
+    store: string;
+    total_cost: number;
+    items: Array<{
+      ingredient: string;
+      price: number;
+      product_name: string;
+    }>;
+  };
+  best_split: {
+    total_cost: number;
+    stores: Array<{
+      store: string;
+      items: Array<{
+        ingredient: string;
+        price: number;
+        product_name: string;
+      }>;
+    }>;
+  };
+}
+
 export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
   const [priceData, setPriceData] = useState<PriceItem[]>([]);
+  const [comparisonData, setComparisonData] = useState<ComparisonResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ingredientInput, setIngredientInput] = useState("pasta, onion, chopped tomatoes");
@@ -78,6 +102,110 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
     }
   };
 
+  const getPriceComparison = async () => {
+    const ingredients = ingredientInput.split(",").map(x => x.trim()).filter(x => x.length > 0);
+    
+    if (ingredients.length === 0) {
+      setError("Please enter at least one ingredient");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch("https://proj3cts.app.n8n.cloud/webhook-test/compare-prices", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ingredients: ingredients
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(result);
+
+      if (result && result[0]) {
+        setComparisonData(result[0]);
+      } else {
+        setError("No comparison data available");
+      }
+    } catch (err) {
+      console.error("Error fetching price comparison:", err);
+      setError(err instanceof Error ? err.message : "Could not fetch price comparison. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderComparisonResult = (bestSingleStore: ComparisonResult['best_single_store'], bestSplit: ComparisonResult['best_split']) => {
+    return (
+      <div className="space-y-6">
+        {/* Best Single Store */}
+        <Card className="p-4 bg-green-50 border-green-200">
+          <h4 className="font-semibold text-green-800 mb-3">🏪 Best Single Store Option</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">{bestSingleStore.store}</span>
+              <span className="text-lg font-bold text-green-600">£{bestSingleStore.total_cost.toFixed(2)}</span>
+            </div>
+            <ul className="text-sm space-y-1">
+              {bestSingleStore.items.map((item, index) => (
+                <li key={index} className="flex justify-between">
+                  <span>{item.ingredient} - {item.product_name}</span>
+                  <span>£{item.price.toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+
+        {/* Best Split Option */}
+        <Card className="p-4 bg-blue-50 border-blue-200">
+          <h4 className="font-semibold text-blue-800 mb-3">🛒 Best Split Shopping Option</h4>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">Total Cost (Split)</span>
+              <span className="text-lg font-bold text-blue-600">£{bestSplit.total_cost.toFixed(2)}</span>
+            </div>
+            {bestSplit.stores.map((store, storeIndex) => (
+              <div key={storeIndex} className="border-l-4 border-blue-300 pl-3">
+                <div className="font-medium text-blue-700">{store.store}</div>
+                <ul className="text-sm space-y-1 mt-1">
+                  {store.items.map((item, itemIndex) => (
+                    <li key={itemIndex} className="flex justify-between">
+                      <span>{item.ingredient} - {item.product_name}</span>
+                      <span>£{item.price.toFixed(2)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Savings Summary */}
+        {bestSingleStore.total_cost !== bestSplit.total_cost && (
+          <Card className="p-4 bg-yellow-50 border-yellow-200">
+            <h4 className="font-semibold text-yellow-800 mb-2">💰 Savings Summary</h4>
+            <p className="text-sm">
+              By shopping across multiple stores, you could save{' '}
+              <span className="font-bold text-green-600">
+                £{(bestSingleStore.total_cost - bestSplit.total_cost).toFixed(2)}
+              </span>
+            </p>
+          </Card>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Card className="p-6">
       <div className="space-y-4">
@@ -99,20 +227,37 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
               className="mt-2"
             />
           </div>
-          <Button 
-            onClick={fetchPrices} 
-            disabled={isLoading}
-            className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Loading prices, please wait...
-              </>
-            ) : (
-              "Get Prices"
-            )}
-          </Button>
+          <div className="flex space-x-2">
+            <Button 
+              onClick={fetchPrices} 
+              disabled={isLoading}
+              className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Get Prices"
+              )}
+            </Button>
+            <Button 
+              onClick={getPriceComparison} 
+              disabled={isLoading}
+              variant="outline"
+              className="border-purple-500 text-purple-600 hover:bg-purple-50"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Compare Stores"
+              )}
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -127,6 +272,8 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
               <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
               <span className="ml-2 text-gray-600">🔄 Loading prices, please wait...</span>
             </div>
+          ) : comparisonData ? (
+            renderComparisonResult(comparisonData.best_single_store, comparisonData.best_split)
           ) : priceData.length > 0 ? (
             <div>
               <strong className="block mb-3">Meal Plan Prices:</strong>
@@ -153,7 +300,7 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
             <div className="flex items-center justify-center h-32 text-gray-500">
               <div className="text-center">
                 <p>No price data available</p>
-                <p className="text-sm mt-1">Enter ingredients above and click "Get Prices" to fetch current prices</p>
+                <p className="text-sm mt-1">Enter ingredients above and click "Get Prices" or "Compare Stores"</p>
               </div>
             </div>
           )}
