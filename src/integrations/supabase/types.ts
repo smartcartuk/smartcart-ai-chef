@@ -9,7 +9,303 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      aldi_prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+        }
+        Relationships: []
+      }
+      amazon_prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+        }
+        Relationships: []
+      }
+      asda_prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+        }
+        Relationships: []
+      }
+      coop_prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+        }
+        Relationships: []
+      }
+      iceland_prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+        }
+        Relationships: []
+      }
+      lidl_prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+        }
+        Relationships: []
+      }
+      morrisons_prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+        }
+        Relationships: []
+      }
+      ocado_prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+        }
+        Relationships: []
+      }
+      sainsbury_prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+        }
+        Relationships: []
+      }
+      tesco_prices: {
+        Row: {
+          average_price: number
+          created_at: string
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string
+        }
+        Insert: {
+          average_price: number
+          created_at?: string
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string
+        }
+        Update: {
+          average_price?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string
+        }
+        Relationships: []
+      }
+      waitrose_prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

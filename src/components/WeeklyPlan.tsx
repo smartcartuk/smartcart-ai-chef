@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,11 @@ interface Recipe {
   image?: string;
 }
 
+interface IngredientPrice {
+  ingredient_name: string;
+  average_price: number;
+}
+
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedData }) => {
@@ -36,8 +42,8 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedDa
 
   const calculateEstimatedPrice = async (ingredients: string[]): Promise<number> => {
     try {
-      // Query the ingredient_prices table for cached prices
-      const { data: priceData, error } = await supabase
+      // Query the ingredient_prices table for cached prices using type assertion
+      const { data: priceData, error } = await (supabase as any)
         .from('ingredient_prices')
         .select('ingredient_name, average_price')
         .in('ingredient_name', ingredients);
@@ -49,7 +55,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedDa
 
       let totalPrice = 0;
       ingredients.forEach(ingredient => {
-        const priceInfo = priceData?.find(p => 
+        const priceInfo = (priceData as IngredientPrice[])?.find(p => 
           p.ingredient_name.toLowerCase().includes(ingredient.toLowerCase()) ||
           ingredient.toLowerCase().includes(p.ingredient_name.toLowerCase())
         );
