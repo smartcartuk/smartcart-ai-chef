@@ -11,9 +11,14 @@ import { WebhookResponse } from '@/utils/webhookService';
 interface WeeklyPlanProps {
   userProfile: any;
   generatedData?: WebhookResponse | null;
+  onRecipesChange?: (recipes: any[]) => void;
 }
 
-export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedData }) => {
+export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ 
+  userProfile, 
+  generatedData,
+  onRecipesChange 
+}) => {
   const {
     recipes,
     isLoading,
@@ -30,6 +35,13 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ userProfile, generatedDa
     compareSelectedPrices,
     clearSelection
   } = useWeeklyPlan(userProfile);
+
+  // Notify parent component when recipes change
+  React.useEffect(() => {
+    if (onRecipesChange && recipes.length > 0) {
+      onRecipesChange(recipes);
+    }
+  }, [recipes, onRecipesChange]);
 
   if (isLoading) {
     return <WeeklyPlanLoading />;

@@ -20,6 +20,12 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
   generatedData 
 }) => {
   const [activeTab, setActiveTab] = useState('plan');
+  const [recipes, setRecipes] = useState<any[]>([]);
+
+  // Handle recipes change from WeeklyPlan
+  const handleRecipesChange = (newRecipes: any[]) => {
+    setRecipes(newRecipes);
+  };
 
   // Calculate stats from generated data if available
   const totalCost = generatedData?.meals?.reduce((sum, meal) => sum + meal.cost, 0) || 46.95;
@@ -120,15 +126,27 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
           </TabsList>
 
           <TabsContent value="plan" className="space-y-6">
-            <WeeklyPlan userProfile={userProfile} generatedData={generatedData} />
+            <WeeklyPlan 
+              userProfile={userProfile} 
+              generatedData={generatedData}
+              onRecipesChange={handleRecipesChange}
+            />
           </TabsContent>
 
           <TabsContent value="shopping" className="space-y-6">
-            <ShoppingList userProfile={userProfile} generatedData={generatedData} />
+            <ShoppingList 
+              userProfile={userProfile} 
+              generatedData={generatedData}
+              recipes={recipes}
+            />
           </TabsContent>
 
           <TabsContent value="prices" className="space-y-6">
-            <PriceComparison userProfile={userProfile} generatedData={generatedData} />
+            <PriceComparison 
+              userProfile={userProfile} 
+              generatedData={generatedData}
+              recipes={recipes}
+            />
           </TabsContent>
 
           <TabsContent value="assistant" className="space-y-6">

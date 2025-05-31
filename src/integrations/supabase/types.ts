@@ -11,82 +11,94 @@ export type Database = {
     Tables: {
       aldi_prices: {
         Row: {
+          average_price: number | null
           created_at: string | null
           currency: string
           id: string
           ingredient_name: string
           last_updated: string | null
           price: number
+          source: string | null
         }
         Insert: {
+          average_price?: number | null
           created_at?: string | null
           currency?: string
           id?: string
           ingredient_name: string
           last_updated?: string | null
           price: number
+          source?: string | null
         }
         Update: {
+          average_price?: number | null
           created_at?: string | null
           currency?: string
           id?: string
           ingredient_name?: string
           last_updated?: string | null
           price?: number
+          source?: string | null
         }
         Relationships: []
       }
       amazon_prices: {
         Row: {
+          average_price: number | null
           created_at: string | null
           currency: string
           id: string
           ingredient_name: string
           last_updated: string | null
-          price: number
+          product_url: string | null
         }
         Insert: {
+          average_price?: number | null
           created_at?: string | null
           currency?: string
           id?: string
           ingredient_name: string
           last_updated?: string | null
-          price: number
+          product_url?: string | null
         }
         Update: {
+          average_price?: number | null
           created_at?: string | null
           currency?: string
           id?: string
           ingredient_name?: string
           last_updated?: string | null
-          price?: number
+          product_url?: string | null
         }
         Relationships: []
       }
       asda_prices: {
         Row: {
+          average_price: number | null
           created_at: string | null
           currency: string
           id: string
           ingredient_name: string
           last_updated: string | null
-          price: number
+          product_url: string | null
         }
         Insert: {
+          average_price?: number | null
           created_at?: string | null
           currency?: string
           id?: string
           ingredient_name: string
           last_updated?: string | null
-          price: number
+          product_url?: string | null
         }
         Update: {
+          average_price?: number | null
           created_at?: string | null
           currency?: string
           id?: string
           ingredient_name?: string
           last_updated?: string | null
-          price?: number
+          product_url?: string | null
         }
         Relationships: []
       }
@@ -227,28 +239,31 @@ export type Database = {
       }
       sainsbury_prices: {
         Row: {
+          average_price: number | null
           created_at: string | null
           currency: string
           id: string
           ingredient_name: string
           last_updated: string | null
-          price: number
+          product_url: string | null
         }
         Insert: {
+          average_price?: number | null
           created_at?: string | null
           currency?: string
           id?: string
           ingredient_name: string
           last_updated?: string | null
-          price: number
+          product_url?: string | null
         }
         Update: {
+          average_price?: number | null
           created_at?: string | null
           currency?: string
           id?: string
           ingredient_name?: string
           last_updated?: string | null
-          price?: number
+          product_url?: string | null
         }
         Relationships: []
       }
@@ -260,6 +275,7 @@ export type Database = {
           id: string
           ingredient_name: string
           last_updated: string
+          product_url: string | null
         }
         Insert: {
           average_price: number
@@ -268,6 +284,7 @@ export type Database = {
           id?: string
           ingredient_name: string
           last_updated?: string
+          product_url?: string | null
         }
         Update: {
           average_price?: number
@@ -276,6 +293,7 @@ export type Database = {
           id?: string
           ingredient_name?: string
           last_updated?: string
+          product_url?: string | null
         }
         Relationships: []
       }
