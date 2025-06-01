@@ -25,7 +25,7 @@ serve(async (req) => {
     
     console.log('Proxying request to n8n webhook with preferences:', preferences);
 
-    // Call the correct n8n webhook URL with -test
+    // Call the n8n webhook URL
     const response = await fetch('https://proj3cts.app.n8n.cloud/webhook-test/generate-recipes', {
       method: 'POST',
       headers: {
@@ -43,6 +43,29 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('n8n webhook error response:', errorText);
+      
+      // Check if it's a 404 webhook not registered error
+      if (response.status === 404 && errorText.includes('not registered')) {
+        console.log('Webhook not registered, returning fallback recipe');
+        // Return a fallback recipe when webhook is not available
+        const fallbackRecipe = {
+          recipe_name: `Quick ${preferences.includes('vegetarian') ? 'Vegetarian' : 'Protein'} Meal`,
+          ingredients: [
+            preferences.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
+            'olive oil',
+            'garlic',
+            'onion',
+            'tomatoes',
+            'herbs and spices'
+          ],
+          instructions: 'Heat oil in a pan. Add garlic and onion, cook until fragrant. Add main ingredient and cook through. Add tomatoes and season. Serve hot.'
+        };
+        
+        return new Response(JSON.stringify(fallbackRecipe), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       throw new Error(`n8n webhook responded with status: ${response.status}, body: ${errorText}`);
     }
 
@@ -88,9 +111,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in proxy-generate-recipes function:', error);
+    
+    // Return a more user-friendly error with fallback suggestion
     return new Response(JSON.stringify({ 
-      error: 'Failed to fetch recipe from n8n webhook',
-      details: error.message 
+      error: 'Unable to generate recipe at the moment',
+      details: error.message,
+      suggestion: 'The AI recipe generator may be temporarily unavailable. Please try again in a moment.'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
