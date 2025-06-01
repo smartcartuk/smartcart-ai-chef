@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -24,8 +25,8 @@ serve(async (req) => {
     
     console.log('Proxying request to n8n webhook with preferences:', preferences);
 
-    // Call the test n8n webhook URL
-    const response = await fetch('https://proj3cts.app.n8n.cloud/webhook-test/generate-recipes', {
+    // Call the live n8n webhook URL
+    const response = await fetch('https://proj3cts.app.n8n.cloud/webhook/generate-recipes', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
