@@ -23,103 +23,70 @@ serve(async (req) => {
   try {
     const { preferences, userProfile } = await req.json();
     
-    console.log('Proxying request to n8n webhook with user profile:', userProfile);
+    console.log('Sending request to Operator endpoint with user profile:', userProfile);
 
-    // Build the structured prompt with user profile data
+    // Build the preferences string with user profile data
     const dietaryPreferences = userProfile?.dietaryPreferences?.join(', ') || 'No specific preferences';
     const allergies = userProfile?.allergies?.join(', ') || 'None';
     const householdSize = userProfile?.householdSize || 2;
     const weeklyBudget = userProfile?.weeklyBudget || 50;
 
-    const mealPlanPrompt = `You are a smart meal planner for a UK family grocery app. 
+    const preferencesString = `dietary preferences: ${dietaryPreferences}, avoid: ${allergies}, serves ${householdSize} people, budget-friendly (weekly budget: £${weeklyBudget}) - Recipe for Monday`;
 
-Your task is to generate a **7-day meal plan** as a JSON object, based on the following user profile:
-
-- Dietary preferences: ${dietaryPreferences}
-- Allergies: ${allergies}
-- Household size: ${householdSize}
-- Weekly budget: £${weeklyBudget}
-- Please avoid any ingredients the user is allergic to.
-- Each recipe should serve ${householdSize} people and be budget-friendly.
-
-**Output format:**
-Return a JSON object with this structure:
-{
-  "meals": [
-    {
-      "day": "Monday",
-      "recipe_name": "Sample Recipe",
-      "ingredients": ["ingredient1", "ingredient2", ...],
-      "instructions": "Step by step cooking instructions."
-    },
-    // repeat for all 7 days (Tuesday ... Sunday)
-  ]
-}
-
-Do **not** include any explanations—output the JSON only.
-
-User profile for this week:
-${JSON.stringify(userProfile, null, 2)}`;
-
-    // Call the test n8n webhook URL
-    const response = await fetch('https://proj3cts.app.n8n.cloud/webhook-test/generate-recipes', {
+    // Call the Operator endpoint
+    const response = await fetch('http://localhost:3000/api/meal-plan', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
-        prompt: mealPlanPrompt,
+        preferences: preferencesString,
         userProfile: userProfile || {}
       }),
     });
 
-    console.log('n8n webhook response status:', response.status);
-    console.log('n8n webhook response headers:', Object.fromEntries(response.headers.entries()));
+    console.log('Operator endpoint response status:', response.status);
+    console.log('Operator endpoint response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('n8n webhook error response:', errorText);
+      console.error('Operator endpoint error response:', errorText);
       
-      // Check if it's a 404 webhook not registered error
-      if (response.status === 404 && errorText.includes('not registered')) {
-        console.log('Webhook not registered, returning fallback recipe');
-        // Return a fallback recipe when webhook is not available
-        const fallbackRecipe = {
-          recipe_name: `Quick ${dietaryPreferences.includes('vegetarian') ? 'Vegetarian' : 'Protein'} Meal`,
-          ingredients: [
-            dietaryPreferences.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
-            'olive oil',
-            'garlic',
-            'onion',
-            'tomatoes',
-            'herbs and spices'
-          ],
-          instructions: 'Heat oil in a pan. Add garlic and onion, cook until fragrant. Add main ingredient and cook through. Add tomatoes and season. Serve hot.'
-        };
-        
-        return new Response(JSON.stringify(fallbackRecipe), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      // Return a fallback recipe when endpoint is not available
+      console.log('Operator endpoint not available, returning fallback recipe');
+      const fallbackRecipe = {
+        recipe_name: `Quick ${dietaryPreferences.includes('vegetarian') ? 'Vegetarian' : 'Protein'} Meal`,
+        ingredients: [
+          dietaryPreferences.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
+          'olive oil',
+          'garlic',
+          'onion',
+          'tomatoes',
+          'herbs and spices'
+        ],
+        instructions: 'Heat oil in a pan. Add garlic and onion, cook until fragrant. Add main ingredient and cook through. Add tomatoes and season. Serve hot.'
+      };
       
-      throw new Error(`n8n webhook responded with status: ${response.status}, body: ${errorText}`);
+      return new Response(JSON.stringify(fallbackRecipe), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const responseText = await response.text();
-    console.log('n8n webhook raw response:', responseText);
+    console.log('Operator endpoint raw response:', responseText);
 
     let data;
     try {
       data = JSON.parse(responseText);
     } catch (parseError) {
-      console.error('Failed to parse n8n response as JSON:', parseError);
+      console.error('Failed to parse Operator response as JSON:', parseError);
       console.error('Raw response was:', responseText);
-      throw new Error('Invalid JSON response from n8n webhook');
+      throw new Error('Invalid JSON response from Operator endpoint');
     }
 
-    console.log('n8n webhook parsed response:', data);
+    console.log('Operator endpoint parsed response:', data);
 
-    // Handle different response formats from n8n
+    // Handle the response format from Operator
     let recipeData;
     if (Array.isArray(data) && data.length > 0) {
       // If response is an array, take the first item
@@ -136,7 +103,10 @@ ${JSON.stringify(userProfile, null, 2)}`;
     const result = {
       recipe_name: recipeData.recipe_name || recipeData.name || 'Generated Recipe',
       ingredients: recipeData.ingredients || [],
-      instructions: recipeData.instructions || 'No instructions provided'
+      instructions: recipeData.instructions || 'No instructions provided',
+      estimated_cost: recipeData.estimated_cost || 0,
+      description: recipeData.description || '',
+      picture_url: recipeData.picture_url || ''
     };
 
     console.log('Final processed recipe data:', result);
@@ -152,7 +122,7 @@ ${JSON.stringify(userProfile, null, 2)}`;
     return new Response(JSON.stringify({ 
       error: 'Unable to generate recipe at the moment',
       details: error.message,
-      suggestion: 'The AI recipe generator may be temporarily unavailable. Please try again in a moment.'
+      suggestion: 'The Operator endpoint may be temporarily unavailable. Please try again in a moment.'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
