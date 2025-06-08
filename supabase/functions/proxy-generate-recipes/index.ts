@@ -34,7 +34,7 @@ serve(async (req) => {
     const preferencesString = `dietary preferences: ${dietaryPreferences}, avoid: ${allergies}, serves ${householdSize} people, budget-friendly (weekly budget: £${weeklyBudget}) - Recipe for Monday`;
 
     // Call the Operator endpoint
-    const response = await fetch('http://localhost:3000/api/meal-plan', {
+    const response = await fetch('https://smartcart-operator.vercel.app/api/meal-plan', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -37,10 +37,10 @@ export const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
             className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-lg px-8 py-6 h-auto"
             onClick={onGetStarted}
           >
-            Start Free Trial →
+            Get Started →
           </Button>
           <Button variant="outline" size="lg" className="text-lg px-8 py-6 h-auto">
-            Watch Demo
+            Sign In
           </Button>
         </div>
 
