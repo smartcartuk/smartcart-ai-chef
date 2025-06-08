@@ -1,5 +1,4 @@
 
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -24,7 +23,43 @@ serve(async (req) => {
   try {
     const { preferences, userProfile } = await req.json();
     
-    console.log('Proxying request to n8n webhook with preferences:', preferences);
+    console.log('Proxying request to n8n webhook with user profile:', userProfile);
+
+    // Build the structured prompt with user profile data
+    const dietaryPreferences = userProfile?.dietaryPreferences?.join(', ') || 'No specific preferences';
+    const allergies = userProfile?.allergies?.join(', ') || 'None';
+    const householdSize = userProfile?.householdSize || 2;
+    const weeklyBudget = userProfile?.weeklyBudget || 50;
+
+    const mealPlanPrompt = `You are a smart meal planner for a UK family grocery app. 
+
+Your task is to generate a **7-day meal plan** as a JSON object, based on the following user profile:
+
+- Dietary preferences: ${dietaryPreferences}
+- Allergies: ${allergies}
+- Household size: ${householdSize}
+- Weekly budget: £${weeklyBudget}
+- Please avoid any ingredients the user is allergic to.
+- Each recipe should serve ${householdSize} people and be budget-friendly.
+
+**Output format:**
+Return a JSON object with this structure:
+{
+  "meals": [
+    {
+      "day": "Monday",
+      "recipe_name": "Sample Recipe",
+      "ingredients": ["ingredient1", "ingredient2", ...],
+      "instructions": "Step by step cooking instructions."
+    },
+    // repeat for all 7 days (Tuesday ... Sunday)
+  ]
+}
+
+Do **not** include any explanations—output the JSON only.
+
+User profile for this week:
+${JSON.stringify(userProfile, null, 2)}`;
 
     // Call the test n8n webhook URL
     const response = await fetch('https://proj3cts.app.n8n.cloud/webhook-test/generate-recipes', {
@@ -33,7 +68,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
-        preferences: preferences || 'healthy meal',
+        prompt: mealPlanPrompt,
         userProfile: userProfile || {}
       }),
     });
@@ -50,9 +85,9 @@ serve(async (req) => {
         console.log('Webhook not registered, returning fallback recipe');
         // Return a fallback recipe when webhook is not available
         const fallbackRecipe = {
-          recipe_name: `Quick ${preferences.includes('vegetarian') ? 'Vegetarian' : 'Protein'} Meal`,
+          recipe_name: `Quick ${dietaryPreferences.includes('vegetarian') ? 'Vegetarian' : 'Protein'} Meal`,
           ingredients: [
-            preferences.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
+            dietaryPreferences.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
             'olive oil',
             'garlic',
             'onion',
@@ -124,4 +159,3 @@ serve(async (req) => {
     });
   }
 });
-
