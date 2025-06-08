@@ -31,7 +31,17 @@ serve(async (req) => {
     const householdSize = userProfile?.householdSize || 2;
     const weeklyBudget = userProfile?.weeklyBudget || 50;
 
-    const preferencesString = `dietary preferences: ${dietaryPreferences}, avoid: ${allergies}, serves ${householdSize} people, budget-friendly (weekly budget: £${weeklyBudget}) - Recipe for Monday`;
+    // Check if this is a request for a full weekly plan or a single recipe
+    const isWeeklyPlanRequest = !preferences.includes('Recipe for');
+    
+    let preferencesString;
+    if (isWeeklyPlanRequest) {
+      // Request for full weekly plan (7 meals)
+      preferencesString = `dietary preferences: ${dietaryPreferences}, avoid: ${allergies}, serves ${householdSize} people, budget-friendly (weekly budget: £${weeklyBudget}) - Generate 7 meals for the week`;
+    } else {
+      // Request for single recipe (specific day)
+      preferencesString = `dietary preferences: ${dietaryPreferences}, avoid: ${allergies}, serves ${householdSize} people, budget-friendly (weekly budget: £${weeklyBudget}) - ${preferences.split(' - ')[1] || 'Recipe for Monday'}`;
+    }
 
     // Call the Operator endpoint
     const response = await fetch('https://smartcart-operator.vercel.app/api/meal-plan', {
@@ -53,23 +63,49 @@ serve(async (req) => {
       console.error('Operator endpoint error response:', errorText);
       
       // Return a fallback recipe when endpoint is not available
-      console.log('Operator endpoint not available, returning fallback recipe');
-      const fallbackRecipe = {
-        recipe_name: `Quick ${dietaryPreferences.includes('vegetarian') ? 'Vegetarian' : 'Protein'} Meal`,
-        ingredients: [
-          dietaryPreferences.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
-          'olive oil',
-          'garlic',
-          'onion',
-          'tomatoes',
-          'herbs and spices'
-        ],
-        instructions: 'Heat oil in a pan. Add garlic and onion, cook until fragrant. Add main ingredient and cook through. Add tomatoes and season. Serve hot.'
-      };
+      console.log('Operator endpoint not available, returning fallback recipe(s)');
       
-      return new Response(JSON.stringify(fallbackRecipe), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      if (isWeeklyPlanRequest) {
+        // Return 7 fallback meals
+        const fallbackMeals = [
+          'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+        ].map(day => ({
+          day,
+          recipe_name: `${dietaryPreferences.includes('vegetarian') ? 'Vegetarian' : 'Protein'} ${day} Meal`,
+          ingredients: [
+            dietaryPreferences.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
+            'olive oil',
+            'garlic',
+            'onion',
+            'tomatoes',
+            'herbs and spices'
+          ],
+          instructions: 'Heat oil in a pan. Add garlic and onion, cook until fragrant. Add main ingredient and cook through. Add tomatoes and season. Serve hot.',
+          picture_url: 'https://placehold.co/400x300'
+        }));
+        
+        return new Response(JSON.stringify({ meals: fallbackMeals }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } else {
+        // Return single fallback recipe
+        const fallbackRecipe = {
+          recipe_name: `Quick ${dietaryPreferences.includes('vegetarian') ? 'Vegetarian' : 'Protein'} Meal`,
+          ingredients: [
+            dietaryPreferences.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
+            'olive oil',
+            'garlic',
+            'onion',
+            'tomatoes',
+            'herbs and spices'
+          ],
+          instructions: 'Heat oil in a pan. Add garlic and onion, cook until fragrant. Add main ingredient and cook through. Add tomatoes and season. Serve hot.'
+        };
+        
+        return new Response(JSON.stringify(fallbackRecipe), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     const responseText = await response.text();
@@ -86,20 +122,25 @@ serve(async (req) => {
 
     console.log('Operator endpoint parsed response:', data);
 
-    // Handle the response format from Operator
+    // If we got a meals array, return it as-is (for weekly plan requests)
+    if (data.meals && Array.isArray(data.meals)) {
+      console.log('Returning meals array with', data.meals.length, 'meals');
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Handle single recipe response (for individual day requests)
     let recipeData;
     if (Array.isArray(data) && data.length > 0) {
       // If response is an array, take the first item
       recipeData = data[0];
-    } else if (data.meals && Array.isArray(data.meals) && data.meals.length > 0) {
-      // If response has meals array, take the first meal
-      recipeData = data.meals[0];
     } else {
       // Assume the data itself is the recipe
       recipeData = data;
     }
 
-    // Ensure we have the required fields
+    // Ensure we have the required fields for single recipe
     const result = {
       recipe_name: recipeData.recipe_name || recipeData.name || 'Generated Recipe',
       ingredients: recipeData.ingredients || [],

@@ -25,6 +25,92 @@ export const useWeeklyPlan = (userProfile: any) => {
 
   const { calculateEstimatedPrice } = usePriceCalculation();
 
+  const fetchWeeklyRecipes = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const preferences = buildPreferencesString(userProfile);
+      console.log('Generating weekly recipes with user preferences:', preferences);
+      
+      // Make a single API call to get all 7 meals
+      const { data, error } = await supabase.functions.invoke('proxy-generate-recipes', {
+        body: { 
+          preferences: preferences,
+          userProfile: userProfile 
+        }
+      });
+
+      if (error) {
+        throw new Error(`Failed to fetch weekly recipes: ${error.message}`);
+      }
+
+      console.log('Operator API response:', data);
+
+      let weeklyRecipes: Recipe[] = [];
+
+      // Check if we got a meals array from the Operator API
+      if (data.meals && Array.isArray(data.meals)) {
+        console.log('Processing meals array from Operator API:', data.meals.length, 'meals');
+        
+        // Map the meals array to our Recipe format
+        weeklyRecipes = await Promise.all(
+          data.meals.map(async (meal: any, index: number) => {
+            const estimatedPrice = await calculateEstimatedPrice(meal.ingredients || []);
+            
+            return {
+              day: meal.day || DAYS_OF_WEEK[index],
+              recipe_name: meal.recipe_name || meal.name || 'Generated Recipe',
+              ingredients: meal.ingredients || [],
+              instructions: meal.instructions || 'No instructions provided',
+              estimated_price: estimatedPrice,
+              image: meal.picture_url || generateRecipeImage(meal.day || DAYS_OF_WEEK[index])
+            };
+          })
+        );
+      } else {
+        // Fallback: if we got a single recipe, create 7 different ones
+        console.log('Single recipe response, generating 7 variations');
+        
+        for (let i = 0; i < DAYS_OF_WEEK.length; i++) {
+          const day = DAYS_OF_WEEK[i];
+          const daySpecificPreferences = `${preferences} - Recipe for ${day}`;
+          
+          const { data: dayData, error: dayError } = await supabase.functions.invoke('proxy-generate-recipes', {
+            body: { 
+              preferences: daySpecificPreferences,
+              userProfile: userProfile 
+            }
+          });
+
+          if (dayError) {
+            console.error(`Error fetching recipe for ${day}:`, dayError);
+            continue;
+          }
+
+          const estimatedPrice = await calculateEstimatedPrice(dayData.ingredients || []);
+
+          weeklyRecipes.push({
+            day,
+            recipe_name: dayData.recipe_name || dayData.name || 'Generated Recipe',
+            ingredients: dayData.ingredients || [],
+            instructions: dayData.instructions || 'No instructions provided',
+            estimated_price: estimatedPrice,
+            image: dayData.picture_url || generateRecipeImage(day)
+          });
+        }
+      }
+      
+      console.log('Final weekly recipes:', weeklyRecipes);
+      setRecipes(weeklyRecipes);
+    } catch (err) {
+      console.error('Error fetching weekly recipes:', err);
+      setError('Failed to fetch weekly recipes. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const fetchSingleRecipe = async (day: string, preferences: string) => {
     const { data, error } = await supabase.functions.invoke('proxy-generate-recipes', {
       body: { 
@@ -47,32 +133,6 @@ export const useWeeklyPlan = (userProfile: any) => {
       estimated_price: estimatedPrice,
       image: generateRecipeImage(day)
     };
-  };
-
-  const fetchWeeklyRecipes = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const preferences = buildPreferencesString(userProfile);
-      console.log('Generating recipes with user preferences:', preferences);
-      
-      const weeklyRecipes: Recipe[] = [];
-      
-      // Fetch 7 recipes based on user onboarding data
-      for (let i = 0; i < DAYS_OF_WEEK.length; i++) {
-        const day = DAYS_OF_WEEK[i];
-        const recipe = await fetchSingleRecipe(day, preferences);
-        weeklyRecipes.push(recipe);
-      }
-      
-      setRecipes(weeklyRecipes);
-    } catch (err) {
-      console.error('Error fetching weekly recipes:', err);
-      setError('Failed to fetch weekly recipes. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const regenerateSingleRecipe = async (index: number) => {
