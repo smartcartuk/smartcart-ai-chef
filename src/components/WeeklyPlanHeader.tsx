@@ -8,13 +8,15 @@ interface WeeklyPlanHeaderProps {
   selectedIngredientsCount: number;
   onRegeneratePlan: () => void;
   onClearSelection: () => void;
+  recipes?: any[];
 }
 
 export const WeeklyPlanHeader: React.FC<WeeklyPlanHeaderProps> = ({
   userProfile,
   selectedIngredientsCount,
   onRegeneratePlan,
-  onClearSelection
+  onClearSelection,
+  recipes = []
 }) => {
   const getPreferencesText = () => {
     const parts = [];
@@ -30,6 +32,12 @@ export const WeeklyPlanHeader: React.FC<WeeklyPlanHeaderProps> = ({
     return parts.length > 0 ? parts.join(' • ') : 'Personalized recipes';
   };
 
+  // Calculate total weekly cost
+  const totalWeeklyCost = recipes.reduce((total, recipe) => {
+    const recipeCost = recipe.estimated_cost || recipe.cost_per_meal || recipe.estimated_price || 0;
+    return total + recipeCost;
+  }, 0);
+
   return (
     <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
@@ -41,6 +49,13 @@ export const WeeklyPlanHeader: React.FC<WeeklyPlanHeaderProps> = ({
           <p className="text-sm text-gray-500 mt-1">
             ✨ Automatically generated based on your onboarding preferences • Prices from cached ingredient data
           </p>
+          {recipes.length > 0 && (
+            <div className="mt-2">
+              <span className="text-lg font-semibold text-green-700">
+                Total Weekly Cost: £{totalWeeklyCost.toFixed(2)}
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center space-x-4">
           <Button onClick={onRegeneratePlan} variant="outline">

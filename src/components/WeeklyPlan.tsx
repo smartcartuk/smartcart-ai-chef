@@ -54,6 +54,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
         selectedIngredientsCount={selectedIngredients.length}
         onRegeneratePlan={fetchWeeklyRecipes}
         onClearSelection={clearSelection}
+        recipes={recipes}
       />
 
       {error && (

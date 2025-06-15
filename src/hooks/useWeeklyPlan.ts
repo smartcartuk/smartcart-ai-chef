@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { buildPreferencesString, generateRecipeImage, DAYS_OF_WEEK } from '@/utils/recipeHelpers';
@@ -7,10 +6,14 @@ import { usePriceCalculation } from './usePriceCalculation';
 interface Recipe {
   day: string;
   recipe_name: string;
-  ingredients: string[];
-  instructions: string;
+  ingredients: string[] | any[];
+  instructions: string | string[];
   estimated_price?: number;
+  estimated_cost?: number;
+  cost_per_meal?: number;
   image?: string;
+  description?: string;
+  nutritional_info?: any;
 }
 
 export const useWeeklyPlan = (userProfile: any) => {
@@ -56,15 +59,28 @@ export const useWeeklyPlan = (userProfile: any) => {
         // Map the meals array to our Recipe format
         weeklyRecipes = await Promise.all(
           data.meals.map(async (meal: any, index: number) => {
-            const estimatedPrice = await calculateEstimatedPrice(meal.ingredients || []);
+            // Use the cost from the API response, or calculate it as fallback
+            let estimatedPrice = meal.estimated_cost || meal.cost_per_meal || meal.estimated_price;
+            
+            if (!estimatedPrice) {
+              // Extract ingredient names for price calculation
+              const ingredientNames = meal.ingredients?.map((ing: any) => 
+                typeof ing === 'string' ? ing : ing.name || ing
+              ) || [];
+              estimatedPrice = await calculateEstimatedPrice(ingredientNames);
+            }
             
             return {
               day: meal.day || DAYS_OF_WEEK[index],
               recipe_name: meal.recipe_name || meal.name || 'Generated Recipe',
               ingredients: meal.ingredients || [],
               instructions: meal.instructions || 'No instructions provided',
+              estimated_cost: estimatedPrice,
               estimated_price: estimatedPrice,
-              image: meal.picture_url || generateRecipeImage(meal.day || DAYS_OF_WEEK[index])
+              cost_per_meal: estimatedPrice,
+              image: meal.picture_url || generateRecipeImage(meal.day || DAYS_OF_WEEK[index]),
+              description: meal.description || '',
+              nutritional_info: meal.nutritional_info || meal.nutrition || null
             };
           })
         );
@@ -96,7 +112,11 @@ export const useWeeklyPlan = (userProfile: any) => {
             ingredients: dayData.ingredients || [],
             instructions: dayData.instructions || 'No instructions provided',
             estimated_price: estimatedPrice,
-            image: dayData.picture_url || generateRecipeImage(day)
+            estimated_cost: estimatedPrice,
+            cost_per_meal: estimatedPrice,
+            image: dayData.picture_url || generateRecipeImage(day),
+            description: dayData.description || '',
+            nutritional_info: dayData.nutritional_info || null
           });
         }
       }
@@ -131,7 +151,11 @@ export const useWeeklyPlan = (userProfile: any) => {
       ingredients: data.ingredients,
       instructions: data.instructions,
       estimated_price: estimatedPrice,
-      image: generateRecipeImage(day)
+      estimated_cost: estimatedPrice,
+      cost_per_meal: estimatedPrice,
+      image: generateRecipeImage(day),
+      description: data.description || '',
+      nutritional_info: data.nutritional_info || null
     };
   };
 

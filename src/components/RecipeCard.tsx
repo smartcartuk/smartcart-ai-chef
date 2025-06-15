@@ -4,13 +4,32 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
+interface Ingredient {
+  name: string;
+  amount: string;
+  price?: number;
+  product_url?: string;
+}
+
+interface NutritionalInfo {
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  fiber?: number;
+}
+
 interface Recipe {
   day: string;
   recipe_name: string;
-  ingredients: string[] | { name: string; amount: string }[];
+  ingredients: string[] | Ingredient[];
   instructions: string | string[];
   estimated_price?: number;
+  estimated_cost?: number;
   image?: string;
+  description?: string;
+  nutritional_info?: NutritionalInfo;
+  cost_per_meal?: number;
 }
 
 interface RecipeCardProps {
@@ -31,7 +50,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   estimatedPrice
 }) => {
   // Helper function to format ingredients
-  const formatIngredient = (ingredient: string | { name: string; amount: string }) => {
+  const formatIngredient = (ingredient: string | Ingredient) => {
     if (typeof ingredient === 'string') {
       return ingredient;
     }
@@ -45,6 +64,9 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     }
     return instructions.join(' ');
   };
+
+  // Get the actual price to display
+  const displayPrice = recipe.estimated_cost || recipe.cost_per_meal || recipe.estimated_price || estimatedPrice || 0;
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -62,13 +84,14 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             <Badge variant="outline">
               {recipe.day}
             </Badge>
-            {estimatedPrice !== undefined && (
-              <Badge variant="secondary" className="bg-green-100 text-green-700">
-                £{estimatedPrice.toFixed(2)}
-              </Badge>
-            )}
+            <Badge variant="secondary" className="bg-green-100 text-green-700">
+              £{displayPrice.toFixed(2)}
+            </Badge>
           </div>
           <h3 className="font-bold text-lg">{recipe.recipe_name}</h3>
+          {recipe.description && (
+            <p className="text-sm text-gray-600 mt-1">{recipe.description}</p>
+          )}
         </div>
 
         <div className="flex space-x-2">
@@ -90,22 +113,103 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
         </div>
 
         {isExpanded && (
-          <div className="pt-3 border-t border-gray-100 space-y-3">
+          <div className="pt-3 border-t border-gray-100 space-y-4">
+            {/* Ingredients Section */}
             <div>
               <h4 className="font-semibold text-sm mb-2">Ingredients:</h4>
-              <ul className="text-sm space-y-1">
-                {recipe.ingredients.map((ingredient, idx) => (
-                  <li key={idx} className="flex items-center">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2"></div>
-                    {formatIngredient(ingredient)}
-                  </li>
-                ))}
+              <ul className="text-sm space-y-2">
+                {recipe.ingredients.map((ingredient, idx) => {
+                  if (typeof ingredient === 'object' && 'name' in ingredient) {
+                    return (
+                      <li key={idx} className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2"></div>
+                          <span>{formatIngredient(ingredient)}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {ingredient.price && (
+                            <span className="text-xs text-gray-500">£{ingredient.price.toFixed(2)}</span>
+                          )}
+                          {ingredient.product_url && (
+                            <a 
+                              href={ingredient.product_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:text-blue-800 underline"
+                            >
+                              Buy
+                            </a>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={idx} className="flex items-center">
+                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2"></div>
+                      {formatIngredient(ingredient)}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
             
+            {/* Instructions Section */}
             <div>
               <h4 className="font-semibold text-sm mb-2">Instructions:</h4>
-              <p className="text-sm text-gray-600">{formatInstructions(recipe.instructions)}</p>
+              <div className="text-sm text-gray-600">
+                {typeof recipe.instructions === 'string' ? (
+                  <p>{recipe.instructions}</p>
+                ) : (
+                  <ol className="list-decimal list-inside space-y-1">
+                    {recipe.instructions.map((step, idx) => (
+                      <li key={idx}>{step}</li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </div>
+
+            {/* Nutritional Information */}
+            {recipe.nutritional_info && (
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Nutritional Breakdown:</h4>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {recipe.nutritional_info.calories && (
+                    <div className="bg-gray-50 p-2 rounded">
+                      <span className="font-medium">Calories:</span> {recipe.nutritional_info.calories}
+                    </div>
+                  )}
+                  {recipe.nutritional_info.protein && (
+                    <div className="bg-gray-50 p-2 rounded">
+                      <span className="font-medium">Protein:</span> {recipe.nutritional_info.protein}g
+                    </div>
+                  )}
+                  {recipe.nutritional_info.carbs && (
+                    <div className="bg-gray-50 p-2 rounded">
+                      <span className="font-medium">Carbs:</span> {recipe.nutritional_info.carbs}g
+                    </div>
+                  )}
+                  {recipe.nutritional_info.fat && (
+                    <div className="bg-gray-50 p-2 rounded">
+                      <span className="font-medium">Fat:</span> {recipe.nutritional_info.fat}g
+                    </div>
+                  )}
+                  {recipe.nutritional_info.fiber && (
+                    <div className="bg-gray-50 p-2 rounded">
+                      <span className="font-medium">Fiber:</span> {recipe.nutritional_info.fiber}g
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Cost Information */}
+            <div className="bg-green-50 p-3 rounded">
+              <h4 className="font-semibold text-sm mb-1">Cost Information:</h4>
+              <div className="text-sm text-green-700">
+                <div>Per meal: £{displayPrice.toFixed(2)}</div>
+              </div>
             </div>
           </div>
         )}
