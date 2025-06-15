@@ -4,13 +4,32 @@ import { Button } from '@/components/ui/button';
 import { Loader2, RotateCcw } from 'lucide-react';
 import { RecipeCard } from '@/components/RecipeCard';
 
+interface Ingredient {
+  name: string;
+  amount: string;
+  price?: number;
+  product_url?: string;
+}
+
+interface NutritionalInfo {
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  fiber?: number;
+}
+
 interface Recipe {
   day: string;
   recipe_name: string;
-  ingredients: string[];
-  instructions: string;
+  ingredients: string[] | Ingredient[];
+  instructions: string | string[];
   estimated_price?: number;
+  estimated_cost?: number;
+  cost_per_meal?: number;
   image?: string;
+  description?: string;
+  nutritional_info?: NutritionalInfo;
 }
 
 interface RecipeGridProps {
