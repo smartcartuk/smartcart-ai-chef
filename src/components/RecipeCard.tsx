@@ -7,8 +7,8 @@ import { Badge } from '@/components/ui/badge';
 interface Recipe {
   day: string;
   recipe_name: string;
-  ingredients: string[];
-  instructions: string;
+  ingredients: string[] | { name: string; amount: string }[];
+  instructions: string | string[];
   estimated_price?: number;
   image?: string;
 }
@@ -30,6 +30,22 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   onAddToPlan,
   estimatedPrice
 }) => {
+  // Helper function to format ingredients
+  const formatIngredient = (ingredient: string | { name: string; amount: string }) => {
+    if (typeof ingredient === 'string') {
+      return ingredient;
+    }
+    return `${ingredient.amount} ${ingredient.name}`;
+  };
+
+  // Helper function to format instructions
+  const formatInstructions = (instructions: string | string[]) => {
+    if (typeof instructions === 'string') {
+      return instructions;
+    }
+    return instructions.join(' ');
+  };
+
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <div className="aspect-video overflow-hidden">
@@ -81,7 +97,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                 {recipe.ingredients.map((ingredient, idx) => (
                   <li key={idx} className="flex items-center">
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2"></div>
-                    {ingredient}
+                    {formatIngredient(ingredient)}
                   </li>
                 ))}
               </ul>
@@ -89,7 +105,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             
             <div>
               <h4 className="font-semibold text-sm mb-2">Instructions:</h4>
-              <p className="text-sm text-gray-600">{recipe.instructions}</p>
+              <p className="text-sm text-gray-600">{formatInstructions(recipe.instructions)}</p>
             </div>
           </div>
         )}
