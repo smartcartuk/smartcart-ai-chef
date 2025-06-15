@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,7 +53,6 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ingredientInput, setIngredientInput] = useState("pasta, onion, chopped tomatoes");
   const [recipePreference, setRecipePreference] = useState("");
 
   const generateRecipe = async () => {
@@ -83,8 +83,6 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
       console.log("Recipe generated:", data);
       
       setRecipe(data);
-      // Set ingredients for price comparison
-      setIngredientInput(data.ingredients.join(", "));
     } catch (err) {
       console.error("Error generating recipe:", err);
       setError("Failed to generate recipe. Please try again later.");
@@ -102,65 +100,9 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
     await getPriceComparison();
   };
 
-  const fetchPrices = async () => {
-    const ingredients = ingredientInput.split(",").map(x => x.trim()).filter(x => x.length > 0);
-    
-    if (ingredients.length === 0) {
-      setError("Please enter at least one ingredient");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const response = await fetch("https://proj3cts.app.n8n.cloud/webhook-test/generate-meal-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: `user_${Date.now()}`,
-          ingredients: ingredients,
-          userProfile: userProfile
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("Prices returned from n8n:", data);
-      
-      // Handle different response formats
-      if (Array.isArray(data)) {
-        setPriceData(data);
-      } else if (data.priceComparisons) {
-        // Convert price comparisons to simple format
-        const prices = data.priceComparisons.flatMap((item: any) =>
-          item.prices.map((price: any) => ({
-            ingredient: item.item,
-            product_name: item.item,
-            price: price.price,
-            store: price.store
-          }))
-        );
-        setPriceData(prices);
-      } else {
-        setPriceData([]);
-      }
-    } catch (err) {
-      console.error("Error fetching prices:", err);
-      setError(err instanceof Error ? err.message : "Could not fetch prices. Please try again later.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const getPriceComparison = async () => {
-    const ingredients = ingredientInput.split(",").map(x => x.trim()).filter(x => x.length > 0);
-    
-    if (ingredients.length === 0) {
-      setError("Please enter at least one ingredient");
+    if (!recipe?.ingredients) {
+      setError("No recipe ingredients available for comparison");
       return;
     }
 
@@ -174,7 +116,7 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          ingredients: ingredients
+          ingredients: recipe.ingredients
         })
       });
 
@@ -326,54 +268,6 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
           </div>
         )}
 
-        {/* Manual Ingredient Input Section */}
-        <div className="space-y-4 p-4 border border-gray-200 rounded-lg">
-          <div>
-            <Label htmlFor="ingredient-input" className="text-sm font-medium">
-              Or enter your ingredients manually (comma separated):
-            </Label>
-            <Input
-              id="ingredient-input"
-              type="text"
-              placeholder="e.g. pasta, onion, tomato"
-              value={ingredientInput}
-              onChange={(e) => setIngredientInput(e.target.value)}
-              className="mt-2"
-            />
-          </div>
-          <div className="flex space-x-2">
-            <Button 
-              onClick={fetchPrices} 
-              disabled={isLoading}
-              className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                "Get Prices"
-              )}
-            </Button>
-            <Button 
-              onClick={getPriceComparison} 
-              disabled={isLoading}
-              variant="outline"
-              className="border-purple-500 text-purple-600 hover:bg-purple-50"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                "Compare Stores"
-              )}
-            </Button>
-          </div>
-        </div>
-
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-700 text-sm">⚠️ {error}</p>
@@ -414,7 +308,7 @@ export const PriceResults: React.FC<PriceResultsProps> = ({ userProfile }) => {
             <div className="flex items-center justify-center h-32 text-gray-500">
               <div className="text-center">
                 <p>No price data available</p>
-                <p className="text-sm mt-1">Generate a recipe above or enter ingredients manually and click "Get Prices" or "Compare Stores"</p>
+                <p className="text-sm mt-1">Generate a recipe above to start price comparison</p>
               </div>
             </div>
           )}
