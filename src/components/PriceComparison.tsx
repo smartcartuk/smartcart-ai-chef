@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,28 +47,37 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
     try {
       console.log('Generating price comparisons for recipes:', recipes);
       
-      // Collect unique ingredients from all recipes
-      const allIngredients: string[] = [];
+      // Collect unique ingredients from all recipes with their price data
+      const ingredientMap = new Map<string, any>();
+      
       recipes.forEach(recipe => {
         console.log('Processing recipe:', recipe);
         if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
           recipe.ingredients.forEach((ingredient: any) => {
+            let ingredientName: string;
+            let ingredientData: any;
+
             // Handle both string and object ingredients
-            const ingredientName = typeof ingredient === 'string' 
-              ? ingredient 
-              : ingredient?.name || ingredient;
+            if (typeof ingredient === 'string') {
+              ingredientName = ingredient;
+              ingredientData = { name: ingredient };
+            } else {
+              ingredientName = ingredient?.name || ingredient;
+              ingredientData = ingredient;
+            }
             
             if (ingredientName && typeof ingredientName === 'string') {
-              allIngredients.push(ingredientName);
+              // Store the most complete ingredient data we have
+              if (!ingredientMap.has(ingredientName) || (ingredientData.price && !ingredientMap.get(ingredientName).price)) {
+                ingredientMap.set(ingredientName, ingredientData);
+              }
             }
           });
         }
       });
 
-      console.log('All ingredients collected:', allIngredients);
-
-      // Get unique ingredients and limit to top 10 for comparison
-      const uniqueIngredients = [...new Set(allIngredients)].slice(0, 10);
+      // Convert map to array and limit to top 10 for comparison
+      const uniqueIngredients = Array.from(ingredientMap.entries()).slice(0, 10);
       console.log('Unique ingredients for comparison:', uniqueIngredients);
       
       if (uniqueIngredients.length === 0) {
@@ -79,11 +87,22 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
       }
 
       const priceComparisons = await Promise.all(
-        uniqueIngredients.map(async (ingredient) => {
-          const basePrice = await calculateEstimatedPrice([ingredient]);
+        uniqueIngredients.map(async ([ingredientName, ingredientData]) => {
+          // Use the actual price from the ingredient data if available
+          let basePrice = ingredientData.price || ingredientData.average_price;
+          
+          // If no price in ingredient data, calculate estimated price
+          if (!basePrice) {
+            basePrice = await calculateEstimatedPrice([ingredientName]);
+          }
+          
+          // Ensure we have a valid price
+          basePrice = basePrice || 2.50;
+          
+          console.log(`Using price ${basePrice} for ingredient: ${ingredientName}`);
           
           return {
-            item: ingredient,
+            item: ingredientName,
             prices: [
               { 
                 store: 'Tesco', 
