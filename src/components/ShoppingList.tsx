@@ -33,7 +33,6 @@ interface EnhancedRecipe {
   cost_by_supermarket: {
     tesco: number;
     sainsburys: number;
-    [key: string]: number;
   };
 }
 
@@ -60,7 +59,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   // Generate shopping list from enhanced recipes with price data
   useEffect(() => {
+    console.log('ShoppingList useEffect triggered', { recipes, generatedData });
+    
     if (recipes.length > 0) {
+      console.log('Processing recipes:', recipes);
       // Check if recipes have the enhanced format with price data
       const hasEnhancedData = recipes.some(recipe => 
         recipe.ingredients && 
@@ -68,21 +70,27 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         recipe.ingredients[0].prices
       );
 
+      console.log('Has enhanced data:', hasEnhancedData);
+
       if (hasEnhancedData) {
         const { items, totals, best } = generateEnhancedShoppingList(recipes as EnhancedRecipe[]);
+        console.log('Generated enhanced shopping list:', { items, totals, best });
         setShoppingItems(items);
         setTotalWeekCost(totals);
         setBestOption(best);
       } else {
         // Fallback for basic recipe format
+        console.log('Using basic recipe format');
         const generatedItems = generateShoppingListFromRecipes(recipes);
         setShoppingItems(generatedItems);
       }
     } else if (generatedData?.shoppingList) {
+      console.log('Using generated data shopping list');
       const generatedItems = generateShoppingItemsFromData(generatedData.shoppingList);
       setShoppingItems(generatedItems);
     } else {
       // Fallback to mock data
+      console.log('Using mock data');
       setShoppingItems(mockShoppingItems);
     }
   }, [recipes, generatedData]);
@@ -110,6 +118,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const availableStores = Object.keys(storeBreakdown).length > 0 ? Object.keys(storeBreakdown) : ['tesco', 'sainsburys'];
 
   const totalItems = Object.values(shoppingItems).flat().length;
+
+  console.log('ShoppingList render state:', {
+    totalItems,
+    storeBreakdown,
+    bestOption,
+    shoppingItemsKeys: Object.keys(shoppingItems)
+  });
 
   return (
     <div className="space-y-6">
@@ -251,6 +266,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           </Card>
         ))}
       </div>
+
+      {/* Show message if no items */}
+      {totalItems === 0 && (
+        <Card className="p-6 text-center">
+          <p className="text-gray-500">No shopping items available. Please generate a meal plan first.</p>
+        </Card>
+      )}
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -404,6 +426,8 @@ const mockShoppingItems = {
 
 // Generate shopping list from enhanced recipes with price data
 const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
+  console.log('generateEnhancedShoppingList called with:', recipes);
+  
   const categorized: {[key: string]: ShoppingItem[]} = {};
   const ingredientMap = new Map<string, IngredientWithPrices>();
   
@@ -417,6 +441,8 @@ const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
     });
   });
 
+  console.log('Unique ingredients found:', Array.from(ingredientMap.keys()));
+
   // Calculate total costs per supermarket
   const totalWeekCost: {[key: string]: number} = {};
   const supermarkets = ['tesco', 'sainsburys'];
@@ -428,10 +454,14 @@ const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
     totalWeekCost[market] = parseFloat(totalWeekCost[market].toFixed(2));
   });
 
+  console.log('Total week costs:', totalWeekCost);
+
   // Find best option
   const bestStore = Object.entries(totalWeekCost).reduce((best, [store, cost]) => 
     cost < best.cost ? { store, cost } : best
   , { store: '', cost: Infinity });
+
+  console.log('Best store option:', bestStore);
 
   // Create shopping items optimized for best prices per ingredient
   Array.from(ingredientMap.values()).forEach(ingredient => {
@@ -456,6 +486,8 @@ const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
       url: bestPrice.url
     });
   });
+
+  console.log('Generated categorized items:', categorized);
 
   return {
     items: categorized,
