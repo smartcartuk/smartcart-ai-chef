@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,13 +11,41 @@ interface ShoppingListProps {
   recipes?: any[];
 }
 
+interface PriceInfo {
+  price: number;
+  url: string;
+}
+
+interface IngredientWithPrices {
+  name: string;
+  amount: string;
+  prices: {
+    tesco: PriceInfo;
+    sainsburys: PriceInfo;
+    [key: string]: PriceInfo;
+  };
+}
+
+interface EnhancedRecipe {
+  day: string;
+  recipe_name: string;
+  ingredients: IngredientWithPrices[];
+  cost_by_supermarket: {
+    tesco: number;
+    sainsburys: number;
+    [key: string]: number;
+    [key: string]: number;
+  };
+}
+
 interface ShoppingItem {
   name: string;
-  quantity: string;
+  amount: string;
   price: number;
   store: string;
   checked: boolean;
   category: string;
+  url?: string;
 }
 
 export const ShoppingList: React.FC<ShoppingListProps> = ({ 
@@ -29,17 +56,34 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [checkedItems, setCheckedItems] = useState<{[key: string]: boolean}>({});
   const [selectedStore, setSelectedStore] = useState<string>('all');
   const [shoppingItems, setShoppingItems] = useState<{[key: string]: ShoppingItem[]}>({});
+  const [totalWeekCost, setTotalWeekCost] = useState<{[key: string]: number}>({});
+  const [bestOption, setBestOption] = useState<{store: string, cost: number} | null>(null);
 
-  // Generate shopping list from recipes
+  // Generate shopping list from enhanced recipes with price data
   useEffect(() => {
     if (recipes.length > 0) {
-      const generatedItems = generateShoppingListFromRecipes(recipes);
-      setShoppingItems(generatedItems);
+      // Check if recipes have the enhanced format with price data
+      const hasEnhancedData = recipes.some(recipe => 
+        recipe.ingredients && 
+        recipe.ingredients.length > 0 && 
+        recipe.ingredients[0].prices
+      );
+
+      if (hasEnhancedData) {
+        const { items, totals, best } = generateEnhancedShoppingList(recipes as EnhancedRecipe[]);
+        setShoppingItems(items);
+        setTotalWeekCost(totals);
+        setBestOption(best);
+      } else {
+        // Fallback for basic recipe format
+        const generatedItems = generateShoppingListFromRecipes(recipes);
+        setShoppingItems(generatedItems);
+      }
     } else if (generatedData?.shoppingList) {
       const generatedItems = generateShoppingItemsFromData(generatedData.shoppingList);
       setShoppingItems(generatedItems);
     } else {
-      // Fallback to mock data if no recipes
+      // Fallback to mock data
       setShoppingItems(mockShoppingItems);
     }
   }, [recipes, generatedData]);
@@ -51,27 +95,22 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   const getStoreColor = (store: string) => {
     const colors = {
-      'Tesco': 'bg-blue-100 text-blue-700',
-      'Sainsburys': 'bg-orange-100 text-orange-700', 
-      'Asda': 'bg-green-100 text-green-700',
-      'Morrisons': 'bg-purple-100 text-purple-700'
+      'tesco': 'bg-blue-100 text-blue-700',
+      'sainsburys': 'bg-orange-100 text-orange-700', 
+      'asda': 'bg-green-100 text-green-700',
+      'morrisons': 'bg-purple-100 text-purple-700'
     };
-    return colors[store as keyof typeof colors] || 'bg-gray-100 text-gray-700';
+    return colors[store.toLowerCase() as keyof typeof colors] || 'bg-gray-100 text-gray-700';
   };
 
-  const totalCost = Object.values(shoppingItems)
-    .flat()
-    .reduce((sum: number, item: ShoppingItem) => sum + item.price, 0);
+  const currentTotalCost = selectedStore === 'all' 
+    ? Object.values(totalWeekCost)[0] || Object.values(shoppingItems).flat().reduce((sum, item) => sum + item.price, 0)
+    : totalWeekCost[selectedStore] || 0;
 
-  const storeBreakdown = Object.values(shoppingItems)
-    .flat()
-    .reduce((acc: {[key: string]: number}, item: ShoppingItem) => {
-      acc[item.store] = (acc[item.store] || 0) + item.price;
-      return acc;
-    }, {});
+  const storeBreakdown = totalWeekCost;
+  const availableStores = Object.keys(storeBreakdown).length > 0 ? Object.keys(storeBreakdown) : ['tesco', 'sainsburys'];
 
   const totalItems = Object.values(shoppingItems).flat().length;
-  const estimatedSavings = totalCost * 0.15; // Estimate 15% savings from optimization
 
   return (
     <div className="space-y-6">
@@ -81,38 +120,57 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Smart Shopping List</h2>
             <p className="text-gray-600 mt-1">
-              Generated from your {recipes.length || 7} meal plan recipes • Optimized across {Object.keys(storeBreakdown).length} stores
+              Generated from your {recipes.length || 7} meal plan recipes • Price comparison across supermarkets
             </p>
+            {bestOption && (
+              <p className="text-sm text-green-600 mt-1 font-medium">
+                💡 Best deal: Shop at {bestOption.store.charAt(0).toUpperCase() + bestOption.store.slice(1)} for £{bestOption.cost.toFixed(2)} total
+              </p>
+            )}
           </div>
           
           <div className="flex items-center space-x-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">£{totalCost.toFixed(2)}</div>
-              <div className="text-sm text-gray-600">Total Cost</div>
+              <div className="text-2xl font-bold text-blue-600">£{currentTotalCost.toFixed(2)}</div>
+              <div className="text-sm text-gray-600">
+                {selectedStore === 'all' ? 'Best Price' : `${selectedStore.charAt(0).toUpperCase() + selectedStore.slice(1)} Total`}
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">£{estimatedSavings.toFixed(2)}</div>
-              <div className="text-sm text-gray-600">Est. Savings</div>
-            </div>
+            {Object.keys(storeBreakdown).length > 1 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  £{(Math.max(...Object.values(storeBreakdown)) - Math.min(...Object.values(storeBreakdown))).toFixed(2)}
+                </div>
+                <div className="text-sm text-gray-600">Potential Savings</div>
+              </div>
+            )}
           </div>
         </div>
       </Card>
 
-      {/* Store Breakdown */}
-      <Card className="p-6">
-        <h3 className="font-semibold text-lg mb-4">Store Breakdown</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {Object.entries(storeBreakdown).map(([store, cost]) => (
-            <div key={store} className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-lg font-bold">£{cost.toFixed(2)}</div>
-              <div className="text-sm text-gray-600">{store}</div>
-              <Badge className={`mt-1 text-xs ${getStoreColor(store)}`}>
-                {Math.round((cost / totalCost) * 100)}% of total
-              </Badge>
-            </div>
-          ))}
-        </div>
-      </Card>
+      {/* Store Comparison */}
+      {Object.keys(storeBreakdown).length > 0 && (
+        <Card className="p-6">
+          <h3 className="font-semibold text-lg mb-4">Weekly Cost Comparison</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {Object.entries(storeBreakdown).map(([store, cost]) => (
+              <div key={store} className={`text-center p-4 rounded-lg border-2 ${
+                bestOption?.store === store ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <div className={`text-lg font-bold ${bestOption?.store === store ? 'text-green-700' : 'text-gray-900'}`}>
+                  £{cost.toFixed(2)}
+                </div>
+                <div className="text-sm text-gray-600 capitalize">{store}</div>
+                {bestOption?.store === store && (
+                  <Badge className="mt-1 text-xs bg-green-100 text-green-700">
+                    Best Deal 🏆
+                  </Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Filter Options */}
       <div className="flex flex-wrap gap-2">
@@ -121,16 +179,17 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           size="sm"
           onClick={() => setSelectedStore('all')}
         >
-          All Stores ({totalItems} items)
+          All Items ({totalItems} items)
         </Button>
-        {Object.keys(storeBreakdown).map((store) => (
+        {availableStores.map((store) => (
           <Button
             key={store}
             variant={selectedStore === store ? 'default' : 'outline'}
             size="sm"
             onClick={() => setSelectedStore(store)}
+            className={selectedStore === store ? getStoreColor(store) : ''}
           >
-            {store}
+            {store.charAt(0).toUpperCase() + store.slice(1)}
           </Button>
         ))}
       </div>
@@ -167,17 +226,24 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         />
                         <div className={isChecked ? 'line-through text-gray-500' : ''}>
                           <div className="font-medium">{item.name}</div>
-                          <div className="text-sm text-gray-600">{item.quantity}</div>
+                          <div className="text-sm text-gray-600">{item.amount}</div>
                         </div>
                       </div>
                       
                       <div className="flex items-center space-x-3">
                         <Badge className={`text-xs ${getStoreColor(item.store)}`}>
-                          {item.store}
+                          {item.store.charAt(0).toUpperCase() + item.store.slice(1)}
                         </Badge>
                         <div className={`font-bold ${isChecked ? 'text-gray-500' : 'text-gray-900'}`}>
                           £{item.price.toFixed(2)}
                         </div>
+                        {item.url && item.url !== '#' && (
+                          <Button size="sm" variant="outline" asChild>
+                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs">
+                              Buy
+                            </a>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
@@ -207,7 +273,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 const generateShoppingListFromRecipes = (recipes: any[]): {[key: string]: ShoppingItem[]} => {
   const categorized: {[key: string]: ShoppingItem[]} = {};
   
-  // Collect all ingredients from recipes
   const allIngredients: string[] = [];
   recipes.forEach(recipe => {
     if (recipe.ingredients) {
@@ -215,7 +280,6 @@ const generateShoppingListFromRecipes = (recipes: any[]): {[key: string]: Shoppi
     }
   });
 
-  // Remove duplicates and categorize
   const uniqueIngredients = [...new Set(allIngredients)];
   
   uniqueIngredients.forEach(ingredient => {
@@ -226,7 +290,7 @@ const generateShoppingListFromRecipes = (recipes: any[]): {[key: string]: Shoppi
     
     categorized[category].push({
       name: ingredient,
-      quantity: '1 unit', // Default quantity
+      amount: '1 unit',
       price: estimatePrice(ingredient),
       store: getOptimalStore(ingredient),
       checked: false,
@@ -244,26 +308,36 @@ const categorizeIngredient = (ingredient: string): string => {
   if (lowerIngredient.includes('chicken') || lowerIngredient.includes('beef') || 
       lowerIngredient.includes('fish') || lowerIngredient.includes('meat') ||
       lowerIngredient.includes('salmon') || lowerIngredient.includes('cheese') ||
-      lowerIngredient.includes('milk') || lowerIngredient.includes('yogurt')) {
+      lowerIngredient.includes('milk') || lowerIngredient.includes('yogurt') ||
+      lowerIngredient.includes('mozzarella')) {
     return 'Meat & Dairy';
   }
   
   if (lowerIngredient.includes('tomato') || lowerIngredient.includes('cucumber') ||
       lowerIngredient.includes('lettuce') || lowerIngredient.includes('onion') ||
       lowerIngredient.includes('pepper') || lowerIngredient.includes('mushroom') ||
-      lowerIngredient.includes('carrot') || lowerIngredient.includes('lemon')) {
+      lowerIngredient.includes('carrot') || lowerIngredient.includes('lemon') ||
+      lowerIngredient.includes('spinach') || lowerIngredient.includes('celery') ||
+      lowerIngredient.includes('zucchini') || lowerIngredient.includes('bell pepper') ||
+      lowerIngredient.includes('bell peppers') || lowerIngredient.includes('cherry tomatoes')) {
     return 'Fresh Produce';
   }
   
   if (lowerIngredient.includes('rice') || lowerIngredient.includes('pasta') ||
       lowerIngredient.includes('flour') || lowerIngredient.includes('oil') ||
       lowerIngredient.includes('salt') || lowerIngredient.includes('sugar') ||
-      lowerIngredient.includes('spice') || lowerIngredient.includes('herb')) {
+      lowerIngredient.includes('spice') || lowerIngredient.includes('herb') ||
+      lowerIngredient.includes('quinoa') || lowerIngredient.includes('lentils') ||
+      lowerIngredient.includes('chickpeas') || lowerIngredient.includes('beans') ||
+      lowerIngredient.includes('soy sauce') || lowerIngredient.includes('stock') ||
+      lowerIngredient.includes('passata') || lowerIngredient.includes('sauce') ||
+      lowerIngredient.includes('mixed herbs') || lowerIngredient.includes('chili powder')) {
     return 'Pantry Staples';
   }
   
   if (lowerIngredient.includes('frozen') || lowerIngredient.includes('ready') ||
-      lowerIngredient.includes('canned') || lowerIngredient.includes('tinned')) {
+      lowerIngredient.includes('canned') || lowerIngredient.includes('tinned') ||
+      lowerIngredient.includes('pizza dough') || lowerIngredient.includes('corn')) {
     return 'Frozen & Convenience';
   }
   
@@ -274,7 +348,6 @@ const categorizeIngredient = (ingredient: string): string => {
 const estimatePrice = (ingredient: string): number => {
   const lowerIngredient = ingredient.toLowerCase();
   
-  // Meat and fish - higher prices
   if (lowerIngredient.includes('salmon') || lowerIngredient.includes('beef')) {
     return 5.99 + Math.random() * 3;
   }
@@ -283,7 +356,6 @@ const estimatePrice = (ingredient: string): number => {
     return 3.99 + Math.random() * 2;
   }
   
-  // Fresh produce - medium prices
   if (lowerIngredient.includes('tomato') || lowerIngredient.includes('cucumber')) {
     return 1.99 + Math.random() * 1;
   }
@@ -294,7 +366,7 @@ const estimatePrice = (ingredient: string): number => {
 
 // Helper function to get optimal store
 const getOptimalStore = (ingredient: string): string => {
-  const stores = ['Tesco', 'Sainsburys', 'Asda', 'Morrisons'];
+  const stores = ['tesco', 'sainsburys', 'asda', 'morrisons'];
   return stores[Math.floor(Math.random() * stores.length)];
 };
 
@@ -309,9 +381,9 @@ const generateShoppingItemsFromData = (shoppingList: any[]): {[key: string]: Sho
     }
     categorized[category].push({
       name: item.item,
-      quantity: item.quantity,
+      amount: item.quantity,
       price: Number(item.estimated_cost) || 0,
-      store: 'Tesco', // Default store
+      store: 'tesco', // Default store
       checked: false,
       category
     });
@@ -323,10 +395,72 @@ const generateShoppingItemsFromData = (shoppingList: any[]): {[key: string]: Sho
 // Mock data fallback
 const mockShoppingItems = {
   'Fresh Produce': [
-    { name: 'Salmon Fillets', quantity: '4 portions', price: 12.99, store: 'Tesco', checked: false, category: 'Fresh Produce' },
-    { name: 'Cherry Tomatoes', quantity: '2 punnets', price: 3.50, store: 'Sainsburys', checked: false, category: 'Fresh Produce' }
+    { name: 'Salmon Fillets', amount: '4 portions', price: 12.99, store: 'tesco', checked: false, category: 'Fresh Produce' },
+    { name: 'Cherry Tomatoes', amount: '2 punnets', price: 3.50, store: 'sainsburys', checked: false, category: 'Fresh Produce' }
   ],
   'Pantry Staples': [
-    { name: 'Arborio Rice', quantity: '1kg', price: 3.20, store: 'Asda', checked: false, category: 'Pantry Staples' }
+    { name: 'Arborio Rice', amount: '1kg', price: 3.20, store: 'asda', checked: false, category: 'Pantry Staples' }
   ]
+};
+
+// Generate shopping list from enhanced recipes with price data
+const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
+  const categorized: {[key: string]: ShoppingItem[]} = {};
+  const ingredientMap = new Map<string, IngredientWithPrices>();
+  
+  // Collect unique ingredients from all recipes
+  recipes.forEach(recipe => {
+    recipe.ingredients?.forEach(ingredient => {
+      const key = ingredient.name.toLowerCase();
+      if (!ingredientMap.has(key)) {
+        ingredientMap.set(key, ingredient);
+      }
+    });
+  });
+
+  // Calculate total costs per supermarket
+  const totalWeekCost: {[key: string]: number} = {};
+  const supermarkets = ['tesco', 'sainsburys'];
+  
+  supermarkets.forEach(market => {
+    totalWeekCost[market] = recipes.reduce((sum, recipe) => {
+      return sum + (recipe.cost_by_supermarket?.[market] || 0);
+    }, 0);
+    totalWeekCost[market] = parseFloat(totalWeekCost[market].toFixed(2));
+  });
+
+  // Find best option
+  const bestStore = Object.entries(totalWeekCost).reduce((best, [store, cost]) => 
+    cost < best.cost ? { store, cost } : best
+  , { store: '', cost: Infinity });
+
+  // Create shopping items optimized for best prices per ingredient
+  Array.from(ingredientMap.values()).forEach(ingredient => {
+    const category = categorizeIngredient(ingredient.name);
+    if (!categorized[category]) {
+      categorized[category] = [];
+    }
+
+    // Find the best price for this ingredient
+    const bestPrice = supermarkets.reduce((best, market) => {
+      const price = ingredient.prices?.[market]?.price || 999;
+      return price < best.price ? { market, price, url: ingredient.prices?.[market]?.url || '#' } : best;
+    }, { market: '', price: Infinity, url: '#' });
+
+    categorized[category].push({
+      name: ingredient.name,
+      amount: ingredient.amount,
+      price: bestPrice.price,
+      store: bestPrice.market,
+      checked: false,
+      category,
+      url: bestPrice.url
+    });
+  });
+
+  return {
+    items: categorized,
+    totals: totalWeekCost,
+    best: bestStore.cost !== Infinity ? bestStore : null
+  };
 };

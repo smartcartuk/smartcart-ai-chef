@@ -23,147 +23,178 @@ serve(async (req) => {
   try {
     const { preferences, userProfile } = await req.json();
     
-    console.log('Sending request to Operator endpoint with user profile:', userProfile);
+    console.log('Generating recipes with enhanced price data');
 
-    // Build the preferences string with user profile data
-    const dietaryPreferences = userProfile?.dietaryPreferences?.join(', ') || 'No specific preferences';
-    const allergies = userProfile?.allergies?.join(', ') || 'None';
-    const householdSize = userProfile?.householdSize || 2;
-    const weeklyBudget = userProfile?.weeklyBudget || 50;
-
-    // Check if this is a request for a full weekly plan or a single recipe
-    const isWeeklyPlanRequest = !preferences.includes('Recipe for');
-    
-    let preferencesString;
-    if (isWeeklyPlanRequest) {
-      // Request for full weekly plan (7 meals)
-      preferencesString = `dietary preferences: ${dietaryPreferences}, avoid: ${allergies}, serves ${householdSize} people, budget-friendly (weekly budget: £${weeklyBudget}) - Generate 7 meals for the week`;
-    } else {
-      // Request for single recipe (specific day)
-      preferencesString = `dietary preferences: ${dietaryPreferences}, avoid: ${allergies}, serves ${householdSize} people, budget-friendly (weekly budget: £${weeklyBudget}) - ${preferences.split(' - ')[1] || 'Recipe for Monday'}`;
-    }
-
-    // Call the Operator endpoint
+    // Call the new API endpoint that includes price comparisons
     const response = await fetch('https://smartcart-operator.vercel.app/api/meal-plan', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
-        preferences: preferencesString,
+        preferences: preferences,
         userProfile: userProfile || {}
       }),
     });
 
-    console.log('Operator endpoint response status:', response.status);
-    console.log('Operator endpoint response headers:', Object.fromEntries(response.headers.entries()));
+    console.log('API response status:', response.status);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Operator endpoint error response:', errorText);
+      console.error('API endpoint error, providing fallback with enhanced data structure');
       
-      // Return a fallback recipe when endpoint is not available
-      console.log('Operator endpoint not available, returning fallback recipe(s)');
-      
-      if (isWeeklyPlanRequest) {
-        // Return 7 fallback meals
-        const fallbackMeals = [
-          'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-        ].map(day => ({
-          day,
-          recipe_name: `${dietaryPreferences.includes('vegetarian') ? 'Vegetarian' : 'Protein'} ${day} Meal`,
-          ingredients: [
-            dietaryPreferences.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
-            'olive oil',
-            'garlic',
-            'onion',
-            'tomatoes',
-            'herbs and spices'
-          ],
-          instructions: 'Heat oil in a pan. Add garlic and onion, cook until fragrant. Add main ingredient and cook through. Add tomatoes and season. Serve hot.',
-          picture_url: 'https://placehold.co/400x300'
-        }));
-        
-        return new Response(JSON.stringify({ meals: fallbackMeals }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      } else {
-        // Return single fallback recipe
-        const fallbackRecipe = {
-          recipe_name: `Quick ${dietaryPreferences.includes('vegetarian') ? 'Vegetarian' : 'Protein'} Meal`,
-          ingredients: [
-            dietaryPreferences.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
-            'olive oil',
-            'garlic',
-            'onion',
-            'tomatoes',
-            'herbs and spices'
-          ],
-          instructions: 'Heat oil in a pan. Add garlic and onion, cook until fragrant. Add main ingredient and cook through. Add tomatoes and season. Serve hot.'
-        };
-        
-        return new Response(JSON.stringify(fallbackRecipe), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      // Enhanced fallback with price comparison structure
+      const fallbackMeals = [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+      ].map(day => ({
+        day,
+        recipe_name: `${userProfile?.dietaryPreferences?.includes('vegetarian') ? 'Vegetarian' : 'Protein'} ${day} Meal`,
+        description: `Healthy ${day.toLowerCase()} meal`,
+        ingredients: [
+          {
+            name: userProfile?.dietaryPreferences?.includes('vegetarian') ? 'chickpeas' : 'chicken breast',
+            amount: '200g',
+            prices: {
+              tesco: { price: 1.2, url: 'https://tesco.com/product' },
+              sainsburys: { price: 1.3, url: 'https://sainsburys.co.uk/product' }
+            }
+          },
+          {
+            name: 'olive oil',
+            amount: '2 tbsp',
+            prices: {
+              tesco: { price: 2.0, url: 'https://tesco.com/product/oil' },
+              sainsburys: { price: 2.1, url: 'https://sainsburys.co.uk/product/oil' }
+            }
+          },
+          {
+            name: 'onion',
+            amount: '1 medium',
+            prices: {
+              tesco: { price: 0.2, url: 'https://tesco.com/product/onion' },
+              sainsburys: { price: 0.25, url: 'https://sainsburys.co.uk/product/onion' }
+            }
+          }
+        ],
+        instructions: [
+          'Heat oil in a pan.',
+          'Add onion, cook until soft.',
+          'Add main ingredient and cook through.',
+          'Season and serve hot.'
+        ],
+        nutrition: {
+          calories: 350,
+          protein: '12g',
+          carbs: '45g',
+          fat: '8g',
+          fiber: '6g'
+        },
+        cost_by_supermarket: {
+          tesco: 3.4,
+          sainsburys: 3.65
+        }
+      }));
+
+      return new Response(JSON.stringify({ 
+        meals: fallbackMeals,
+        total_week_cost: {
+          tesco: 23.8,
+          sainsburys: 25.55
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const responseText = await response.text();
-    console.log('Operator endpoint raw response:', responseText);
+    console.log('API raw response:', responseText);
 
     let data;
     try {
       data = JSON.parse(responseText);
     } catch (parseError) {
-      console.error('Failed to parse Operator response as JSON:', parseError);
-      console.error('Raw response was:', responseText);
-      throw new Error('Invalid JSON response from Operator endpoint');
+      console.error('Failed to parse API response as JSON:', parseError);
+      throw new Error('Invalid JSON response from API endpoint');
     }
 
-    console.log('Operator endpoint parsed response:', data);
+    console.log('API parsed response:', data);
 
-    // If we got a meals array, return it as-is (for weekly plan requests)
+    // Check if we have the enhanced format with meals array and price data
     if (data.meals && Array.isArray(data.meals)) {
-      console.log('Returning meals array with', data.meals.length, 'meals');
-      return new Response(JSON.stringify(data), {
+      console.log('Returning enhanced meals data with', data.meals.length, 'meals');
+      
+      // Ensure all meals have the required structure
+      const enhancedMeals = data.meals.map(meal => ({
+        ...meal,
+        // Ensure ingredients have price structure
+        ingredients: meal.ingredients?.map((ingredient: any) => {
+          if (typeof ingredient === 'string') {
+            // Convert string ingredients to enhanced format
+            return {
+              name: ingredient,
+              amount: '1 unit',
+              prices: {
+                tesco: { price: 1.0, url: '#' },
+                sainsburys: { price: 1.1, url: '#' }
+              }
+            };
+          }
+          return ingredient;
+        }) || [],
+        // Ensure cost structure exists
+        cost_by_supermarket: meal.cost_by_supermarket || {
+          tesco: 5.0,
+          sainsburys: 5.5
+        }
+      }));
+
+      return new Response(JSON.stringify({
+        meals: enhancedMeals,
+        total_week_cost: data.total_week_cost || {
+          tesco: enhancedMeals.reduce((sum: number, meal: any) => sum + (meal.cost_by_supermarket?.tesco || 5), 0),
+          sainsburys: enhancedMeals.reduce((sum: number, meal: any) => sum + (meal.cost_by_supermarket?.sainsburys || 5.5), 0)
+        }
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Handle single recipe response (for individual day requests)
-    let recipeData;
-    if (Array.isArray(data) && data.length > 0) {
-      // If response is an array, take the first item
-      recipeData = data[0];
-    } else {
-      // Assume the data itself is the recipe
-      recipeData = data;
-    }
-
-    // Ensure we have the required fields for single recipe
-    const result = {
-      recipe_name: recipeData.recipe_name || recipeData.name || 'Generated Recipe',
-      ingredients: recipeData.ingredients || [],
-      instructions: recipeData.instructions || 'No instructions provided',
-      estimated_cost: recipeData.estimated_cost || 0,
-      description: recipeData.description || '',
-      picture_url: recipeData.picture_url || ''
+    // Handle single recipe response (convert to enhanced format)
+    const singleRecipe = Array.isArray(data) ? data[0] : data;
+    
+    const enhancedSingleRecipe = {
+      recipe_name: singleRecipe.recipe_name || singleRecipe.name || 'Generated Recipe',
+      ingredients: singleRecipe.ingredients?.map((ingredient: any) => {
+        if (typeof ingredient === 'string') {
+          return {
+            name: ingredient,
+            amount: '1 unit',
+            prices: {
+              tesco: { price: 1.0, url: '#' },
+              sainsburys: { price: 1.1, url: '#' }
+            }
+          };
+        }
+        return ingredient;
+      }) || [],
+      instructions: singleRecipe.instructions || 'No instructions provided',
+      estimated_cost: singleRecipe.estimated_cost || 0,
+      description: singleRecipe.description || '',
+      picture_url: singleRecipe.picture_url || ''
     };
 
-    console.log('Final processed recipe data:', result);
+    console.log('Returning single enhanced recipe:', enhancedSingleRecipe);
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(enhancedSingleRecipe), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('Error in proxy-generate-recipes function:', error);
     
-    // Return a more user-friendly error with fallback suggestion
     return new Response(JSON.stringify({ 
       error: 'Unable to generate recipe at the moment',
       details: error.message,
-      suggestion: 'The Operator endpoint may be temporarily unavailable. Please try again in a moment.'
+      suggestion: 'The API endpoint may be temporarily unavailable. Please try again in a moment.'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
