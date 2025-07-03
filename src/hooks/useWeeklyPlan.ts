@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { buildPreferencesString, generateRecipeImage, DAYS_OF_WEEK } from '@/utils/recipeHelpers';
+import { buildPreferencesString, DAYS_OF_WEEK } from '@/utils/recipeHelpers';
+import { generateMealImage } from '@/utils/recipeImageGenerator';
 import { usePriceCalculation } from './usePriceCalculation';
 
 interface Recipe {
@@ -70,15 +71,17 @@ export const useWeeklyPlan = (userProfile: any) => {
               estimatedPrice = await calculateEstimatedPrice(ingredientNames);
             }
             
+            const recipeName = meal.recipe_name || meal.name || 'Generated Recipe';
+            
             return {
               day: meal.day || DAYS_OF_WEEK[index],
-              recipe_name: meal.recipe_name || meal.name || 'Generated Recipe',
+              recipe_name: recipeName,
               ingredients: meal.ingredients || [],
               instructions: meal.instructions || 'No instructions provided',
               estimated_cost: estimatedPrice,
               estimated_price: estimatedPrice,
               cost_per_meal: estimatedPrice,
-              image: meal.picture_url || generateRecipeImage(meal.day || DAYS_OF_WEEK[index]),
+              image: meal.picture_url || generateMealImage(recipeName),
               description: meal.description || '',
               nutritional_info: meal.nutritional_info || meal.nutrition || null
             };
@@ -105,16 +108,17 @@ export const useWeeklyPlan = (userProfile: any) => {
           }
 
           const estimatedPrice = await calculateEstimatedPrice(dayData.ingredients || []);
+          const recipeName = dayData.recipe_name || dayData.name || 'Generated Recipe';
 
           weeklyRecipes.push({
             day,
-            recipe_name: dayData.recipe_name || dayData.name || 'Generated Recipe',
+            recipe_name: recipeName,
             ingredients: dayData.ingredients || [],
             instructions: dayData.instructions || 'No instructions provided',
             estimated_price: estimatedPrice,
             estimated_cost: estimatedPrice,
             cost_per_meal: estimatedPrice,
-            image: dayData.picture_url || generateRecipeImage(day),
+            image: dayData.picture_url || generateMealImage(recipeName),
             description: dayData.description || '',
             nutritional_info: dayData.nutritional_info || null
           });
@@ -144,16 +148,17 @@ export const useWeeklyPlan = (userProfile: any) => {
     }
 
     const estimatedPrice = await calculateEstimatedPrice(data.ingredients || []);
+    const recipeName = data.recipe_name || 'Generated Recipe';
 
     return {
       day,
-      recipe_name: data.recipe_name,
+      recipe_name: recipeName,
       ingredients: data.ingredients,
       instructions: data.instructions,
       estimated_price: estimatedPrice,
       estimated_cost: estimatedPrice,
       cost_per_meal: estimatedPrice,
-      image: generateRecipeImage(day),
+      image: generateMealImage(recipeName),
       description: data.description || '',
       nutritional_info: data.nutritional_info || null
     };
@@ -192,8 +197,13 @@ export const useWeeklyPlan = (userProfile: any) => {
   };
 
   const addToPlan = (recipe: Recipe) => {
-    setSelectedIngredients(prev => [...prev, ...recipe.ingredients]);
-    console.log(`${recipe.recipe_name} added to plan`);
+    // Extract ingredient names properly
+    const ingredientNames = recipe.ingredients.map((ingredient: any) => {
+      return typeof ingredient === 'string' ? ingredient : ingredient?.name || ingredient;
+    }).filter(Boolean);
+    
+    setSelectedIngredients(prev => [...prev, ...ingredientNames]);
+    console.log(`${recipe.recipe_name} added to plan with ingredients:`, ingredientNames);
   };
 
   const compareSelectedPrices = async () => {

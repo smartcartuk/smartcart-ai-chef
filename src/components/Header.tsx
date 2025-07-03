@@ -6,10 +6,18 @@ import { Badge } from '@/components/ui/badge';
 interface HeaderProps {
   currentView: 'landing' | 'onboarding' | 'dashboard';
   onBackToLanding: () => void;
+  onGetStarted: () => void;
+  onSignIn: () => void;
   userProfile: any;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentView, onBackToLanding, userProfile }) => {
+export const Header: React.FC<HeaderProps> = ({ 
+  currentView, 
+  onBackToLanding, 
+  onGetStarted,
+  onSignIn,
+  userProfile 
+}) => {
   return (
     <header className="bg-white/80 backdrop-blur-md border-b border-emerald-100 sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -44,8 +52,14 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onBackToLanding, us
             
             {currentView === 'landing' && (
               <div className="flex items-center space-x-2">
-                <Button variant="ghost" size="sm">Sign In</Button>
-                <Button size="sm" className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700">
+                <Button variant="ghost" size="sm" onClick={onSignIn}>
+                  Sign In
+                </Button>
+                <Button 
+                  size="sm" 
+                  className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
+                  onClick={onGetStarted}
+                >
                   Get Started
                 </Button>
               </div>

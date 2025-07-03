@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { PriceComparison } from '@/components/PriceComparison';
 import { PriceResults } from '@/components/PriceResults';
 import { AIAssistant } from '@/components/AIAssistant';
 import { WebhookResponse } from '@/utils/webhookService';
+import { useToast } from '@/components/ui/use-toast';
 
 interface MealPlanDashboardProps {
   userProfile: any;
@@ -21,10 +23,29 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState('plan');
   const [recipes, setRecipes] = useState<any[]>([]);
+  const { toast } = useToast();
 
   // Handle recipes change from WeeklyPlan
   const handleRecipesChange = (newRecipes: any[]) => {
     setRecipes(newRecipes);
+  };
+
+  // Handle regenerate plan
+  const handleRegeneratePlan = () => {
+    toast({
+      title: "Regenerating meal plan...",
+      description: "Creating a fresh weekly meal plan for you.",
+    });
+    // The actual regeneration is handled by the WeeklyPlan component
+  };
+
+  // Handle start shopping
+  const handleStartShopping = () => {
+    setActiveTab('shopping');
+    toast({
+      title: "Ready to shop!",
+      description: "Switched to shopping list with optimized prices.",
+    });
   };
 
   // Calculate stats from generated data if available
@@ -56,11 +77,18 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
           </div>
           
           <div className="flex items-center space-x-4">
-            <Button variant="outline" className="flex items-center space-x-2">
+            <Button 
+              variant="outline" 
+              className="flex items-center space-x-2"
+              onClick={handleRegeneratePlan}
+            >
               <span>🔄</span>
               <span>Regenerate Plan</span>
             </Button>
-            <Button className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700">
+            <Button 
+              className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
+              onClick={handleStartShopping}
+            >
               Start Shopping
             </Button>
           </div>

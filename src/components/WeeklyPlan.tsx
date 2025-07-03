@@ -7,6 +7,7 @@ import { WeeklyPlanLoading } from '@/components/WeeklyPlanLoading';
 import { RecipeGrid } from '@/components/RecipeGrid';
 import { useWeeklyPlan } from '@/hooks/useWeeklyPlan';
 import { WebhookResponse } from '@/utils/webhookService';
+import { useToast } from '@/components/ui/use-toast';
 
 interface WeeklyPlanProps {
   userProfile: any;
@@ -19,6 +20,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
   generatedData,
   onRecipesChange 
 }) => {
+  const { toast } = useToast();
   const {
     recipes,
     isLoading,
@@ -42,6 +44,41 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
       onRecipesChange(recipes);
     }
   }, [recipes, onRecipesChange]);
+
+  // Enhanced addToPlan function with toast feedback
+  const handleAddToPlan = (recipe: any) => {
+    addToPlan(recipe);
+    toast({
+      title: "Added to Plan!",
+      description: `${recipe.recipe_name} has been added to your meal plan.`,
+    });
+  };
+
+  // Enhanced compareSelectedPrices with proper feedback
+  const handleCompareSelectedPrices = async () => {
+    if (selectedIngredients.length === 0) {
+      toast({
+        title: "No ingredients selected",
+        description: "Please add some recipes to your plan first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await compareSelectedPrices();
+      toast({
+        title: "Price comparison complete!",
+        description: `Compared prices for ${selectedIngredients.length} ingredients.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error comparing prices",
+        description: "Failed to compare prices. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
 
   if (isLoading) {
     return <WeeklyPlanLoading />;
@@ -68,7 +105,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
         expandedRecipes={expandedRecipes}
         regeneratingIndex={regeneratingIndex}
         onToggleDetails={toggleRecipeDetails}
-        onAddToPlan={addToPlan}
+        onAddToPlan={handleAddToPlan}
         onRegenerateSingleRecipe={regenerateSingleRecipe}
       />
 
@@ -76,7 +113,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
         selectedIngredientsCount={selectedIngredients.length}
         isComparingPrices={isComparingPrices}
         priceComparisonResult={priceComparisonResult}
-        onCompareSelectedPrices={compareSelectedPrices}
+        onCompareSelectedPrices={handleCompareSelectedPrices}
       />
     </div>
   );

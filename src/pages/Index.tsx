@@ -16,6 +16,12 @@ const Index = () => {
     setCurrentView('onboarding');
   };
 
+  const handleSignIn = () => {
+    // For now, simulate sign in by going directly to onboarding
+    // In a real app, this would open a sign-in modal or redirect to auth page
+    setCurrentView('onboarding');
+  };
+
   const handleOnboardingComplete = (profile: any, webhookData?: WebhookResponse) => {
     setUserProfile(profile);
     setGeneratedData(webhookData || null);
@@ -31,12 +37,17 @@ const Index = () => {
       <Header 
         currentView={currentView} 
         onBackToLanding={handleBackToLanding}
+        onGetStarted={handleGetStarted}
+        onSignIn={handleSignIn}
         userProfile={userProfile}
       />
       
       {currentView === 'landing' && (
         <>
-          <Hero onGetStarted={handleGetStarted} />
+          <Hero 
+            onGetStarted={handleGetStarted}
+            onSignIn={handleSignIn}
+          />
         </>
       )}
       

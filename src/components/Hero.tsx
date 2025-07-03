@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge';
 
 interface HeroProps {
   onGetStarted: () => void;
+  onSignIn: () => void;
 }
 
-export const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
+export const Hero: React.FC<HeroProps> = ({ onGetStarted, onSignIn }) => {
   return (
     <div className="container mx-auto px-4 py-16">
       <div className="max-w-4xl mx-auto text-center space-y-8">
@@ -39,7 +40,12 @@ export const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
           >
             Get Started →
           </Button>
-          <Button variant="outline" size="lg" className="text-lg px-8 py-6 h-auto">
+          <Button 
+            variant="outline" 
+            size="lg" 
+            className="text-lg px-8 py-6 h-auto"
+            onClick={onSignIn}
+          >
             Sign In
           </Button>
         </div>
