@@ -34,7 +34,6 @@ interface EnhancedRecipe {
     tesco: number;
     sainsburys: number;
     [key: string]: number;
-    [key: string]: number;
   };
 }
 
