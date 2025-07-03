@@ -67,17 +67,24 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       const hasEnhancedData = recipes.some(recipe => 
         recipe.ingredients && 
         recipe.ingredients.length > 0 && 
+        typeof recipe.ingredients[0] === 'object' &&
         recipe.ingredients[0].prices
       );
 
       console.log('Has enhanced data:', hasEnhancedData);
 
       if (hasEnhancedData) {
-        const { items, totals, best } = generateEnhancedShoppingList(recipes as EnhancedRecipe[]);
-        console.log('Generated enhanced shopping list:', { items, totals, best });
-        setShoppingItems(items);
-        setTotalWeekCost(totals);
-        setBestOption(best);
+        try {
+          const { items, totals, best } = generateEnhancedShoppingList(recipes as EnhancedRecipe[]);
+          console.log('Generated enhanced shopping list:', { items, totals, best });
+          setShoppingItems(items);
+          setTotalWeekCost(totals);
+          setBestOption(best);
+        } catch (error) {
+          console.error('Error generating enhanced shopping list:', error);
+          const fallbackItems = generateShoppingListFromRecipes(recipes);
+          setShoppingItems(fallbackItems);
+        }
       } else {
         // Fallback for basic recipe format
         console.log('Using basic recipe format');
@@ -296,8 +303,14 @@ const generateShoppingListFromRecipes = (recipes: any[]): {[key: string]: Shoppi
   
   const allIngredients: string[] = [];
   recipes.forEach(recipe => {
-    if (recipe.ingredients) {
-      allIngredients.push(...recipe.ingredients);
+    if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+      recipe.ingredients.forEach(ingredient => {
+        // Handle both string and object ingredients
+        const ingredientName = typeof ingredient === 'string' ? ingredient : ingredient.name;
+        if (ingredientName) {
+          allIngredients.push(ingredientName);
+        }
+      });
     }
   });
 
@@ -322,9 +335,11 @@ const generateShoppingListFromRecipes = (recipes: any[]): {[key: string]: Shoppi
   return categorized;
 };
 
-// Helper function to categorize ingredients
-const categorizeIngredient = (ingredient: string): string => {
-  const lowerIngredient = ingredient.toLowerCase();
+// Helper function to categorize ingredients - ensure we always get a string
+const categorizeIngredient = (ingredient: string | any): string => {
+  // Handle both string and object inputs
+  const ingredientName = typeof ingredient === 'string' ? ingredient : (ingredient?.name || 'unknown');
+  const lowerIngredient = ingredientName.toLowerCase();
   
   if (lowerIngredient.includes('chicken') || lowerIngredient.includes('beef') || 
       lowerIngredient.includes('fish') || lowerIngredient.includes('meat') ||
@@ -433,12 +448,16 @@ const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
   
   // Collect unique ingredients from all recipes
   recipes.forEach(recipe => {
-    recipe.ingredients?.forEach(ingredient => {
-      const key = ingredient.name.toLowerCase();
-      if (!ingredientMap.has(key)) {
-        ingredientMap.set(key, ingredient);
-      }
-    });
+    if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+      recipe.ingredients.forEach(ingredient => {
+        if (ingredient && ingredient.name) {
+          const key = ingredient.name.toLowerCase();
+          if (!ingredientMap.has(key)) {
+            ingredientMap.set(key, ingredient);
+          }
+        }
+      });
+    }
   });
 
   console.log('Unique ingredients found:', Array.from(ingredientMap.keys()));
