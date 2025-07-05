@@ -4,6 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { WebhookResponse } from '@/utils/webhookService';
+import { SupermarketCredentialsModal } from '@/components/SupermarketCredentialsModal';
+import { addItemsToBasket, formatItemsForBasket } from '@/utils/shoppingBasketService';
+import { useToast } from '@/hooks/use-toast';
+import { ExternalLink } from 'lucide-react';
 
 interface ShoppingListProps {
   userProfile: any;
@@ -56,6 +60,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [shoppingItems, setShoppingItems] = useState<{[key: string]: ShoppingItem[]}>({});
   const [totalWeekCost, setTotalWeekCost] = useState<{[key: string]: number}>({});
   const [bestOption, setBestOption] = useState<{store: string, cost: number} | null>(null);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [isAddingToBasket, setIsAddingToBasket] = useState(false);
+  const [basketUrl, setBasketUrl] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Generate shopping list from enhanced recipes with price data
   useEffect(() => {
@@ -132,6 +140,90 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     bestOption,
     shoppingItemsKeys: Object.keys(shoppingItems)
   });
+
+  const handleStartShoppingOnline = async () => {
+    const items = formatItemsForBasket(shoppingItems);
+    
+    if (items.length === 0) {
+      toast({
+        title: "No items to add",
+        description: "Please generate a meal plan first to create your shopping list.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Determine which supermarket to use
+    const targetSupermarket = selectedStore === 'all' 
+      ? (bestOption?.store || 'tesco') 
+      : selectedStore;
+
+    // Check if user has saved credentials for this supermarket
+    const savedCredentials = userProfile?.connectedStores?.find(
+      (store: any) => store.name.toLowerCase() === targetSupermarket.toLowerCase()
+    );
+
+    if (savedCredentials?.credentials?.username && savedCredentials?.credentials?.password) {
+      // Use saved credentials
+      await processBasketAddition(targetSupermarket, {
+        username: savedCredentials.credentials.username,
+        password: savedCredentials.credentials.password
+      }, items);
+    } else {
+      // Show credentials modal
+      setShowCredentialsModal(true);
+    }
+  };
+
+  const processBasketAddition = async (
+    supermarket: string, 
+    credentials: { username: string; password: string }, 
+    items: any[]
+  ) => {
+    setIsAddingToBasket(true);
+    
+    try {
+      const result = await addItemsToBasket(supermarket, credentials, items);
+      
+      if (result.success && result.basketUrl) {
+        setBasketUrl(result.basketUrl);
+        toast({
+          title: "Items added to basket!",
+          description: `Successfully added ${items.length} items to your ${supermarket} basket.`,
+        });
+      } else {
+        toast({
+          title: "Failed to add items",
+          description: result.error || "There was an error adding items to your basket. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection error",
+        description: "Failed to connect to the shopping service. Please try again later.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingToBasket(false);
+      setShowCredentialsModal(false);
+    }
+  };
+
+  const handleCredentialsSubmit = async (credentials: { username: string; password: string }) => {
+    const items = formatItemsForBasket(shoppingItems);
+    const targetSupermarket = selectedStore === 'all' 
+      ? (bestOption?.store || 'tesco') 
+      : selectedStore;
+    
+    await processBasketAddition(targetSupermarket, credentials, items);
+  };
+
+  const handleFinishOrder = () => {
+    if (basketUrl) {
+      window.open(basketUrl, '_blank');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -289,10 +381,32 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         <Button variant="outline" className="flex-1">
           Add to Phone
         </Button>
-        <Button className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700">
-          Start Shopping Online
-        </Button>
+        {basketUrl ? (
+          <Button 
+            onClick={handleFinishOrder}
+            className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Finish Order at {selectedStore === 'all' ? (bestOption?.store || 'Tesco') : selectedStore}
+          </Button>
+        ) : (
+          <Button 
+            onClick={handleStartShoppingOnline}
+            disabled={isAddingToBasket}
+            className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
+          >
+            {isAddingToBasket ? 'Adding to Basket...' : 'Start Shopping Online'}
+          </Button>
+        )}
       </div>
+
+      <SupermarketCredentialsModal
+        isOpen={showCredentialsModal}
+        onClose={() => setShowCredentialsModal(false)}
+        onSubmit={handleCredentialsSubmit}
+        supermarket={selectedStore === 'all' ? (bestOption?.store || 'Tesco') : selectedStore}
+        isLoading={isAddingToBasket}
+      />
     </div>
   );
 };
