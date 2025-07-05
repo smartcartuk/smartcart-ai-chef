@@ -8,6 +8,7 @@ import { SupermarketCredentialsModal } from '@/components/SupermarketCredentials
 import { addItemsToBasket, formatItemsForBasket } from '@/utils/shoppingBasketService';
 import { useToast } from '@/hooks/use-toast';
 import { ExternalLink } from 'lucide-react';
+import { MatchedProductsModal } from '@/components/MatchedProductsModal';
 
 interface ShoppingListProps {
   userProfile: any;
@@ -26,6 +27,7 @@ interface IngredientWithPrices {
   prices: {
     tesco: PriceInfo;
     sainsburys: PriceInfo;
+    [key: string]: PriceInfo;
     [key: string]: PriceInfo;
   };
 }
@@ -64,6 +66,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [isAddingToBasket, setIsAddingToBasket] = useState(false);
   const [basketUrl, setBasketUrl] = useState<string | null>(null);
   const { toast } = useToast();
+  const [showMatchedProductsModal, setShowMatchedProductsModal] = useState(false);
+  const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
 
   // Generate shopping list from enhanced recipes with price data
   useEffect(() => {
@@ -185,12 +189,28 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     try {
       const result = await addItemsToBasket(supermarket, credentials, items);
       
-      if (result.success && result.basketUrl) {
-        setBasketUrl(result.basketUrl);
-        toast({
-          title: "Items added to basket!",
-          description: `Successfully added ${items.length} items to your ${supermarket} basket.`,
-        });
+      if (result.success) {
+        if (result.items && result.items.length > 0) {
+          // Show matched products modal
+          setMatchedProducts(result.items);
+          setShowMatchedProductsModal(true);
+          
+          if (result.basketUrl) {
+            setBasketUrl(result.basketUrl);
+          }
+          
+          const matchedCount = result.items.filter(item => item.matched_product).length;
+          toast({
+            title: "Product matches found!",
+            description: `Found ${matchedCount}/${result.items.length} product matches. Review before proceeding.`,
+          });
+        } else if (result.basketUrl) {
+          setBasketUrl(result.basketUrl);
+          toast({
+            title: "Items added to basket!",
+            description: `Successfully added ${items.length} items to your ${supermarket} basket.`,
+          });
+        }
       } else {
         toast({
           title: "Failed to add items",
@@ -217,6 +237,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       : selectedStore;
     
     await processBasketAddition(targetSupermarket, credentials, items);
+  };
+
+  const handleProceedToBasket = () => {
+    setShowMatchedProductsModal(false);
+    if (basketUrl) {
+      window.open(basketUrl, '_blank');
+    }
   };
 
   const handleFinishOrder = () => {
@@ -406,6 +433,15 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         onSubmit={handleCredentialsSubmit}
         supermarket={selectedStore === 'all' ? (bestOption?.store || 'Tesco') : selectedStore}
         isLoading={isAddingToBasket}
+      />
+
+      <MatchedProductsModal
+        isOpen={showMatchedProductsModal}
+        onClose={() => setShowMatchedProductsModal(false)}
+        onProceedToBasket={handleProceedToBasket}
+        items={matchedProducts}
+        basketUrl={basketUrl}
+        supermarket={selectedStore === 'all' ? (bestOption?.store || 'tesco') : selectedStore}
       />
     </div>
   );

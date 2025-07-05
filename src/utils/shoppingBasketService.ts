@@ -4,6 +4,19 @@ interface ShoppingItem {
   quantity: string;
 }
 
+interface MatchedProduct {
+  title: string;
+  price: string;
+  source: string;
+  url?: string;
+}
+
+interface BasketItemResponse {
+  name: string;
+  quantity: number;
+  matched_product?: MatchedProduct;
+}
+
 interface BasketCredentials {
   username: string;
   password: string;
@@ -20,6 +33,7 @@ interface AddToBasketResponse {
   basketUrl?: string;
   message?: string;
   error?: string;
+  items?: BasketItemResponse[];
 }
 
 const BASKET_API_URL = 'https://smartcart-operator.vercel.app/api/add-to-basket';
@@ -56,7 +70,8 @@ export const addItemsToBasket = async (
     return {
       success: true,
       basketUrl: data.basketUrl,
-      message: data.message
+      message: data.message,
+      items: data.items // Include the matched products data
     };
   } catch (error) {
     console.error('Error adding items to basket:', error);
