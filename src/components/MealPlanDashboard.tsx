@@ -216,41 +216,41 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
                 Clear Selection
               </Button>
             </div>
-          </div>
+          </Card>
         )}
 
         <PriceResults userProfile={userProfile} />
 
         {/* Main Content Tabs - Enhanced visibility */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 h-12 bg-gray-100 rounded-lg p-1">
+          <TabsList className="grid w-full grid-cols-4 h-14 bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl p-1 shadow-md border">
             <TabsTrigger 
               value="plan" 
-              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"
+              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
             >
-              <span className="text-lg">📅</span>
-              <span className="font-medium">Meal Plan</span>
+              <span className="text-xl">📅</span>
+              <span className="font-bold">Meal Plan</span>
             </TabsTrigger>
             <TabsTrigger 
               value="shopping" 
-              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"
+              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
             >
-              <span className="text-lg">🛒</span>
-              <span className="font-medium">Shopping List</span>
+              <span className="text-xl">🛒</span>
+              <span className="font-bold">Shopping List</span>
             </TabsTrigger>
             <TabsTrigger 
               value="prices" 
-              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"
+              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
             >
-              <span className="text-lg">💷</span>
-              <span className="font-medium">Price Compare</span>
+              <span className="text-xl">💷</span>
+              <span className="font-bold">Price Compare</span>
             </TabsTrigger>
             <TabsTrigger 
               value="assistant" 
-              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"
+              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
             >
-              <span className="text-lg">🤖</span>
-              <span className="font-medium">AI Assistant</span>
+              <span className="text-xl">🤖</span>
+              <span className="font-bold">AI Assistant</span>
             </TabsTrigger>
           </TabsList>
 
