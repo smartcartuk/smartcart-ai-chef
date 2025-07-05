@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { buildPreferencesString, DAYS_OF_WEEK } from '@/utils/recipeHelpers';
 import { generateMealImage } from '@/utils/recipeImageGenerator';
-import { usePriceCalculation } from './usePriceCalculation';
+import { useUnifiedPriceCalculation } from './useUnifiedPriceCalculation';
 
 interface Recipe {
   day: string;
@@ -27,7 +27,7 @@ export const useWeeklyPlan = (userProfile: any) => {
   const [isComparingPrices, setIsComparingPrices] = useState(false);
   const [priceComparisonResult, setPriceComparisonResult] = useState<any>(null);
 
-  const { calculateEstimatedPrice } = usePriceCalculation();
+  const { calculateEstimatedPrice } = useUnifiedPriceCalculation();
 
   const fetchWeeklyRecipes = async () => {
     setIsLoading(true);
@@ -60,16 +60,17 @@ export const useWeeklyPlan = (userProfile: any) => {
         // Map the meals array to our Recipe format
         weeklyRecipes = await Promise.all(
           data.meals.map(async (meal: any, index: number) => {
-            // Use the cost from the API response, or calculate it as fallback
+            // Calculate price using the enhanced ingredients data
             let estimatedPrice = meal.estimated_cost || meal.cost_per_meal || meal.estimated_price;
             
-            if (!estimatedPrice) {
-              // Extract ingredient names for price calculation
-              const ingredientNames = meal.ingredients?.map((ing: any) => 
-                typeof ing === 'string' ? ing : ing.name || ing
-              ) || [];
-              estimatedPrice = await calculateEstimatedPrice(ingredientNames);
+            if (!estimatedPrice && meal.ingredients) {
+              console.log(`Calculating price for meal ${index + 1}: ${meal.recipe_name || meal.name}`);
+              estimatedPrice = await calculateEstimatedPrice(meal.ingredients);
+              console.log(`Calculated price: £${estimatedPrice.toFixed(2)}`);
             }
+            
+            // Ensure we have a valid price
+            estimatedPrice = estimatedPrice || 5.00; // Reasonable default for a meal
             
             const recipeName = meal.recipe_name || meal.name || 'Generated Recipe';
             
@@ -107,7 +108,9 @@ export const useWeeklyPlan = (userProfile: any) => {
             continue;
           }
 
-          const estimatedPrice = await calculateEstimatedPrice(dayData.ingredients || []);
+          const estimatedPrice = dayData.ingredients 
+            ? await calculateEstimatedPrice(dayData.ingredients)
+            : 5.00;
           const recipeName = dayData.recipe_name || dayData.name || 'Generated Recipe';
 
           weeklyRecipes.push({
@@ -125,7 +128,7 @@ export const useWeeklyPlan = (userProfile: any) => {
         }
       }
       
-      console.log('Final weekly recipes:', weeklyRecipes);
+      console.log('Final weekly recipes with calculated prices:', weeklyRecipes);
       setRecipes(weeklyRecipes);
     } catch (err) {
       console.error('Error fetching weekly recipes:', err);
@@ -147,7 +150,9 @@ export const useWeeklyPlan = (userProfile: any) => {
       throw new Error(`Failed to fetch recipe for ${day}: ${error.message}`);
     }
 
-    const estimatedPrice = await calculateEstimatedPrice(data.ingredients || []);
+    const estimatedPrice = data.ingredients 
+      ? await calculateEstimatedPrice(data.ingredients)
+      : 5.00;
     const recipeName = data.recipe_name || 'Generated Recipe';
 
     return {

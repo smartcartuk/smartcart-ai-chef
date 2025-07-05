@@ -6,33 +6,84 @@ interface IngredientPrice {
   average_price: number;
 }
 
-export const usePriceCalculation = () => {
-  const calculateEstimatedPrice = async (ingredients: string[]): Promise<number> => {
-    try {
-      // Query the ingredient_prices table for cached prices using type assertion
-      const { data: priceData, error } = await (supabase as any)
-        .from('ingredient_prices')
-        .select('ingredient_name, average_price')
-        .in('ingredient_name', ingredients);
+interface EnhancedIngredient {
+  name: string;
+  amount: string;
+  prices?: {
+    tesco?: { price: number; url?: string };
+    sainsburys?: { price: number; url?: string };
+    [key: string]: { price: number; url?: string } | undefined;
+  };
+}
 
-      if (error) {
-        console.warn('Could not fetch ingredient prices:', error);
-        return 0;
+export const usePriceCalculation = () => {
+  const calculateEstimatedPrice = async (ingredients: (string | EnhancedIngredient)[]): Promise<number> => {
+    try {
+      let totalPrice = 0;
+      
+      for (const ingredient of ingredients) {
+        let ingredientPrice = 0;
+        let ingredientName = '';
+        
+        if (typeof ingredient === 'string') {
+          // Handle simple string ingredients
+          ingredientName = ingredient;
+          
+          // Try to get price from database
+          const { data: priceData, error } = await (supabase as any)
+            .from('ingredient_prices')
+            .select('ingredient_name, average_price')
+            .ilike('ingredient_name', `%${ingredientName}%`)
+            .limit(1)
+            .single();
+
+          if (!error && priceData) {
+            ingredientPrice = priceData.average_price;
+          } else {
+            ingredientPrice = 2.50; // Default fallback price
+          }
+        } else if (ingredient && typeof ingredient === 'object') {
+          // Handle enhanced ingredients with embedded price data
+          ingredientName = ingredient.name || '';
+          
+          if (ingredient.prices) {
+            // Use the lowest price from available stores
+            const availablePrices = Object.values(ingredient.prices)
+              .filter(store => store && typeof store.price === 'number')
+              .map(store => store!.price);
+            
+            if (availablePrices.length > 0) {
+              ingredientPrice = Math.min(...availablePrices);
+            }
+          }
+          
+          // Fallback to database lookup if no embedded price
+          if (ingredientPrice === 0 && ingredientName) {
+            const { data: priceData, error } = await (supabase as any)
+              .from('ingredient_prices')
+              .select('ingredient_name, average_price')
+              .ilike('ingredient_name', `%${ingredientName}%`)
+              .limit(1)
+              .single();
+
+            if (!error && priceData) {
+              ingredientPrice = priceData.average_price;
+            } else {
+              ingredientPrice = 2.50; // Default fallback price
+            }
+          }
+        }
+        
+        totalPrice += ingredientPrice;
+        console.log(`Price for ${ingredientName}: £${ingredientPrice.toFixed(2)}`);
       }
 
-      let totalPrice = 0;
-      ingredients.forEach(ingredient => {
-        const priceInfo = (priceData as IngredientPrice[])?.find(p => 
-          p.ingredient_name.toLowerCase().includes(ingredient.toLowerCase()) ||
-          ingredient.toLowerCase().includes(p.ingredient_name.toLowerCase())
-        );
-        totalPrice += priceInfo?.average_price || 2.50; // Default price if not found
-      });
-
-      return Math.round(totalPrice * 100) / 100; // Round to 2 decimal places
+      const finalPrice = Math.round(totalPrice * 100) / 100;
+      console.log(`Total calculated price: £${finalPrice.toFixed(2)}`);
+      return finalPrice;
     } catch (err) {
       console.warn('Error calculating estimated price:', err);
-      return 0;
+      return ingredients.length * 2.50; // Fallback: default price per ingredient
     }
   };
 
