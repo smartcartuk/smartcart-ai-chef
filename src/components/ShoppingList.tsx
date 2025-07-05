@@ -28,7 +28,6 @@ interface IngredientWithPrices {
     tesco: PriceInfo;
     sainsburys: PriceInfo;
     [key: string]: PriceInfo;
-    [key: string]: PriceInfo;
   };
 }
 
@@ -69,7 +68,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [showMatchedProductsModal, setShowMatchedProductsModal] = useState(false);
   const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
 
-  // Generate shopping list from enhanced recipes with price data
+  const handleItemCheck = (category: string, index: number) => {
+    const key = `${category}-${index}`;
+    setCheckedItems(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const getStoreColor = (store: string) => {
+    const colors = {
+      'tesco': 'bg-blue-100 text-blue-700',
+      'sainsburys': 'bg-orange-100 text-orange-700', 
+      'asda': 'bg-green-100 text-green-700',
+      'morrisons': 'bg-purple-100 text-purple-700'
+    };
+    return colors[store.toLowerCase() as keyof typeof colors] || 'bg-gray-100 text-gray-700';
+  };
+
   useEffect(() => {
     console.log('ShoppingList useEffect triggered', { recipes, generatedData });
     
@@ -113,21 +126,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       setShoppingItems(mockShoppingItems);
     }
   }, [recipes, generatedData]);
-
-  const handleItemCheck = (category: string, index: number) => {
-    const key = `${category}-${index}`;
-    setCheckedItems(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const getStoreColor = (store: string) => {
-    const colors = {
-      'tesco': 'bg-blue-100 text-blue-700',
-      'sainsburys': 'bg-orange-100 text-orange-700', 
-      'asda': 'bg-green-100 text-green-700',
-      'morrisons': 'bg-purple-100 text-purple-700'
-    };
-    return colors[store.toLowerCase() as keyof typeof colors] || 'bg-gray-100 text-gray-700';
-  };
 
   const currentTotalCost = selectedStore === 'all' 
     ? Object.values(totalWeekCost)[0] || Object.values(shoppingItems).flat().reduce((sum, item) => sum + item.price, 0)
