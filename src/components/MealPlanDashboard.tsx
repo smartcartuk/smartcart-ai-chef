@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WeeklyPlan } from '@/components/WeeklyPlan';
 import { ShoppingList } from '@/components/ShoppingList';
 import { PriceComparison } from '@/components/PriceComparison';
-import { PriceResults } from '@/components/PriceResults';
 import { AIAssistant } from '@/components/AIAssistant';
 import { WebhookResponse } from '@/utils/webhookService';
 import { useToast } from '@/components/ui/use-toast';
@@ -219,8 +218,6 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
           </Card>
         )}
 
-        <PriceResults userProfile={userProfile} />
-
         {/* Main Content Tabs - Enhanced visibility */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 h-14 bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl p-1 shadow-md border">
@@ -283,6 +280,22 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
             <AIAssistant userProfile={userProfile} />
           </TabsContent>
         </Tabs>
+
+        {/* Recipe Generator Section - Moved to bottom */}
+        <Card className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200">
+          <div className="text-center space-y-4">
+            <h3 className="text-2xl font-bold text-gray-900">Recipe Generator</h3>
+            <p className="text-gray-600">
+              Generate new recipes based on your preferences and dietary requirements
+            </p>
+            <Button 
+              className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
+              onClick={handleRegeneratePlan}
+            >
+              Generate New Recipes
+            </Button>
+          </div>
+        </Card>
       </div>
     </div>
   );
