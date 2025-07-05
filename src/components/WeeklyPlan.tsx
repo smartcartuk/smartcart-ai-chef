@@ -13,12 +13,14 @@ interface WeeklyPlanProps {
   userProfile: any;
   generatedData?: WebhookResponse | null;
   onRecipesChange?: (recipes: any[]) => void;
+  onAddToPlan?: (recipe: any) => void;
 }
 
 export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ 
   userProfile, 
   generatedData,
-  onRecipesChange 
+  onRecipesChange,
+  onAddToPlan 
 }) => {
   const { toast } = useToast();
   const {
@@ -38,23 +40,19 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
     clearSelection
   } = useWeeklyPlan(userProfile);
 
-  // Notify parent component when recipes change
   React.useEffect(() => {
     if (onRecipesChange && recipes.length > 0) {
       onRecipesChange(recipes);
     }
   }, [recipes, onRecipesChange]);
 
-  // Enhanced addToPlan function with toast feedback
   const handleAddToPlan = (recipe: any) => {
     addToPlan(recipe);
-    toast({
-      title: "Added to Plan!",
-      description: `${recipe.recipe_name} has been added to your meal plan.`,
-    });
+    if (onAddToPlan) {
+      onAddToPlan(recipe);
+    }
   };
 
-  // Enhanced compareSelectedPrices with proper feedback
   const handleCompareSelectedPrices = async () => {
     if (selectedIngredients.length === 0) {
       toast({
@@ -73,8 +71,8 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
       });
     } catch (error) {
       toast({
-        title: "Error comparing prices",
-        description: "Failed to compare prices. Please try again.",
+        title: "Price comparison temporarily unavailable",
+        description: "The price comparison service is currently unavailable. Please try again later.",
         variant: "destructive"
       });
     }

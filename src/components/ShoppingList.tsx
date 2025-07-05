@@ -67,10 +67,31 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const { toast } = useToast();
   const [showMatchedProductsModal, setShowMatchedProductsModal] = useState(false);
   const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
 
   const handleItemCheck = (category: string, index: number) => {
     const key = `${category}-${index}`;
     setCheckedItems(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleSelectAll = () => {
+    const newSelectAll = !selectAll;
+    setSelectAll(newSelectAll);
+    
+    const newCheckedItems: {[key: string]: boolean} = {};
+    Object.entries(shoppingItems).forEach(([category, items]) => {
+      items
+        .filter(item => selectedStore === 'all' || item.store === selectedStore)
+        .forEach((item, index) => {
+          const key = `${category}-${index}`;
+          newCheckedItems[key] = newSelectAll;
+        });
+    });
+    setCheckedItems(newCheckedItems);
+  };
+
+  const capitalizeFirstLetter = (str: string) => {
+    return str.charAt(0).toUpperCase() + str.slice(1);
   };
 
   const getStoreColor = (store: string) => {
@@ -88,7 +109,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     
     if (recipes.length > 0) {
       console.log('Processing recipes:', recipes);
-      // Check if recipes have the enhanced format with price data
       const hasEnhancedData = recipes.some(recipe => 
         recipe.ingredients && 
         recipe.ingredients.length > 0 && 
@@ -111,7 +131,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           setShoppingItems(fallbackItems);
         }
       } else {
-        // Fallback for basic recipe format
         console.log('Using basic recipe format');
         const generatedItems = generateShoppingListFromRecipes(recipes);
         setShoppingItems(generatedItems);
@@ -121,27 +140,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       const generatedItems = generateShoppingItemsFromData(generatedData.shoppingList);
       setShoppingItems(generatedItems);
     } else {
-      // Fallback to mock data
       console.log('Using mock data');
       setShoppingItems(mockShoppingItems);
     }
   }, [recipes, generatedData]);
-
-  const currentTotalCost = selectedStore === 'all' 
-    ? Object.values(totalWeekCost)[0] || Object.values(shoppingItems).flat().reduce((sum, item) => sum + item.price, 0)
-    : totalWeekCost[selectedStore] || 0;
-
-  const storeBreakdown = totalWeekCost;
-  const availableStores = Object.keys(storeBreakdown).length > 0 ? Object.keys(storeBreakdown) : ['tesco', 'sainsburys'];
-
-  const totalItems = Object.values(shoppingItems).flat().length;
-
-  console.log('ShoppingList render state:', {
-    totalItems,
-    storeBreakdown,
-    bestOption,
-    shoppingItemsKeys: Object.keys(shoppingItems)
-  });
 
   const handleStartShoppingOnline = async () => {
     const items = formatItemsForBasket(shoppingItems);
@@ -155,24 +157,20 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       return;
     }
 
-    // Determine which supermarket to use
     const targetSupermarket = selectedStore === 'all' 
       ? (bestOption?.store || 'tesco') 
       : selectedStore;
 
-    // Check if user has saved credentials for this supermarket
     const savedCredentials = userProfile?.connectedStores?.find(
       (store: any) => store.name.toLowerCase() === targetSupermarket.toLowerCase()
     );
 
     if (savedCredentials?.credentials?.username && savedCredentials?.credentials?.password) {
-      // Use saved credentials
       await processBasketAddition(targetSupermarket, {
         username: savedCredentials.credentials.username,
         password: savedCredentials.credentials.password
       }, items);
     } else {
-      // Show credentials modal
       setShowCredentialsModal(true);
     }
   };
@@ -189,7 +187,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       
       if (result.success) {
         if (result.items && result.items.length > 0) {
-          // Show matched products modal
           setMatchedProducts(result.items);
           setShowMatchedProductsModal(true);
           
@@ -249,6 +246,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       window.open(basketUrl, '_blank');
     }
   };
+
+  const currentTotalCost = selectedStore === 'all' 
+    ? Object.values(totalWeekCost)[0] || Object.values(shoppingItems).flat().reduce((sum, item) => sum + item.price, 0)
+    : totalWeekCost[selectedStore] || 0;
+
+  const storeBreakdown = totalWeekCost;
+  const availableStores = Object.keys(storeBreakdown).length > 0 ? Object.keys(storeBreakdown) : ['tesco', 'sainsburys'];
+  const totalItems = Object.values(shoppingItems).flat().length;
+
+  console.log('ShoppingList render state:', {
+    totalItems,
+    storeBreakdown,
+    bestOption,
+    shoppingItemsKeys: Object.keys(shoppingItems)
+  });
 
   return (
     <div className="space-y-6">
@@ -310,26 +322,38 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         </Card>
       )}
 
-      {/* Filter Options */}
-      <div className="flex flex-wrap gap-2">
-        <Button 
-          variant={selectedStore === 'all' ? 'default' : 'outline'} 
-          size="sm"
-          onClick={() => setSelectedStore('all')}
-        >
-          All Items ({totalItems} items)
-        </Button>
-        {availableStores.map((store) => (
-          <Button
-            key={store}
-            variant={selectedStore === store ? 'default' : 'outline'}
+      {/* Filter Options and Select All */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant={selectedStore === 'all' ? 'default' : 'outline'} 
             size="sm"
-            onClick={() => setSelectedStore(store)}
-            className={selectedStore === store ? getStoreColor(store) : ''}
+            onClick={() => setSelectedStore('all')}
           >
-            {store.charAt(0).toUpperCase() + store.slice(1)}
+            All Items ({totalItems} items)
           </Button>
-        ))}
+          {availableStores.map((store) => (
+            <Button
+              key={store}
+              variant={selectedStore === store ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedStore(store)}
+              className={selectedStore === store ? getStoreColor(store) : ''}
+            >
+              {store.charAt(0).toUpperCase() + store.slice(1)}
+            </Button>
+          ))}
+        </div>
+        
+        {totalItems > 0 && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleSelectAll}
+          >
+            {selectAll ? 'Deselect All' : 'Select All'}
+          </Button>
+        )}
       </div>
 
       {/* Shopping List Items */}
@@ -353,7 +377,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                       key={index}
                       className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
                         isChecked 
-                          ? 'bg-green-50 border-green-200 opacity-60' 
+                          ? 'bg-green-50 border-green-200' 
                           : 'bg-white border-gray-200 hover:border-gray-300'
                       }`}
                     >
@@ -362,9 +386,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           checked={isChecked}
                           onCheckedChange={() => handleItemCheck(category, index)}
                         />
-                        <div className={isChecked ? 'line-through text-gray-500' : ''}>
-                          <div className="font-medium">{item.name}</div>
+                        <div>
+                          <div className="font-medium">{capitalizeFirstLetter(item.name)}</div>
                           <div className="text-sm text-gray-600">{item.amount}</div>
+                          {isChecked && (
+                            <Badge className="mt-1 text-xs bg-green-100 text-green-700">
+                              Added to Basket
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       
@@ -372,16 +401,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         <Badge className={`text-xs ${getStoreColor(item.store)}`}>
                           {item.store.charAt(0).toUpperCase() + item.store.slice(1)}
                         </Badge>
-                        <div className={`font-bold ${isChecked ? 'text-gray-500' : 'text-gray-900'}`}>
+                        <div className="font-bold text-gray-900">
                           £{item.price.toFixed(2)}
                         </div>
-                        {item.url && item.url !== '#' && (
-                          <Button size="sm" variant="outline" asChild>
-                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs">
-                              Buy
-                            </a>
-                          </Button>
-                        )}
                       </div>
                     </div>
                   );
@@ -445,7 +467,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   );
 };
 
-// Helper function to generate shopping list from recipes
 const generateShoppingListFromRecipes = (recipes: any[]): {[key: string]: ShoppingItem[]} => {
   const categorized: {[key: string]: ShoppingItem[]} = {};
   
@@ -453,7 +474,6 @@ const generateShoppingListFromRecipes = (recipes: any[]): {[key: string]: Shoppi
   recipes.forEach(recipe => {
     if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
       recipe.ingredients.forEach(ingredient => {
-        // Handle both string and object ingredients
         const ingredientName = typeof ingredient === 'string' ? ingredient : ingredient.name;
         if (ingredientName) {
           allIngredients.push(ingredientName);
@@ -483,9 +503,7 @@ const generateShoppingListFromRecipes = (recipes: any[]): {[key: string]: Shoppi
   return categorized;
 };
 
-// Helper function to categorize ingredients - ensure we always get a string
 const categorizeIngredient = (ingredient: string | any): string => {
-  // Handle both string and object inputs
   const ingredientName = typeof ingredient === 'string' ? ingredient : (ingredient?.name || 'unknown');
   const lowerIngredient = ingredientName.toLowerCase();
   
@@ -528,7 +546,6 @@ const categorizeIngredient = (ingredient: string | any): string => {
   return 'Other Items';
 };
 
-// Helper function to estimate price
 const estimatePrice = (ingredient: string): number => {
   const lowerIngredient = ingredient.toLowerCase();
   
@@ -544,17 +561,14 @@ const estimatePrice = (ingredient: string): number => {
     return 1.99 + Math.random() * 1;
   }
   
-  // Pantry staples - lower prices
   return 0.99 + Math.random() * 2;
 };
 
-// Helper function to get optimal store
 const getOptimalStore = (ingredient: string): string => {
   const stores = ['tesco', 'sainsburys', 'asda', 'morrisons'];
   return stores[Math.floor(Math.random() * stores.length)];
 };
 
-// Helper function to convert webhook shopping list to component format
 const generateShoppingItemsFromData = (shoppingList: any[]): {[key: string]: ShoppingItem[]} => {
   const categorized: {[key: string]: ShoppingItem[]} = {};
   
@@ -567,7 +581,7 @@ const generateShoppingItemsFromData = (shoppingList: any[]): {[key: string]: Sho
       name: item.item,
       amount: item.quantity,
       price: Number(item.estimated_cost) || 0,
-      store: 'tesco', // Default store
+      store: 'tesco',
       checked: false,
       category
     });
@@ -576,7 +590,6 @@ const generateShoppingItemsFromData = (shoppingList: any[]): {[key: string]: Sho
   return categorized;
 };
 
-// Mock data fallback
 const mockShoppingItems = {
   'Fresh Produce': [
     { name: 'Salmon Fillets', amount: '4 portions', price: 12.99, store: 'tesco', checked: false, category: 'Fresh Produce' },
@@ -587,14 +600,12 @@ const mockShoppingItems = {
   ]
 };
 
-// Generate shopping list from enhanced recipes with price data
 const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
   console.log('generateEnhancedShoppingList called with:', recipes);
   
   const categorized: {[key: string]: ShoppingItem[]} = {};
   const ingredientMap = new Map<string, IngredientWithPrices>();
   
-  // Collect unique ingredients from all recipes
   recipes.forEach(recipe => {
     if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
       recipe.ingredients.forEach(ingredient => {
@@ -610,7 +621,6 @@ const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
 
   console.log('Unique ingredients found:', Array.from(ingredientMap.keys()));
 
-  // Calculate total costs per supermarket
   const totalWeekCost: {[key: string]: number} = {};
   const supermarkets = ['tesco', 'sainsburys'];
   
@@ -623,21 +633,18 @@ const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
 
   console.log('Total week costs:', totalWeekCost);
 
-  // Find best option
   const bestStore = Object.entries(totalWeekCost).reduce((best, [store, cost]) => 
     cost < best.cost ? { store, cost } : best
   , { store: '', cost: Infinity });
 
   console.log('Best store option:', bestStore);
 
-  // Create shopping items optimized for best prices per ingredient
   Array.from(ingredientMap.values()).forEach(ingredient => {
     const category = categorizeIngredient(ingredient.name);
     if (!categorized[category]) {
       categorized[category] = [];
     }
 
-    // Find the best price for this ingredient
     const bestPrice = supermarkets.reduce((best, market) => {
       const price = ingredient.prices?.[market]?.price || 999;
       return price < best.price ? { market, price, url: ingredient.prices?.[market]?.url || '#' } : best;
