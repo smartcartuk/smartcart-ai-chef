@@ -10,6 +10,7 @@ interface MatchedProduct {
   price: string;
   source: string;
   url?: string;
+  image?: string;
 }
 
 interface MatchedProductDisplayProps {
@@ -48,7 +49,18 @@ export const MatchedProductDisplay: React.FC<MatchedProductDisplayProps> = ({
 
   return (
     <Card className="p-4 border-green-200 bg-green-50">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
+        {matchedProduct.image && (
+          <img 
+            src={matchedProduct.image} 
+            alt={matchedProduct.title}
+            className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        )}
+        
         <div className="flex-1">
           <div className="font-medium text-green-800">
             {matchedProduct.url ? (
@@ -77,6 +89,7 @@ export const MatchedProductDisplay: React.FC<MatchedProductDisplayProps> = ({
             </Badge>
           </div>
         </div>
+        
         <div className="text-green-600">
           <ShoppingCart className="w-5 h-5" />
         </div>

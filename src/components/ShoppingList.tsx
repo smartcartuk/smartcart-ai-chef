@@ -54,6 +54,13 @@ interface ShoppingItem {
   url?: string;
   image?: string;
   storePrices?: {[key: string]: number};
+  matchedProduct?: {
+    title: string;
+    price: string;
+    source: string;
+    url?: string;
+    image?: string;
+  };
 }
 
 export const ShoppingList: React.FC<ShoppingListProps> = ({ 
@@ -73,6 +80,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [showMatchedProductsModal, setShowMatchedProductsModal] = useState(false);
   const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [matchedProductsData, setMatchedProductsData] = useState<{[key: string]: any}>({});
 
   const handleItemCheck = (category: string, index: number) => {
     const key = `${category}-${index}`;
@@ -276,6 +284,26 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       if (result.success) {
         if (result.items && result.items.length > 0) {
           setMatchedProducts(result.items);
+          
+          // Update shopping items with matched product data
+          const updatedShoppingItems = { ...shoppingItems };
+          const matchedDataMap: {[key: string]: any} = {};
+          
+          result.items.forEach(item => {
+            if (item.matched_product) {
+              matchedDataMap[item.name.toLowerCase()] = item.matched_product;
+            }
+          });
+          
+          Object.keys(updatedShoppingItems).forEach(category => {
+            updatedShoppingItems[category] = updatedShoppingItems[category].map(shoppingItem => ({
+              ...shoppingItem,
+              matchedProduct: matchedDataMap[shoppingItem.name.toLowerCase()]
+            }));
+          });
+          
+          setShoppingItems(updatedShoppingItems);
+          setMatchedProductsData(matchedDataMap);
           setShowMatchedProductsModal(true);
           
           if (result.basketUrl) {
@@ -463,41 +491,87 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   return (
                     <div 
                       key={index}
-                      className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
+                      className={`p-4 rounded-lg border transition-all ${
                         isChecked 
                           ? 'bg-green-50 border-green-200' 
                           : 'bg-white border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-start space-x-3">
                         <Checkbox
                           checked={isChecked}
                           onCheckedChange={() => handleItemCheck(category, index)}
+                          className="flex-shrink-0 mt-1"
                         />
-                        {item.image && (
+                        
+                        {item.matchedProduct?.image && (
                           <img 
-                            src={item.image} 
-                            alt={item.name}
-                            className="w-12 h-12 object-cover rounded-md"
+                            src={item.matchedProduct.image} 
+                            alt={item.matchedProduct.title || item.name}
+                            className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
                           />
                         )}
-                        <div>
-                          <div className="font-medium">{capitalizeFirstLetter(item.name)}</div>
-                          <div className="text-sm text-gray-600">{item.amount}</div>
-                          {isChecked && (
-                            <Badge className="mt-1 text-xs bg-green-100 text-green-700">
-                              Added to Basket
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-3">
-                        <Badge className={`text-xs ${getStoreColor(item.store)}`}>
-                          {item.store.charAt(0).toUpperCase() + item.store.slice(1)}
-                        </Badge>
-                        <div className="font-bold text-gray-900">
-                          £{item.price.toFixed(2)}
+                        
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-1">
+                                {item.matchedProduct?.url ? (
+                                  <a 
+                                    href={item.matchedProduct.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className={`font-medium hover:underline ${isChecked ? 'line-through text-gray-500' : 'text-blue-600'}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {item.matchedProduct.title}
+                                    <ExternalLink className="w-3 h-3 inline ml-1" />
+                                  </a>
+                                ) : (
+                                  <span className={`font-medium ${isChecked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                                    {item.matchedProduct?.title || item.name}
+                                  </span>
+                                )}
+                                <Badge variant="outline" className={`text-xs ${getStoreColor(item.store)}`}>
+                                  {item.store}
+                                </Badge>
+                              </div>
+                              
+                              {item.matchedProduct && item.matchedProduct.title !== item.name && (
+                                <div className="text-sm text-gray-600 mb-1">
+                                  Original: {item.name}
+                                </div>
+                              )}
+                              
+                              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                                <span>Amount: {item.amount}</span>
+                                {item.matchedProduct && (
+                                  <Badge className="text-xs bg-green-100 text-green-700">
+                                    Matched from {item.matchedProduct.source}
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              {item.storePrices && Object.keys(item.storePrices).length > 1 && (
+                                <div className="flex items-center space-x-2 mt-1">
+                                  {Object.entries(item.storePrices).map(([store, price]) => (
+                                    <span key={store} className="text-xs text-gray-500">
+                                      {store}: £{typeof price === 'number' ? price.toFixed(2) : price}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="text-right">
+                              <div className={`font-semibold ${isChecked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                                {item.matchedProduct?.price || `£${item.price.toFixed(2)}`}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
