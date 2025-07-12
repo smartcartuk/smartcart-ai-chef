@@ -111,18 +111,26 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   useEffect(() => {
     console.log('ShoppingList useEffect triggered', { recipes, generatedData });
+    console.log('Recipe data sample:', recipes[0]);
     
     const loadShoppingData = async () => {
       if (recipes.length > 0) {
         console.log('Processing recipes:', recipes);
-        const hasEnhancedData = recipes.some(recipe => 
-          recipe.ingredients && 
-          recipe.ingredients.length > 0 && 
-          typeof recipe.ingredients[0] === 'object' &&
-          recipe.ingredients[0].prices
-        );
+        const hasEnhancedData = recipes.some(recipe => {
+          console.log('Checking recipe for enhanced data:', recipe);
+          const hasIngredients = recipe.ingredients && Array.isArray(recipe.ingredients);
+          console.log('Has ingredients:', hasIngredients);
+          if (hasIngredients && recipe.ingredients.length > 0) {
+            console.log('First ingredient:', recipe.ingredients[0]);
+            console.log('First ingredient type:', typeof recipe.ingredients[0]);
+            console.log('Has prices?', recipe.ingredients[0]?.prices);
+            return typeof recipe.ingredients[0] === 'object' && recipe.ingredients[0].prices;
+          }
+          return false;
+        });
 
         console.log('Has enhanced data:', hasEnhancedData);
+        console.log('First ingredient structure:', recipes[0]?.ingredients?.[0]);
 
         if (hasEnhancedData) {
           try {
@@ -764,6 +772,7 @@ const mockShoppingItems = {
 
 const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
   console.log('generateEnhancedShoppingList called with:', recipes);
+  console.log('Sample recipe ingredient:', recipes[0]?.ingredients?.[0]);
   
   const categorized: {[key: string]: ShoppingItem[]} = {};
   const ingredientMap = new Map<string, IngredientWithPrices>();
@@ -788,12 +797,14 @@ const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
   
   supermarkets.forEach(market => {
     totalWeekCost[market] = recipes.reduce((sum, recipe) => {
-      return sum + (recipe.cost_by_supermarket?.[market] || 0);
+      const recipeCost = recipe.cost_by_supermarket?.[market];
+      console.log(`${recipe.recipe_name} cost at ${market}:`, recipeCost);
+      return sum + (recipeCost || 0);
     }, 0);
     totalWeekCost[market] = parseFloat(totalWeekCost[market].toFixed(2));
   });
 
-  console.log('Total week costs:', totalWeekCost);
+  console.log('Total week costs from recipes:', totalWeekCost);
 
   const bestStore = Object.entries(totalWeekCost).reduce((best, [store, cost]) => 
     cost < best.cost ? { store, cost } : best
@@ -807,6 +818,7 @@ const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
       categorized[category] = [];
     }
 
+    // Find the best price for display, but keep all store prices for calculations
     const bestPrice = supermarkets.reduce((best, market) => {
       const price = ingredient.prices?.[market]?.price || 999;
       return price < best.price ? { 
@@ -817,15 +829,27 @@ const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
       } : best;
     }, { market: '', price: Infinity, url: '#', image: '' });
 
+    // Extract all store prices for cost breakdown
+    const storePrices: {[key: string]: number} = {};
+    supermarkets.forEach(market => {
+      const price = ingredient.prices?.[market]?.price;
+      if (price && typeof price === 'number') {
+        storePrices[market] = price;
+      }
+    });
+
+    console.log(`Ingredient: ${ingredient.name}, Store prices:`, storePrices);
+
     categorized[category].push({
       name: ingredient.name,
       amount: ingredient.amount,
-      price: bestPrice.price,
-      store: bestPrice.market,
+      price: bestPrice.price !== Infinity ? bestPrice.price : 2.50,
+      store: bestPrice.market || 'tesco',
       checked: false,
       category,
       url: bestPrice.url,
-      image: bestPrice.image
+      image: bestPrice.image,
+      storePrices: storePrices
     });
   });
 
