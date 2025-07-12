@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,42 +7,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { WebhookResponse } from '@/utils/webhookService';
 import { SupermarketCredentialsModal } from '@/components/SupermarketCredentialsModal';
 import { addItemsToBasket, formatItemsForBasket } from '@/utils/shoppingBasketService';
-import { useUnifiedPriceCalculation } from '@/hooks/useUnifiedPriceCalculation';
-import { supabase } from '@/integrations/supabase/client';
+import { useRealTimePricing } from '@/hooks/useRealTimePricing';
 import { useToast } from '@/hooks/use-toast';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Loader2 } from 'lucide-react';
 import { MatchedProductsModal } from '@/components/MatchedProductsModal';
 
 interface ShoppingListProps {
   userProfile: any;
   generatedData?: WebhookResponse | null;
   recipes?: any[];
-}
-
-interface PriceInfo {
-  price: number;
-  url: string;
-  image?: string;
-}
-
-interface IngredientWithPrices {
-  name: string;
-  amount: string;
-  prices: {
-    tesco: PriceInfo;
-    sainsburys: PriceInfo;
-    [key: string]: PriceInfo;
-  };
-}
-
-interface EnhancedRecipe {
-  day: string;
-  recipe_name: string;
-  ingredients: IngredientWithPrices[];
-  cost_by_supermarket: {
-    tesco: number;
-    sainsburys: number;
-  };
 }
 
 interface ShoppingItem {
@@ -54,6 +28,7 @@ interface ShoppingItem {
   url?: string;
   image?: string;
   storePrices?: {[key: string]: number};
+  storeProducts?: {[key: string]: { price: number; url?: string; title?: string; image?: string }};
   matchedProduct?: {
     title: string;
     price: string;
@@ -71,8 +46,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [checkedItems, setCheckedItems] = useState<{[key: string]: boolean}>({});
   const [selectedStore, setSelectedStore] = useState<string>('all');
   const [shoppingItems, setShoppingItems] = useState<{[key: string]: ShoppingItem[]}>({});
-  const [totalWeekCost, setTotalWeekCost] = useState<{[key: string]: number}>({});
-  const [bestOption, setBestOption] = useState<{store: string, cost: number} | null>(null);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [isAddingToBasket, setIsAddingToBasket] = useState(false);
   const [basketUrl, setBasketUrl] = useState<string | null>(null);
@@ -80,7 +53,84 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [showMatchedProductsModal, setShowMatchedProductsModal] = useState(false);
   const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const [matchedProductsData, setMatchedProductsData] = useState<{[key: string]: any}>({});
+
+  // Extract ingredients from recipes for real-time pricing
+  const ingredients = React.useMemo(() => {
+    const allIngredients: Array<{ name: string; amount: string }> = [];
+    
+    recipes.forEach(recipe => {
+      if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+        recipe.ingredients.forEach(ingredient => {
+          const ingredientName = typeof ingredient === 'string' ? ingredient : ingredient.name;
+          const ingredientAmount = typeof ingredient === 'string' ? '1 unit' : (ingredient.amount || '1 unit');
+          
+          if (ingredientName) {
+            // Avoid duplicates
+            const exists = allIngredients.find(item => item.name.toLowerCase() === ingredientName.toLowerCase());
+            if (!exists) {
+              allIngredients.push({
+                name: ingredientName,
+                amount: ingredientAmount
+              });
+            }
+          }
+        });
+      }
+    });
+    
+    return allIngredients;
+  }, [recipes]);
+
+  // Use real-time pricing hook
+  const { pricedIngredients, storeTotals, isLoading: isPricingLoading, error: pricingError, refetchPrices } = useRealTimePricing(ingredients);
+
+  // Convert priced ingredients to shopping items format
+  useEffect(() => {
+    if (pricedIngredients.length > 0) {
+      console.log('Converting priced ingredients to shopping items:', pricedIngredients);
+      
+      const categorized: {[key: string]: ShoppingItem[]} = {};
+      
+      pricedIngredients.forEach(pricedItem => {
+        const category = categorizeIngredient(pricedItem.name);
+        if (!categorized[category]) {
+          categorized[category] = [];
+        }
+
+        // Create store-specific pricing data
+        const storePrices: {[key: string]: number} = {};
+        const storeProducts: {[key: string]: { price: number; url?: string; title?: string; image?: string }} = {};
+        
+        pricedItem.prices.forEach(priceData => {
+          storePrices[priceData.store] = priceData.price;
+          storeProducts[priceData.store] = {
+            price: priceData.price,
+            url: priceData.url,
+            title: priceData.title,
+            image: priceData.image
+          };
+        });
+
+        const bestPrice = pricedItem.bestPrice || pricedItem.prices[0];
+        
+        categorized[category].push({
+          name: pricedItem.name,
+          amount: pricedItem.amount,
+          price: bestPrice?.price || 2.50,
+          store: bestPrice?.store || 'tesco',
+          checked: false,
+          category,
+          url: bestPrice?.url,
+          image: bestPrice?.image,
+          storePrices,
+          storeProducts
+        });
+      });
+      
+      setShoppingItems(categorized);
+      console.log('Shopping items updated with real-time pricing:', categorized);
+    }
+  }, [pricedIngredients]);
 
   const handleItemCheck = (category: string, index: number) => {
     const key = `${category}-${index}`;
@@ -112,133 +162,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       'tesco': 'bg-blue-100 text-blue-700',
       'sainsburys': 'bg-orange-100 text-orange-700', 
       'asda': 'bg-green-100 text-green-700',
-      'morrisons': 'bg-purple-100 text-purple-700'
+      'aldi': 'bg-purple-100 text-purple-700'
     };
     return colors[store.toLowerCase() as keyof typeof colors] || 'bg-gray-100 text-gray-700';
-  };
-
-  useEffect(() => {
-    console.log('🚨 ShoppingList useEffect TRIGGERED', { recipes, generatedData });
-    console.log('🧪 Recipe count:', recipes?.length);
-    console.log('📋 First recipe sample:', recipes[0]);
-    
-    const loadShoppingData = async () => {
-      if (recipes.length > 0) {
-        console.log('🧪 Processing recipes:', recipes.length);
-        
-        // Always try enhanced path first, then fallback to database-driven
-        try {
-          // Check if recipes have cost_by_supermarket (this is the key indicator)
-          const hasStoreCosting = recipes.some(recipe => recipe.cost_by_supermarket);
-          console.log('💰 Recipes have store costing:', hasStoreCosting);
-          
-          if (hasStoreCosting) {
-            console.log('🎯 Using enhanced recipe-based pricing');
-            const { items, totals, best } = generateEnhancedShoppingList(recipes);
-            console.log('📊 Enhanced results:', { totals, best });
-            setShoppingItems(items);
-            setTotalWeekCost(totals);
-            setBestOption(best);
-          } else {
-            console.log('🔍 Using database-driven pricing');
-            const generatedItems = await generateShoppingListFromRecipes(recipes);
-            setShoppingItems(generatedItems);
-            const realisticTotals = generateRealisticCostBreakdownWithStorePrices(generatedItems);
-            setTotalWeekCost(realisticTotals);
-            setBestOption(getBestOption(realisticTotals));
-          }
-        } catch (error) {
-          console.error('❌ Error in shopping list generation:', error);
-          // Ultimate fallback with realistic multi-store pricing
-          setShoppingItems(mockShoppingItems);
-          const mockTotals = { tesco: 20.29, sainsburys: 20.80, asda: 18.90, morrisons: 21.30 };
-          setTotalWeekCost(mockTotals);
-          setBestOption({ store: 'asda', cost: 18.90 });
-        }
-      } else if (generatedData?.shoppingList) {
-        console.log('Using generated data shopping list');
-        const generatedItems = generateShoppingItemsFromData(generatedData.shoppingList);
-        setShoppingItems(generatedItems);
-        const realisticTotals = generateRealisticCostBreakdown(generatedItems);
-        setTotalWeekCost(realisticTotals);
-        setBestOption(getBestOption(realisticTotals));
-      } else {
-        console.log('📦 Using mock data with multi-store pricing');
-        setShoppingItems(mockShoppingItems);
-        const mockTotals = { tesco: 20.29, sainsburys: 20.80, asda: 18.90, morrisons: 21.30 };
-        setTotalWeekCost(mockTotals);
-        setBestOption({ store: 'asda', cost: 18.90 });
-      }
-    };
-
-    loadShoppingData();
-  }, [recipes, generatedData]);
-
-  // Generate realistic cost breakdown for stores
-  const generateRealisticCostBreakdown = (items: {[key: string]: ShoppingItem[]}) => {
-    const allItems = Object.values(items).flat();
-    const stores = ['tesco', 'sainsburys', 'asda', 'morrisons'];
-    const totals: {[key: string]: number} = {};
-    
-    stores.forEach(store => {
-      let total = 0;
-      allItems.forEach(item => {
-        // Generate store-specific pricing variations
-        let storePrice = item.price;
-        switch(store) {
-          case 'tesco':
-            storePrice = item.price * (0.95 + Math.random() * 0.1); // 95-105% of base price
-            break;
-          case 'sainsburys':
-            storePrice = item.price * (0.98 + Math.random() * 0.08); // 98-106% of base price
-            break;
-          case 'asda':
-            storePrice = item.price * (0.92 + Math.random() * 0.12); // 92-104% of base price
-            break;
-          case 'morrisons':
-            storePrice = item.price * (0.96 + Math.random() * 0.1); // 96-106% of base price
-            break;
-        }
-        total += storePrice;
-      });
-      totals[store] = parseFloat(total.toFixed(2));
-    });
-    
-    return totals;
-  };
-
-  // Enhanced cost breakdown using actual store prices from items
-  const generateRealisticCostBreakdownWithStorePrices = (items: {[key: string]: ShoppingItem[]}) => {
-    const allItems = Object.values(items).flat();
-    const stores = ['tesco', 'sainsburys', 'asda', 'morrisons'];
-    const totals: {[key: string]: number} = {};
-    
-    stores.forEach(store => {
-      let total = 0;
-      allItems.forEach(item => {
-        if (item.storePrices && item.storePrices[store]) {
-          total += item.storePrices[store];
-        } else {
-          // Fallback to item's main price if no store-specific price
-          total += item.price;
-        }
-      });
-      totals[store] = parseFloat(total.toFixed(2));
-    });
-    
-    console.log('Store price breakdown:', totals);
-    return totals;
-  };
-
-  const getBestOption = (totals: {[key: string]: number}) => {
-    const entries = Object.entries(totals);
-    if (entries.length === 0) return null;
-    
-    const best = entries.reduce((min, [store, cost]) => 
-      cost < min.cost ? { store, cost } : min
-    , { store: entries[0][0], cost: entries[0][1] });
-    
-    return best;
   };
 
   const handleStartShoppingOnline = async () => {
@@ -254,7 +180,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }
 
     const targetSupermarket = selectedStore === 'all' 
-      ? (bestOption?.store || 'tesco') 
+      ? (getBestStore()?.store || 'tesco') 
       : selectedStore;
 
     const savedCredentials = userProfile?.connectedStores?.find(
@@ -284,26 +210,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       if (result.success) {
         if (result.items && result.items.length > 0) {
           setMatchedProducts(result.items);
-          
-          // Update shopping items with matched product data
-          const updatedShoppingItems = { ...shoppingItems };
-          const matchedDataMap: {[key: string]: any} = {};
-          
-          result.items.forEach(item => {
-            if (item.matched_product) {
-              matchedDataMap[item.name.toLowerCase()] = item.matched_product;
-            }
-          });
-          
-          Object.keys(updatedShoppingItems).forEach(category => {
-            updatedShoppingItems[category] = updatedShoppingItems[category].map(shoppingItem => ({
-              ...shoppingItem,
-              matchedProduct: matchedDataMap[shoppingItem.name.toLowerCase()]
-            }));
-          });
-          
-          setShoppingItems(updatedShoppingItems);
-          setMatchedProductsData(matchedDataMap);
           setShowMatchedProductsModal(true);
           
           if (result.basketUrl) {
@@ -344,7 +250,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const handleCredentialsSubmit = async (credentials: { username: string; password: string }) => {
     const items = formatItemsForBasket(shoppingItems);
     const targetSupermarket = selectedStore === 'all' 
-      ? (bestOption?.store || 'tesco') 
+      ? (getBestStore()?.store || 'tesco') 
       : selectedStore;
     
     await processBasketAddition(targetSupermarket, credentials, items);
@@ -363,20 +269,49 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }
   };
 
-  const currentTotalCost = selectedStore === 'all' 
-    ? (bestOption?.cost || Object.values(totalWeekCost)[0] || Object.values(shoppingItems).flat().reduce((sum, item) => sum + item.price, 0))
-    : totalWeekCost[selectedStore] || 0;
+  const getBestStore = () => {
+    if (Object.keys(storeTotals).length === 0) return null;
+    
+    const entries = Object.entries(storeTotals);
+    return entries.reduce((best, [store, cost]) => 
+      cost < best.cost ? { store, cost } : best
+    , { store: entries[0][0], cost: entries[0][1] });
+  };
 
-  const storeBreakdown = totalWeekCost;
-  const availableStores = Object.keys(storeBreakdown).length > 0 ? Object.keys(storeBreakdown) : ['tesco', 'sainsburys'];
+  const bestStore = getBestStore();
+  const currentTotalCost = selectedStore === 'all' 
+    ? (bestStore?.cost || 0)
+    : storeTotals[selectedStore] || 0;
+
+  const availableStores = Object.keys(storeTotals).length > 0 ? Object.keys(storeTotals) : ['tesco', 'sainsburys', 'asda', 'aldi'];
   const totalItems = Object.values(shoppingItems).flat().length;
 
-  console.log('ShoppingList render state:', {
-    totalItems,
-    storeBreakdown,
-    bestOption,
-    shoppingItemsKeys: Object.keys(shoppingItems)
-  });
+  if (isPricingLoading) {
+    return (
+      <div className="space-y-6">
+        <Card className="p-6">
+          <div className="flex items-center justify-center space-x-2">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <span>Loading real-time prices from supermarkets...</span>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (pricingError) {
+    return (
+      <div className="space-y-6">
+        <Card className="p-6">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Price Lookup Error</h2>
+            <p className="text-red-600 mb-4">{pricingError}</p>
+            <Button onClick={refetchPrices}>Retry Price Lookup</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -386,11 +321,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Smart Shopping List</h2>
             <p className="text-gray-600 mt-1">
-              Generated from your {recipes.length || 7} meal plan recipes • Price comparison across supermarkets
+              Real-time prices from {recipes.length || 7} meal plan recipes • Live price comparison across supermarkets
             </p>
-            {bestOption && (
+            {bestStore && (
               <p className="text-sm text-green-600 mt-1 font-medium">
-                💡 Best deal: Shop at {bestOption.store.charAt(0).toUpperCase() + bestOption.store.slice(1)} for £{bestOption.cost.toFixed(2)} total
+                💡 Best deal: Shop at {bestStore.store.charAt(0).toUpperCase() + bestStore.store.slice(1)} for £{bestStore.cost.toFixed(2)} total
               </p>
             )}
           </div>
@@ -402,12 +337,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                 {selectedStore === 'all' ? 'Best Price' : `${selectedStore.charAt(0).toUpperCase() + selectedStore.slice(1)} Total`}
               </div>
             </div>
-            {Object.keys(storeBreakdown).length > 1 && (
+            {Object.keys(storeTotals).length > 1 && (
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
-                  £{(Math.max(...Object.values(storeBreakdown)) - Math.min(...Object.values(storeBreakdown))).toFixed(2)}
+                  £{(Math.max(...Object.values(storeTotals)) - Math.min(...Object.values(storeTotals))).toFixed(2)}
                 </div>
-                <div className="text-sm text-gray-600">Potential Savings</div>
+                <div className="text-sm text-gray-600">Live Savings</div>
               </div>
             )}
           </div>
@@ -415,25 +350,31 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       </Card>
 
       {/* Store Comparison */}
-      {Object.keys(storeBreakdown).length > 0 && (
+      {Object.keys(storeTotals).length > 0 && (
         <Card className="p-6">
-          <h3 className="font-semibold text-lg mb-4">Weekly Cost Comparison</h3>
+          <h3 className="font-semibold text-lg mb-4">Real-Time Weekly Cost Comparison</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {Object.entries(storeBreakdown).map(([store, cost]) => (
+            {Object.entries(storeTotals).map(([store, cost]) => (
               <div key={store} className={`text-center p-4 rounded-lg border-2 ${
-                bestOption?.store === store ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'
+                bestStore?.store === store ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'
               }`}>
-                <div className={`text-lg font-bold ${bestOption?.store === store ? 'text-green-700' : 'text-gray-900'}`}>
+                <div className={`text-lg font-bold ${bestStore?.store === store ? 'text-green-700' : 'text-gray-900'}`}>
                   £{cost.toFixed(2)}
                 </div>
                 <div className="text-sm text-gray-600 capitalize">{store}</div>
-                {bestOption?.store === store && (
+                {bestStore?.store === store && (
                   <Badge className="mt-1 text-xs bg-green-100 text-green-700">
                     Best Deal 🏆
                   </Badge>
                 )}
               </div>
             ))}
+          </div>
+          <div className="mt-4 flex justify-center">
+            <Button variant="outline" size="sm" onClick={refetchPrices}>
+              <Loader2 className="w-4 h-4 mr-2" />
+              Refresh Live Prices
+            </Button>
           </div>
         </Card>
       )}
@@ -488,6 +429,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   const key = `${category}-${index}`;
                   const isChecked = checkedItems[key] || false;
                   
+                  // Get store-specific product data for selected store or best store
+                  const displayStore = selectedStore === 'all' ? item.store : selectedStore;
+                  const storeProduct = item.storeProducts?.[displayStore];
+                  
                   return (
                     <div 
                       key={index}
@@ -504,10 +449,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           className="flex-shrink-0 mt-1"
                         />
                         
-                        {item.matchedProduct?.image && (
+                        {storeProduct?.image && (
                           <img 
-                            src={item.matchedProduct.image} 
-                            alt={item.matchedProduct.title || item.name}
+                            src={storeProduct.image} 
+                            alt={storeProduct.title || item.name}
                             className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
@@ -519,48 +464,44 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center space-x-2 mb-1">
-                                {item.matchedProduct?.url ? (
+                                {storeProduct?.url ? (
                                   <a 
-                                    href={item.matchedProduct.url} 
+                                    href={storeProduct.url} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     className={`font-medium hover:underline ${isChecked ? 'line-through text-gray-500' : 'text-blue-600'}`}
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    {item.matchedProduct.title}
+                                    {storeProduct.title || item.name}
                                     <ExternalLink className="w-3 h-3 inline ml-1" />
                                   </a>
                                 ) : (
                                   <span className={`font-medium ${isChecked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                                    {item.matchedProduct?.title || item.name}
+                                    {storeProduct?.title || item.name}
                                   </span>
                                 )}
-                                <Badge variant="outline" className={`text-xs ${getStoreColor(item.store)}`}>
-                                  {item.store}
+                                <Badge variant="outline" className={`text-xs ${getStoreColor(displayStore)}`}>
+                                  {displayStore}
                                 </Badge>
                               </div>
                               
-                              {item.matchedProduct && item.matchedProduct.title !== item.name && (
-                                <div className="text-sm text-gray-600 mb-1">
-                                  Original: {item.name}
-                                </div>
-                              )}
-                              
                               <div className="flex items-center space-x-4 text-sm text-gray-600">
                                 <span>Amount: {item.amount}</span>
-                                {item.matchedProduct && (
-                                  <Badge className="text-xs bg-green-100 text-green-700">
-                                    Matched from {item.matchedProduct.source}
-                                  </Badge>
-                                )}
+                                <Badge className="text-xs bg-green-100 text-green-700">
+                                  Live Price via Google Shopping
+                                </Badge>
                               </div>
                               
+                              {/* Show prices for all stores */}
                               {item.storePrices && Object.keys(item.storePrices).length > 1 && (
-                                <div className="flex items-center space-x-2 mt-1">
+                                <div className="flex items-center space-x-2 mt-2">
                                   {Object.entries(item.storePrices).map(([store, price]) => (
-                                    <span key={store} className="text-xs text-gray-500">
-                                      {store}: £{typeof price === 'number' ? price.toFixed(2) : price}
-                                    </span>
+                                    <div key={store} className="flex items-center space-x-1">
+                                      <span className="text-xs text-gray-500 capitalize">{store}:</span>
+                                      <span className={`text-xs font-medium ${displayStore === store ? 'text-green-600' : 'text-gray-600'}`}>
+                                        £{typeof price === 'number' ? price.toFixed(2) : price}
+                                      </span>
+                                    </div>
                                   ))}
                                 </div>
                               )}
@@ -568,7 +509,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                             
                             <div className="text-right">
                               <div className={`font-semibold ${isChecked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                                {item.matchedProduct?.price || `£${item.price.toFixed(2)}`}
+                                £{(storeProduct?.price || item.price).toFixed(2)}
                               </div>
                             </div>
                           </div>
@@ -583,7 +524,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       </div>
 
       {/* Show message if no items */}
-      {totalItems === 0 && (
+      {totalItems === 0 && !isPricingLoading && (
         <Card className="p-6 text-center">
           <p className="text-gray-500">No shopping items available. Please generate a meal plan first.</p>
         </Card>
@@ -603,7 +544,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
           >
             <ExternalLink className="w-4 h-4 mr-2" />
-            Finish Order at {selectedStore === 'all' ? (bestOption?.store || 'Tesco') : selectedStore}
+            Finish Order at {selectedStore === 'all' ? (bestStore?.store || 'Tesco') : selectedStore}
           </Button>
         ) : (
           <Button 
@@ -620,7 +561,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         isOpen={showCredentialsModal}
         onClose={() => setShowCredentialsModal(false)}
         onSubmit={handleCredentialsSubmit}
-        supermarket={selectedStore === 'all' ? (bestOption?.store || 'Tesco') : selectedStore}
+        supermarket={selectedStore === 'all' ? (bestStore?.store || 'Tesco') : selectedStore}
         isLoading={isAddingToBasket}
       />
 
@@ -630,105 +571,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         onProceedToBasket={handleProceedToBasket}
         items={matchedProducts}
         basketUrl={basketUrl}
-        supermarket={selectedStore === 'all' ? (bestOption?.store || 'tesco') : selectedStore}
+        supermarket={selectedStore === 'all' ? (bestStore?.store || 'tesco') : selectedStore}
       />
     </div>
   );
-};
-
-// Function to get ingredient prices from all store tables
-const getIngredientPricesFromStores = async (ingredientName: string): Promise<{[store: string]: number}> => {
-  const storeTables = ['tesco_prices', 'sainsbury_prices', 'asda_prices', 'aldi_prices'];
-  const storePrices: {[store: string]: number} = {};
-  
-  for (const table of storeTables) {
-    try {
-      const { data, error } = await (supabase as any)
-        .from(table)
-        .select('average_price, price')
-        .ilike('ingredient_name', `%${ingredientName}%`)
-        .limit(1)
-        .single();
-
-      if (!error && data) {
-        const price = data.average_price || data.price;
-        if (price && typeof price === 'number') {
-          // Map table names to store names
-          const storeMapping: {[key: string]: string} = {
-            'tesco_prices': 'tesco',
-            'sainsbury_prices': 'sainsburys',
-            'asda_prices': 'asda',
-            'aldi_prices': 'aldi'
-          };
-          const storeName = storeMapping[table];
-          if (storeName) {
-            storePrices[storeName] = price;
-          }
-        }
-      }
-    } catch (tableError) {
-      // Continue checking other tables
-      continue;
-    }
-  }
-  
-  console.log(`Prices found for ${ingredientName}:`, storePrices);
-  return storePrices;
-};
-
-const generateShoppingListFromRecipes = async (recipes: any[]): Promise<{[key: string]: ShoppingItem[]}> => {
-  const categorized: {[key: string]: ShoppingItem[]} = {};
-  
-  const allIngredients: string[] = [];
-  recipes.forEach(recipe => {
-    if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
-      recipe.ingredients.forEach(ingredient => {
-        const ingredientName = typeof ingredient === 'string' ? ingredient : ingredient.name;
-        if (ingredientName) {
-          allIngredients.push(ingredientName);
-        }
-      });
-    }
-  });
-
-  const uniqueIngredients = [...new Set(allIngredients)];
-  
-  for (const ingredient of uniqueIngredients) {
-    const category = categorizeIngredient(ingredient);
-    if (!categorized[category]) {
-      categorized[category] = [];
-    }
-    
-    // Get actual prices from database for all stores
-    const storePrices = await getIngredientPricesFromStores(ingredient);
-    
-    // Find the best price among stores
-    let bestStore = 'tesco';
-    let bestPrice = 2.50; // fallback
-    
-    if (Object.keys(storePrices).length > 0) {
-      const priceEntries = Object.entries(storePrices);
-      const best = priceEntries.reduce((min, [store, price]) => 
-        price < min.price ? { store, price } : min
-      , { store: priceEntries[0][0], price: priceEntries[0][1] });
-      
-      bestStore = best.store;
-      bestPrice = best.price;
-    }
-    
-    categorized[category].push({
-      name: ingredient,
-      amount: '1 unit',
-      price: bestPrice,
-      store: bestStore,
-      checked: false,
-      category,
-      image: generateMockImage(ingredient),
-      storePrices: storePrices // Store all prices for cost breakdown
-    });
-  }
-  
-  return categorized;
 };
 
 const categorizeIngredient = (ingredient: string | any): string => {
@@ -772,188 +618,4 @@ const categorizeIngredient = (ingredient: string | any): string => {
   }
   
   return 'Other Items';
-};
-
-const estimatePrice = (ingredient: string): number => {
-  const lowerIngredient = ingredient.toLowerCase();
-  
-  if (lowerIngredient.includes('salmon') || lowerIngredient.includes('beef')) {
-    return 5.99 + Math.random() * 3;
-  }
-  
-  if (lowerIngredient.includes('chicken') || lowerIngredient.includes('fish')) {
-    return 3.99 + Math.random() * 2;
-  }
-  
-  if (lowerIngredient.includes('tomato') || lowerIngredient.includes('cucumber')) {
-    return 1.99 + Math.random() * 1;
-  }
-  
-  return 0.99 + Math.random() * 2;
-};
-
-const getOptimalStore = (ingredient: string): string => {
-  const stores = ['tesco', 'sainsburys', 'asda', 'morrisons'];
-  return stores[Math.floor(Math.random() * stores.length)];
-};
-
-const generateMockImage = (ingredient: string): string => {
-  // Generate placeholder images - in a real app, these would come from the supermarket APIs
-  return `https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop&crop=center`;
-};
-
-const generateShoppingItemsFromData = (shoppingList: any[]): {[key: string]: ShoppingItem[]} => {
-  const categorized: {[key: string]: ShoppingItem[]} = {};
-  
-  shoppingList.forEach(item => {
-    const category = item.category || 'Other';
-    if (!categorized[category]) {
-      categorized[category] = [];
-    }
-    categorized[category].push({
-      name: item.item,
-      amount: item.quantity,
-      price: Number(item.estimated_cost) || 0,
-      store: 'tesco',
-      checked: false,
-      category,
-      image: generateMockImage(item.item)
-    });
-  });
-  
-  return categorized;
-};
-
-const mockShoppingItems = {
-  'Fresh Produce': [
-    { 
-      name: 'Salmon Fillets', 
-      amount: '4 portions', 
-      price: 12.99, 
-      store: 'tesco', 
-      checked: false, 
-      category: 'Fresh Produce', 
-      image: generateMockImage('salmon'),
-      storePrices: { tesco: 12.99, sainsburys: 13.50, asda: 12.20, morrisons: 13.80 }
-    },
-    { 
-      name: 'Cherry Tomatoes', 
-      amount: '2 punnets', 
-      price: 3.50, 
-      store: 'sainsburys', 
-      checked: false, 
-      category: 'Fresh Produce', 
-      image: generateMockImage('tomatoes'),
-      storePrices: { tesco: 3.80, sainsburys: 3.50, asda: 3.20, morrisons: 3.90 }
-    }
-  ],
-  'Pantry Staples': [
-    { 
-      name: 'Arborio Rice', 
-      amount: '1kg', 
-      price: 3.20, 
-      store: 'asda', 
-      checked: false, 
-      category: 'Pantry Staples', 
-      image: generateMockImage('rice'),
-      storePrices: { tesco: 3.50, sainsburys: 3.80, asda: 3.20, morrisons: 3.60 }
-    }
-  ]
-};
-
-const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
-  console.log('🚀 generateEnhancedShoppingList STARTED');
-  console.log('📝 Input recipes:', recipes);
-  console.log('🔢 Recipe count:', recipes.length);
-  console.log('generateEnhancedShoppingList called with:', recipes);
-  console.log('Sample recipe ingredient:', recipes[0]?.ingredients?.[0]);
-  
-  const categorized: {[key: string]: ShoppingItem[]} = {};
-  const ingredientMap = new Map<string, IngredientWithPrices>();
-  
-  recipes.forEach(recipe => {
-    if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
-      recipe.ingredients.forEach(ingredient => {
-        if (ingredient && ingredient.name) {
-          const key = ingredient.name.toLowerCase();
-          if (!ingredientMap.has(key)) {
-            ingredientMap.set(key, ingredient);
-          }
-        }
-      });
-    }
-  });
-
-  console.log('Unique ingredients found:', Array.from(ingredientMap.keys()));
-
-  const totalWeekCost: {[key: string]: number} = {};
-  const supermarkets = ['tesco', 'sainsburys', 'asda', 'morrisons'];
-  
-  supermarkets.forEach(market => {
-    const recipeCosts = recipes.map(recipe => {
-      const cost = recipe.cost_by_supermarket?.[market] || 0;
-      console.log(`📊 Recipe "${recipe.recipe_name}" ${market} cost:`, cost);
-      return cost;
-    });
-    totalWeekCost[market] = recipeCosts.reduce((sum, cost) => sum + cost, 0);
-    totalWeekCost[market] = parseFloat(totalWeekCost[market].toFixed(2));
-    console.log(`🏪 Total ${market} cost:`, totalWeekCost[market]);
-  });
-
-  console.log('Total week costs from recipes:', totalWeekCost);
-
-  const bestStore = Object.entries(totalWeekCost).reduce((best, [store, cost]) => 
-    cost < best.cost ? { store, cost } : best
-  , { store: '', cost: Infinity });
-
-  console.log('Best store option:', bestStore);
-
-  Array.from(ingredientMap.values()).forEach(ingredient => {
-    const category = categorizeIngredient(ingredient.name);
-    if (!categorized[category]) {
-      categorized[category] = [];
-    }
-
-    // Find the best price for display, but keep all store prices for calculations
-    const bestPrice = supermarkets.reduce((best, market) => {
-      const price = ingredient.prices?.[market]?.price || 999;
-      return price < best.price ? { 
-        market, 
-        price, 
-        url: ingredient.prices?.[market]?.url || '#',
-        image: ingredient.prices?.[market]?.image || generateMockImage(ingredient.name)
-      } : best;
-    }, { market: '', price: Infinity, url: '#', image: '' });
-
-    // Extract all store prices for cost breakdown
-    const storePrices: {[key: string]: number} = {};
-    supermarkets.forEach(market => {
-      const price = ingredient.prices?.[market]?.price;
-      if (price && typeof price === 'number') {
-        storePrices[market] = price;
-      }
-    });
-
-    console.log(`Ingredient: ${ingredient.name}, Store prices:`, storePrices);
-
-    categorized[category].push({
-      name: ingredient.name,
-      amount: ingredient.amount,
-      price: bestPrice.price !== Infinity ? bestPrice.price : 2.50,
-      store: bestPrice.market || 'tesco',
-      checked: false,
-      category,
-      url: bestPrice.url,
-      image: bestPrice.image,
-      storePrices: storePrices
-    });
-  });
-
-  console.log('Generated categorized items:', categorized);
-
-  return {
-    items: categorized,
-    totals: totalWeekCost,
-    best: bestStore.cost !== Infinity ? bestStore : null
-  };
 };

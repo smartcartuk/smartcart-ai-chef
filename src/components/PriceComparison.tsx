@@ -1,10 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WebhookResponse } from '@/utils/webhookService';
-import { usePriceCalculation } from '@/hooks/usePriceCalculation';
+import { useRealTimePricing } from '@/hooks/useRealTimePricing';
+import { Loader2 } from 'lucide-react';
 
 interface PriceComparisonProps {
   userProfile: any;
@@ -13,10 +15,10 @@ interface PriceComparisonProps {
 }
 
 const storeLogos = {
-  'Tesco': '🔵',
-  'Sainsburys': '🟠', 
-  'Asda': '🟢',
-  'Morrisons': '🟣'
+  'tesco': '🔵',
+  'sainsburys': '🟠', 
+  'asda': '🟢',
+  'aldi': '🟣'
 };
 
 export const PriceComparison: React.FC<PriceComparisonProps> = ({ 
@@ -25,140 +27,104 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
   recipes = [] 
 }) => {
   const [sortBy, setSortBy] = useState<'price' | 'savings'>('price');
-  const [comparisons, setComparisons] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const { calculateEstimatedPrice } = usePriceCalculation();
 
-  console.log('PriceComparison received recipes:', recipes);
-
-  // Generate price comparisons from recipes
-  useEffect(() => {
-    if (recipes.length > 0) {
-      generatePriceComparisons();
-    } else if (generatedData?.priceComparisons) {
-      setComparisons(generatedData.priceComparisons);
-    } else {
-      setComparisons(mockComparisons);
-    }
-  }, [recipes, generatedData]);
-
-  const generatePriceComparisons = async () => {
-    setIsLoading(true);
-    try {
-      console.log('Generating price comparisons for recipes:', recipes);
-      
-      // Collect unique ingredients from all recipes with their price data
-      const ingredientMap = new Map<string, any>();
-      
-      recipes.forEach(recipe => {
-        console.log('Processing recipe:', recipe);
-        if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
-          recipe.ingredients.forEach((ingredient: any) => {
-            let ingredientName: string;
-            let ingredientData: any;
-
-            // Handle both string and object ingredients
-            if (typeof ingredient === 'string') {
-              ingredientName = ingredient;
-              ingredientData = { name: ingredient };
-            } else {
-              ingredientName = ingredient?.name || ingredient;
-              ingredientData = ingredient;
-            }
-            
-            if (ingredientName && typeof ingredientName === 'string') {
-              // Store the most complete ingredient data we have
-              if (!ingredientMap.has(ingredientName) || (ingredientData.price && !ingredientMap.get(ingredientName).price)) {
-                ingredientMap.set(ingredientName, ingredientData);
-              }
-            }
-          });
-        }
-      });
-
-      // Convert map to array and limit to top 10 for comparison
-      const uniqueIngredients = Array.from(ingredientMap.entries()).slice(0, 10);
-      console.log('Unique ingredients for comparison:', uniqueIngredients);
-      
-      if (uniqueIngredients.length === 0) {
-        console.log('No ingredients found, using mock data');
-        setComparisons(mockComparisons);
-        return;
-      }
-
-      const priceComparisons = await Promise.all(
-        uniqueIngredients.map(async ([ingredientName, ingredientData]) => {
-          // Use the actual price from the ingredient data if available
-          let basePrice = ingredientData.price || ingredientData.average_price;
+  // Extract ingredients from recipes for real-time pricing
+  const ingredients = React.useMemo(() => {
+    const allIngredients: Array<{ name: string; amount: string }> = [];
+    
+    recipes.forEach(recipe => {
+      if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+        recipe.ingredients.forEach(ingredient => {
+          const ingredientName = typeof ingredient === 'string' ? ingredient : ingredient.name;
+          const ingredientAmount = typeof ingredient === 'string' ? '1 unit' : (ingredient.amount || '1 unit');
           
-          // If no price in ingredient data, calculate estimated price
-          if (!basePrice) {
-            basePrice = await calculateEstimatedPrice([ingredientName]);
+          if (ingredientName) {
+            // Avoid duplicates and limit to first 10 for performance
+            const exists = allIngredients.find(item => item.name.toLowerCase() === ingredientName.toLowerCase());
+            if (!exists && allIngredients.length < 10) {
+              allIngredients.push({
+                name: ingredientName,
+                amount: ingredientAmount
+              });
+            }
           }
-          
-          // Ensure we have a valid price
-          basePrice = basePrice || 2.50;
-          
-          console.log(`Using price ${basePrice} for ingredient: ${ingredientName}`);
-          
-          return {
-            item: ingredientName,
-            prices: [
-              { 
-                store: 'Tesco', 
-                price: basePrice * 1.1, 
-                discount: 'Clubcard', 
-                savings: basePrice * 0.1, 
-                clubcard: true 
-              },
-              { 
-                store: 'Sainsburys', 
-                price: basePrice * 1.05, 
-                discount: null, 
-                savings: 0, 
-                clubcard: false 
-              },
-              { 
-                store: 'Asda', 
-                price: basePrice * 0.95, 
-                discount: 'Rollback', 
-                savings: basePrice * 0.05, 
-                clubcard: false 
-              },
-              { 
-                store: 'Morrisons', 
-                price: basePrice * 1.02, 
-                discount: null, 
-                savings: 0, 
-                clubcard: false 
-              }
-            ]
-          };
-        })
-      );
-      
-      console.log('Generated price comparisons:', priceComparisons);
-      setComparisons(priceComparisons);
-    } catch (error) {
-      console.error('Error generating price comparisons:', error);
-      setComparisons(mockComparisons);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        });
+      }
+    });
+    
+    return allIngredients;
+  }, [recipes]);
 
-  const totalPotentialSavings = comparisons.reduce((sum, item) => {
-    const bestPrice = Math.min(...item.prices.map(p => p.price - p.savings));
-    const worstPrice = Math.max(...item.prices.map(p => p.price));
-    return sum + (worstPrice - bestPrice);
-  }, 0);
+  // Use real-time pricing hook
+  const { pricedIngredients, storeTotals, isLoading, error, refetchPrices } = useRealTimePricing(ingredients);
 
-  const totalOptimizedCost = comparisons.reduce((sum, item) => {
-    const bestPrice = Math.min(...item.prices.map(p => p.price - p.savings));
-    return sum + bestPrice;
-  }, 0);
+  // Convert priced ingredients to comparison format
+  const comparisons = React.useMemo(() => {
+    return pricedIngredients.map(ingredient => {
+      const prices = ingredient.prices.map(priceData => ({
+        store: storeLogos[priceData.store as keyof typeof storeLogos] ? 
+          priceData.store.charAt(0).toUpperCase() + priceData.store.slice(1) : 
+          priceData.store,
+        price: priceData.price,
+        discount: priceData.price < 3 ? 'Best Price' : null,
+        savings: priceData.price < 3 ? 0.50 : 0,
+        clubcard: priceData.store === 'tesco',
+        url: priceData.url,
+        title: priceData.title
+      }));
 
-  if (comparisons.length === 0 && !isLoading) {
+      return {
+        item: ingredient.name,
+        prices: prices.sort((a, b) => a.price - b.price) // Sort by price
+      };
+    });
+  }, [pricedIngredients]);
+
+  const totalPotentialSavings = React.useMemo(() => {
+    return comparisons.reduce((sum, item) => {
+      if (item.prices.length === 0) return sum;
+      const bestPrice = Math.min(...item.prices.map(p => p.price));
+      const worstPrice = Math.max(...item.prices.map(p => p.price));
+      return sum + (worstPrice - bestPrice);
+    }, 0);
+  }, [comparisons]);
+
+  const totalOptimizedCost = React.useMemo(() => {
+    return comparisons.reduce((sum, item) => {
+      if (item.prices.length === 0) return sum;
+      const bestPrice = Math.min(...item.prices.map(p => p.price));
+      return sum + bestPrice;
+    }, 0);
+  }, [comparisons]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card className="p-6">
+          <div className="flex items-center justify-center space-x-2">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <span>Loading real-time price comparisons...</span>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Card className="p-6">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Price Comparison Error</h2>
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={refetchPrices}>Retry Price Lookup</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (comparisons.length === 0) {
     return (
       <div className="space-y-6">
         <Card className="p-6">
@@ -178,12 +144,9 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
       <Card className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Smart Price Comparison</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Live Price Comparison</h2>
             <p className="text-gray-600 mt-1">
-              {recipes.length > 0 
-                ? `Real-time prices for ingredients from your ${recipes.length} generated recipes`
-                : 'Real-time prices across your connected stores with loyalty discounts applied'
-              }
+              Real-time prices via Google Shopping for ingredients from your {recipes.length} generated recipes
             </p>
           </div>
           
@@ -194,160 +157,160 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">£{totalPotentialSavings.toFixed(2)}</div>
-              <div className="text-sm text-gray-600">Max Savings</div>
+              <div className="text-sm text-gray-600">Live Savings</div>
             </div>
           </div>
         </div>
       </Card>
 
-      {isLoading ? (
-        <Card className="p-6">
-          <div className="text-center">
-            <p>Loading price comparisons...</p>
-          </div>
-        </Card>
-      ) : (
-        <>
-          {/* Sort Options */}
-          <div className="flex items-center justify-between">
-            <Tabs value={sortBy} onValueChange={(value) => setSortBy(value as 'price' | 'savings')}>
-              <TabsList>
-                <TabsTrigger value="price">Sort by Price</TabsTrigger>
-                <TabsTrigger value="savings">Sort by Savings</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={generatePriceComparisons}
-              disabled={isLoading}
-            >
-              {isLoading ? 'Refreshing...' : 'Refresh Prices'}
-            </Button>
-          </div>
+      {/* Sort Options */}
+      <div className="flex items-center justify-between">
+        <Tabs value={sortBy} onValueChange={(value) => setSortBy(value as 'price' | 'savings')}>
+          <TabsList>
+            <TabsTrigger value="price">Sort by Price</TabsTrigger>
+            <TabsTrigger value="savings">Sort by Savings</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={refetchPrices}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Refreshing...
+            </>
+          ) : (
+            'Refresh Live Prices'
+          )}
+        </Button>
+      </div>
 
-          {/* Price Comparison Items */}
-          <div className="space-y-6">
-            {comparisons.map((comparison, index) => (
-              <Card key={index} className="p-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-lg">{comparison.item}</h3>
-                    <Badge variant="outline">
-                      Best: {comparison.prices.sort((a, b) => (a.price - a.savings) - (b.price - b.savings))[0].store}
-                    </Badge>
-                  </div>
-                  
-                  <div className="grid gap-4">
-                    {comparison.prices
-                      .sort((a, b) => sortBy === 'price' 
-                        ? (a.price - a.savings) - (b.price - b.savings)
-                        : b.savings - a.savings
-                      )
-                      .map((store, storeIndex) => {
-                        const finalPrice = store.price - store.savings;
-                        const isBest = finalPrice === Math.min(...comparison.prices.map(p => p.price - p.savings));
-                        
-                        return (
-                          <div 
-                            key={storeIndex}
-                            className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
-                              isBest 
-                                ? 'border-green-400 bg-green-50' 
-                                : 'border-gray-200 bg-white'
-                            }`}
-                          >
-                            <div className="flex items-center space-x-4">
-                              <div className="text-2xl">{storeLogos[store.store as keyof typeof storeLogos]}</div>
-                              <div>
-                                <div className="font-medium">{store.store}</div>
-                                {store.clubcard && (
-                                  <Badge variant="secondary" className="text-xs mt-1">
-                                    Loyalty Member
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div className="text-right">
-                              <div className="flex items-center space-x-2">
-                                {store.savings > 0 && (
-                                  <span className="text-sm text-gray-500 line-through">
-                                    £{store.price.toFixed(2)}
-                                  </span>
-                                )}
-                                <span className={`text-lg font-bold ${isBest ? 'text-green-600' : 'text-gray-900'}`}>
-                                  £{finalPrice.toFixed(2)}
-                                </span>
-                              </div>
-                              
-                              {store.discount && (
-                                <div className="flex items-center space-x-2 mt-1">
-                                  <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
-                                    {store.discount}
-                                  </Badge>
-                                  {store.savings > 0 && (
-                                    <span className="text-xs text-green-600 font-medium">
-                                      Save £{store.savings.toFixed(2)}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-
-          {/* Summary Card */}
-          <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50">
+      {/* Price Comparison Items */}
+      <div className="space-y-6">
+        {comparisons.map((comparison, index) => (
+          <Card key={index} className="p-6">
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Optimization Summary</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-white rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">3</div>
-                  <div className="text-sm text-gray-600">Stores to visit</div>
-                </div>
-                <div className="text-center p-4 bg-white rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    {((totalPotentialSavings / (totalOptimizedCost + totalPotentialSavings)) * 100).toFixed(0)}%
-                  </div>
-                  <div className="text-sm text-gray-600">Total savings</div>
-                </div>
-                <div className="text-center p-4 bg-white rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">£{totalOptimizedCost.toFixed(2)}</div>
-                  <div className="text-sm text-gray-600">Final cost</div>
-                </div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-lg">{comparison.item}</h3>
+                <Badge variant="outline">
+                  Best: {comparison.prices.length > 0 ? comparison.prices[0].store : 'N/A'}
+                </Badge>
               </div>
               
-              <div className="pt-4 border-t border-gray-200">
-                <Button className="w-full bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700">
-                  Apply Optimal Shopping Route
-                </Button>
+              <div className="grid gap-4">
+                {comparison.prices
+                  .sort((a, b) => sortBy === 'price' 
+                    ? a.price - b.price
+                    : b.savings - a.savings
+                  )
+                  .map((store, storeIndex) => {
+                    const isBest = storeIndex === 0 && sortBy === 'price';
+                    const storeName = store.store.toLowerCase();
+                    
+                    return (
+                      <div 
+                        key={storeIndex}
+                        className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                          isBest 
+                            ? 'border-green-400 bg-green-50' 
+                            : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="text-2xl">
+                            {storeLogos[storeName as keyof typeof storeLogos] || '🏪'}
+                          </div>
+                          <div>
+                            <div className="font-medium">{store.store}</div>
+                            {store.title && store.title !== comparison.item && (
+                              <div className="text-sm text-gray-600 truncate max-w-[200px]">
+                                {store.title}
+                              </div>
+                            )}
+                            {store.clubcard && (
+                              <Badge variant="secondary" className="text-xs mt-1">
+                                Loyalty Member
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="text-right">
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-lg font-bold ${isBest ? 'text-green-600' : 'text-gray-900'}`}>
+                              £{store.price.toFixed(2)}
+                            </span>
+                            {store.url && (
+                              <a 
+                                href={store.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-500 hover:text-blue-700"
+                              >
+                                🔗
+                              </a>
+                            )}
+                          </div>
+                          
+                          {store.discount && (
+                            <div className="flex items-center space-x-2 mt-1">
+                              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                                {store.discount}
+                              </Badge>
+                            </div>
+                          )}
+                          
+                          <div className="text-xs text-gray-500 mt-1">
+                            Live via Google Shopping
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           </Card>
-        </>
-      )}
+        ))}
+      </div>
+
+      {/* Summary Card */}
+      <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50">
+        <div className="space-y-4">
+          <h3 className="font-semibold text-lg">Live Price Optimization Summary</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-white rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">
+                {Object.keys(storeTotals).length || 4}
+              </div>
+              <div className="text-sm text-gray-600">Stores compared</div>
+            </div>
+            <div className="text-center p-4 bg-white rounded-lg">
+              <div className="text-2xl font-bold text-green-600">
+                {totalPotentialSavings > 0 ? 
+                  ((totalPotentialSavings / (totalOptimizedCost + totalPotentialSavings)) * 100).toFixed(0) : 
+                  '0'
+                }%
+              </div>
+              <div className="text-sm text-gray-600">Live savings</div>
+            </div>
+            <div className="text-center p-4 bg-white rounded-lg">
+              <div className="text-2xl font-bold text-purple-600">£{totalOptimizedCost.toFixed(2)}</div>
+              <div className="text-sm text-gray-600">Optimized cost</div>
+            </div>
+          </div>
+          
+          <div className="pt-4 border-t border-gray-200">
+            <Button className="w-full bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700">
+              Apply Live Price Shopping Route
+            </Button>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 };
-
-// Mock data fallback
-const mockComparisons = [
-  {
-    item: 'Salmon Fillets (4 portions)',
-    prices: [
-      { store: 'Tesco', price: 12.99, discount: '25% off', savings: 4.33, clubcard: true },
-      { store: 'Sainsburys', price: 14.50, discount: 'Nectar offer', savings: 2.00, clubcard: true },
-      { store: 'Asda', price: 15.99, discount: null, savings: 0, clubcard: false },
-      { store: 'Morrisons', price: 13.75, discount: '£1 off', savings: 1.00, clubcard: false }
-    ]
-  }
-];
