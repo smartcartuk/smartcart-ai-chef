@@ -8,7 +8,7 @@ import { SupermarketCredentialsModal } from '@/components/SupermarketCredentials
 import { addItemsToBasket, formatItemsForBasket } from '@/utils/shoppingBasketService';
 import { useRealTimePricing } from '@/hooks/useRealTimePricing';
 import { useToast } from '@/hooks/use-toast';
-import { ExternalLink, Loader2, AlertCircle } from 'lucide-react';
+import { ExternalLink, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { MatchedProductsModal } from '@/components/MatchedProductsModal';
 
 interface ShoppingListProps {
@@ -52,6 +52,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [showMatchedProductsModal, setShowMatchedProductsModal] = useState(false);
   const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [apiStatus, setApiStatus] = useState<{[key: string]: 'loading' | 'success' | 'error'}>({});
 
   // Extract ingredients from recipes for real-time pricing
   const ingredients = React.useMemo(() => {
@@ -89,6 +90,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       console.log('🔄 Converting priced ingredients to shopping items:', pricedIngredients);
       
       const categorized: {[key: string]: ShoppingItem[]} = {};
+      const newApiStatus: {[key: string]: 'loading' | 'success' | 'error'} = {};
       
       pricedIngredients.forEach(pricedItem => {
         const category = categorizeIngredient(pricedItem.name);
@@ -100,6 +102,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         const storePrices: {[key: string]: number} = {};
         const storeProducts: {[key: string]: { price: number; url?: string; title?: string; image?: string }} = {};
         
+        let hasRealPrice = false;
         pricedItem.prices.forEach(priceData => {
           storePrices[priceData.store] = priceData.price;
           storeProducts[priceData.store] = {
@@ -108,7 +111,15 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             title: priceData.title,
             image: priceData.image
           };
+          
+          // Check if this is a real price (not fallback)
+          if (priceData.url && !priceData.title?.includes('(No Match)')) {
+            hasRealPrice = true;
+          }
         });
+
+        // Set API status based on whether we got real prices
+        newApiStatus[pricedItem.name] = hasRealPrice ? 'success' : 'error';
 
         const bestPrice = pricedItem.bestPrice || pricedItem.prices[0];
         
@@ -127,9 +138,32 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       });
       
       setShoppingItems(categorized);
+      setApiStatus(newApiStatus);
       console.log('✅ Shopping items updated with live pricing:', categorized);
     }
   }, [pricedIngredients]);
+
+  const handleManualRefresh = async () => {
+    console.log('🔄 Manual refresh triggered by user');
+    toast({
+      title: "Refreshing Live Prices",
+      description: "Fetching latest prices from Google Shopping via all supermarkets...",
+    });
+    
+    // Reset API status to show loading
+    const loadingStatus: {[key: string]: 'loading' | 'success' | 'error'} = {};
+    ingredients.forEach(ingredient => {
+      loadingStatus[ingredient.name] = 'loading';
+    });
+    setApiStatus(loadingStatus);
+    
+    await refetchPrices();
+    
+    toast({
+      title: "Price Refresh Complete",
+      description: "Live pricing data has been updated from all supermarkets.",
+    });
+  };
 
   const handleItemCheck = (category: string, index: number) => {
     const key = `${category}-${index}`;
@@ -285,6 +319,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const availableStores = Object.keys(storeTotals).length > 0 ? Object.keys(storeTotals) : ['tesco', 'sainsburys', 'asda', 'aldi'];
   const totalItems = Object.values(shoppingItems).flat().length;
 
+  // Calculate API status summary
+  const apiStatusCounts = Object.values(apiStatus).reduce((acc, status) => {
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {} as {[key: string]: number});
+
   if (isPricingLoading) {
     return (
       <div className="space-y-6">
@@ -318,7 +358,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Shopping List Header */}
+      {/* Shopping List Header with API Status */}
       <Card className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
           <div>
@@ -331,6 +371,20 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                 💡 Best deal: Shop at {bestStore.store.charAt(0).toUpperCase() + bestStore.store.slice(1)} for £{bestStore.cost.toFixed(2)} total
               </p>
             )}
+            
+            {/* API Status Indicator */}
+            <div className="flex items-center space-x-2 mt-2">
+              <div className="flex items-center space-x-1">
+                {apiStatusCounts.success > 0 ? (
+                  <Wifi className="w-4 h-4 text-green-600" />
+                ) : (
+                  <WifiOff className="w-4 h-4 text-red-500" />
+                )}
+                <span className="text-xs text-gray-600">
+                  API Status: {apiStatusCounts.success || 0} live prices, {apiStatusCounts.error || 0} fallbacks
+                </span>
+              </div>
+            </div>
           </div>
           
           <div className="flex items-center space-x-6">
@@ -355,7 +409,19 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       {/* Store Comparison */}
       {Object.keys(storeTotals).length > 0 && (
         <Card className="p-6">
-          <h3 className="font-semibold text-lg mb-4">Live Weekly Cost Comparison</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-lg">Live Weekly Cost Comparison</h3>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleManualRefresh}
+              disabled={isPricingLoading}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isPricingLoading ? 'animate-spin' : ''}`} />
+              Refresh Live Prices
+            </Button>
+          </div>
+          
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {Object.entries(storeTotals).map(([store, cost]) => (
               <div key={store} className={`text-center p-4 rounded-lg border-2 ${
@@ -372,12 +438,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                 )}
               </div>
             ))}
-          </div>
-          <div className="mt-4 flex justify-center">
-            <Button variant="outline" size="sm" onClick={refetchPrices}>
-              <Loader2 className="w-4 h-4 mr-2" />
-              Refresh Live Prices
-            </Button>
           </div>
         </Card>
       )}
@@ -436,8 +496,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   const displayStore = selectedStore === 'all' ? item.store : selectedStore;
                   const storeProduct = item.storeProducts?.[displayStore];
                   
-                  // Check if this is a "No Match" item
+                  // Check if this is a "No Match" item or API failed
                   const isNoMatch = storeProduct?.title?.includes('(No Match)') || !storeProduct?.url;
+                  const itemApiStatus = apiStatus[item.name] || 'error';
                   
                   return (
                     <div 
@@ -494,6 +555,16 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                     No Match
                                   </Badge>
                                 )}
+                                {/* API Status Indicator */}
+                                <Badge variant="outline" className={`text-xs ${
+                                  itemApiStatus === 'success' ? 'bg-green-100 text-green-700' : 
+                                  itemApiStatus === 'loading' ? 'bg-blue-100 text-blue-700' : 
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {itemApiStatus === 'success' ? 'Live' : 
+                                   itemApiStatus === 'loading' ? 'Loading' : 
+                                   'Fallback'}
+                                </Badge>
                               </div>
                               
                               <div className="flex items-center space-x-4 text-sm text-gray-600">
