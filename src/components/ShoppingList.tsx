@@ -117,42 +117,43 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       if (recipes.length > 0) {
         console.log('Processing recipes:', recipes);
         const hasEnhancedData = recipes.some(recipe => {
-          console.log('Checking recipe for enhanced data:', recipe);
+          console.log('🔍 Checking recipe for enhanced data:', recipe?.recipe_name);
           const hasIngredients = recipe.ingredients && Array.isArray(recipe.ingredients);
-          console.log('Has ingredients:', hasIngredients);
+          console.log('📦 Has ingredients:', hasIngredients, recipe.ingredients?.length);
           if (hasIngredients && recipe.ingredients.length > 0) {
-            console.log('First ingredient:', recipe.ingredients[0]);
-            console.log('First ingredient type:', typeof recipe.ingredients[0]);
-            console.log('Has prices?', recipe.ingredients[0]?.prices);
-            return typeof recipe.ingredients[0] === 'object' && recipe.ingredients[0].prices;
+            console.log('🥕 First ingredient:', recipe.ingredients[0]);
+            console.log('💰 Has prices?', recipe.ingredients[0]?.prices);
+            const hasEnhancedPricing = typeof recipe.ingredients[0] === 'object' && recipe.ingredients[0].prices;
+            console.log('✅ Enhanced pricing detected:', hasEnhancedPricing);
+            return hasEnhancedPricing;
           }
           return false;
         });
 
-        console.log('Has enhanced data:', hasEnhancedData);
-        console.log('First ingredient structure:', recipes[0]?.ingredients?.[0]);
+        console.log('🎯 Has enhanced data overall:', hasEnhancedData);
+        console.log('📊 First ingredient structure:', recipes[0]?.ingredients?.[0]);
 
         if (hasEnhancedData) {
+          console.log('🚀 Using enhanced shopping list generation');
           try {
             const { items, totals, best } = generateEnhancedShoppingList(recipes as EnhancedRecipe[]);
-            console.log('Generated enhanced shopping list:', { items, totals, best });
+            console.log('📋 Generated enhanced shopping list:', { items, totals, best });
             setShoppingItems(items);
             setTotalWeekCost(totals);
             setBestOption(best);
           } catch (error) {
-            console.error('Error generating enhanced shopping list:', error);
+            console.error('❌ Error generating enhanced shopping list:', error);
+            console.log('🔄 Falling back to database-driven generation');
             const fallbackItems = await generateShoppingListFromRecipes(recipes);
             setShoppingItems(fallbackItems);
-            // Generate realistic cost estimates for fallback
             const fallbackTotals = generateRealisticCostBreakdownWithStorePrices(fallbackItems);
             setTotalWeekCost(fallbackTotals);
             setBestOption(getBestOption(fallbackTotals));
           }
         } else {
-          console.log('Using basic recipe format');
+          console.log('⚠️ No enhanced data detected, using database-driven generation');
           const generatedItems = await generateShoppingListFromRecipes(recipes);
           setShoppingItems(generatedItems);
-          // Generate realistic cost estimates using store prices
           const realisticTotals = generateRealisticCostBreakdownWithStorePrices(generatedItems);
           setTotalWeekCost(realisticTotals);
           setBestOption(getBestOption(realisticTotals));
@@ -796,12 +797,14 @@ const generateEnhancedShoppingList = (recipes: EnhancedRecipe[]) => {
   const supermarkets = ['tesco', 'sainsburys', 'asda', 'morrisons'];
   
   supermarkets.forEach(market => {
-    totalWeekCost[market] = recipes.reduce((sum, recipe) => {
-      const recipeCost = recipe.cost_by_supermarket?.[market];
-      console.log(`${recipe.recipe_name} cost at ${market}:`, recipeCost);
-      return sum + (recipeCost || 0);
-    }, 0);
+    const recipeCosts = recipes.map(recipe => {
+      const cost = recipe.cost_by_supermarket?.[market] || 0;
+      console.log(`📊 Recipe "${recipe.recipe_name}" ${market} cost:`, cost);
+      return cost;
+    });
+    totalWeekCost[market] = recipeCosts.reduce((sum, cost) => sum + cost, 0);
     totalWeekCost[market] = parseFloat(totalWeekCost[market].toFixed(2));
+    console.log(`🏪 Total ${market} cost:`, totalWeekCost[market]);
   });
 
   console.log('Total week costs from recipes:', totalWeekCost);
