@@ -17,6 +17,45 @@ interface EnhancedIngredient {
 }
 
 export const usePriceCalculation = () => {
+  const calculatePriceFromStoreData = async (ingredientName: string): Promise<number> => {
+    try {
+      // Check multiple store tables for the ingredient
+      const storeTables = ['tesco_prices', 'sainsbury_prices', 'asda_prices', 'aldi_prices'];
+      const prices: number[] = [];
+
+      for (const table of storeTables) {
+        try {
+          const { data, error } = await (supabase as any)
+            .from(table)
+            .select('average_price, price')
+            .ilike('ingredient_name', `%${ingredientName}%`)
+            .limit(1)
+            .single();
+
+          if (!error && data) {
+            const price = data.average_price || data.price;
+            if (price && typeof price === 'number') {
+              prices.push(price);
+            }
+          }
+        } catch (tableError) {
+          // Continue checking other tables
+          continue;
+        }
+      }
+
+      // Return the average of found prices, or a default
+      if (prices.length > 0) {
+        return prices.reduce((sum, price) => sum + price, 0) / prices.length;
+      }
+      
+      return 2.50; // Default fallback price
+    } catch (err) {
+      console.warn(`Error fetching price for ${ingredientName}:`, err);
+      return 2.50;
+    }
+  };
+
   const calculateEstimatedPrice = async (ingredients: (string | EnhancedIngredient)[]): Promise<number> => {
     try {
       let totalPrice = 0;
@@ -26,24 +65,9 @@ export const usePriceCalculation = () => {
         let ingredientName = '';
         
         if (typeof ingredient === 'string') {
-          // Handle simple string ingredients
           ingredientName = ingredient;
-          
-          // Try to get price from database
-          const { data: priceData, error } = await (supabase as any)
-            .from('ingredient_prices')
-            .select('ingredient_name, average_price')
-            .ilike('ingredient_name', `%${ingredientName}%`)
-            .limit(1)
-            .single();
-
-          if (!error && priceData) {
-            ingredientPrice = priceData.average_price;
-          } else {
-            ingredientPrice = 2.50; // Default fallback price
-          }
+          ingredientPrice = await calculatePriceFromStoreData(ingredientName);
         } else if (ingredient && typeof ingredient === 'object') {
-          // Handle enhanced ingredients with embedded price data
           ingredientName = ingredient.name || '';
           
           if (ingredient.prices) {
@@ -54,23 +78,11 @@ export const usePriceCalculation = () => {
             
             if (availablePrices.length > 0) {
               ingredientPrice = Math.min(...availablePrices);
-            }
-          }
-          
-          // Fallback to database lookup if no embedded price
-          if (ingredientPrice === 0 && ingredientName) {
-            const { data: priceData, error } = await (supabase as any)
-              .from('ingredient_prices')
-              .select('ingredient_name, average_price')
-              .ilike('ingredient_name', `%${ingredientName}%`)
-              .limit(1)
-              .single();
-
-            if (!error && priceData) {
-              ingredientPrice = priceData.average_price;
             } else {
-              ingredientPrice = 2.50; // Default fallback price
+              ingredientPrice = await calculatePriceFromStoreData(ingredientName);
             }
+          } else {
+            ingredientPrice = await calculatePriceFromStoreData(ingredientName);
           }
         }
         
@@ -83,7 +95,7 @@ export const usePriceCalculation = () => {
       return finalPrice;
     } catch (err) {
       console.warn('Error calculating estimated price:', err);
-      return ingredients.length * 2.50; // Fallback: default price per ingredient
+      return ingredients.length * 2.50;
     }
   };
 
