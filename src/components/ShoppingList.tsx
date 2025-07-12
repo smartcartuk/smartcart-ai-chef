@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { SupermarketCredentialsModal } from '@/components/SupermarketCredentials
 import { addItemsToBasket, formatItemsForBasket } from '@/utils/shoppingBasketService';
 import { useRealTimePricing } from '@/hooks/useRealTimePricing';
 import { useToast } from '@/hooks/use-toast';
-import { ExternalLink, Loader2 } from 'lucide-react';
+import { ExternalLink, Loader2, AlertCircle } from 'lucide-react';
 import { MatchedProductsModal } from '@/components/MatchedProductsModal';
 
 interface ShoppingListProps {
@@ -87,7 +86,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   // Convert priced ingredients to shopping items format
   useEffect(() => {
     if (pricedIngredients.length > 0) {
-      console.log('Converting priced ingredients to shopping items:', pricedIngredients);
+      console.log('🔄 Converting priced ingredients to shopping items:', pricedIngredients);
       
       const categorized: {[key: string]: ShoppingItem[]} = {};
       
@@ -128,7 +127,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       });
       
       setShoppingItems(categorized);
-      console.log('Shopping items updated with real-time pricing:', categorized);
+      console.log('✅ Shopping items updated with live pricing:', categorized);
     }
   }, [pricedIngredients]);
 
@@ -292,8 +291,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         <Card className="p-6">
           <div className="flex items-center justify-center space-x-2">
             <Loader2 className="w-6 h-6 animate-spin" />
-            <span>Loading real-time prices from supermarkets...</span>
+            <span>Loading live prices from Google Shopping...</span>
           </div>
+          <p className="text-center text-sm text-gray-500 mt-2">
+            Fetching real-time prices from Tesco, Sainsbury's, Asda, and Aldi
+          </p>
         </Card>
       </div>
     );
@@ -304,9 +306,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       <div className="space-y-6">
         <Card className="p-6">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Price Lookup Error</h2>
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Live Price Lookup Error</h2>
             <p className="text-red-600 mb-4">{pricingError}</p>
-            <Button onClick={refetchPrices}>Retry Price Lookup</Button>
+            <Button onClick={refetchPrices}>Retry Live Price Lookup</Button>
           </div>
         </Card>
       </div>
@@ -319,9 +322,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       <Card className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Smart Shopping List</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Live Shopping List</h2>
             <p className="text-gray-600 mt-1">
-              Real-time prices from {recipes.length || 7} meal plan recipes • Live price comparison across supermarkets
+              Real-time prices from Google Shopping • {recipes.length || 7} meal plan recipes
             </p>
             {bestStore && (
               <p className="text-sm text-green-600 mt-1 font-medium">
@@ -352,7 +355,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       {/* Store Comparison */}
       {Object.keys(storeTotals).length > 0 && (
         <Card className="p-6">
-          <h3 className="font-semibold text-lg mb-4">Real-Time Weekly Cost Comparison</h3>
+          <h3 className="font-semibold text-lg mb-4">Live Weekly Cost Comparison</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {Object.entries(storeTotals).map(([store, cost]) => (
               <div key={store} className={`text-center p-4 rounded-lg border-2 ${
@@ -433,6 +436,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   const displayStore = selectedStore === 'all' ? item.store : selectedStore;
                   const storeProduct = item.storeProducts?.[displayStore];
                   
+                  // Check if this is a "No Match" item
+                  const isNoMatch = storeProduct?.title?.includes('(No Match)') || !storeProduct?.url;
+                  
                   return (
                     <div 
                       key={index}
@@ -449,7 +455,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           className="flex-shrink-0 mt-1"
                         />
                         
-                        {storeProduct?.image && (
+                        {storeProduct?.image && !isNoMatch && (
                           <img 
                             src={storeProduct.image} 
                             alt={storeProduct.title || item.name}
@@ -464,7 +470,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center space-x-2 mb-1">
-                                {storeProduct?.url ? (
+                                {storeProduct?.url && !isNoMatch ? (
                                   <a 
                                     href={storeProduct.url} 
                                     target="_blank" 
@@ -483,12 +489,17 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                 <Badge variant="outline" className={`text-xs ${getStoreColor(displayStore)}`}>
                                   {displayStore}
                                 </Badge>
+                                {isNoMatch && (
+                                  <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-700">
+                                    No Match
+                                  </Badge>
+                                )}
                               </div>
                               
                               <div className="flex items-center space-x-4 text-sm text-gray-600">
                                 <span>Amount: {item.amount}</span>
-                                <Badge className="text-xs bg-green-100 text-green-700">
-                                  Live Price via Google Shopping
+                                <Badge className={`text-xs ${isNoMatch ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                                  {isNoMatch ? 'Fallback Price' : 'Live via Google Shopping'}
                                 </Badge>
                               </div>
                               

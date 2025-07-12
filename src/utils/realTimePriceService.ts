@@ -37,10 +37,47 @@ interface PriceLookupResponse {
 
 const BASKET_API_URL = 'https://smartcart-operator.vercel.app/api/add-to-basket';
 
+// Simple in-memory cache with 5-minute expiration
+interface CacheEntry {
+  data: RealTimePrice[];
+  timestamp: number;
+}
+
+const priceCache = new Map<string, CacheEntry>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+const getCacheKey = (ingredientName: string, quantity: string): string => {
+  return `${ingredientName.toLowerCase()}-${quantity}`;
+};
+
+const getCachedPrice = (cacheKey: string): RealTimePrice[] | null => {
+  const cached = priceCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    console.log(`Using cached price for: ${cacheKey}`);
+    return cached.data;
+  }
+  return null;
+};
+
+const setCachedPrice = (cacheKey: string, data: RealTimePrice[]): void => {
+  priceCache.set(cacheKey, {
+    data,
+    timestamp: Date.now()
+  });
+};
+
 export const getRealTimePrices = async (
   ingredientName: string,
   quantity: string = '1'
 ): Promise<RealTimePrice[]> => {
+  const cacheKey = getCacheKey(ingredientName, quantity);
+  
+  // Check cache first
+  const cachedResult = getCachedPrice(cacheKey);
+  if (cachedResult) {
+    return cachedResult;
+  }
+
   const supermarkets = ['tesco', 'sainsburys', 'asda', 'aldi'];
   const prices: RealTimePrice[] = [];
   
@@ -50,7 +87,10 @@ export const getRealTimePrices = async (
     password: 'lookup123'
   };
 
-  console.log(`Looking up real-time prices for: ${ingredientName}`);
+  console.log(`🔍 Looking up live prices for: ${ingredientName} (${quantity})`);
+
+  let successfulCalls = 0;
+  let failedCalls = 0;
 
   for (const supermarket of supermarkets) {
     try {
@@ -63,7 +103,7 @@ export const getRealTimePrices = async (
         }]
       };
 
-      console.log(`Fetching ${supermarket} price for ${ingredientName}`);
+      console.log(`📡 Fetching ${supermarket} price for ${ingredientName}`);
 
       const response = await fetch(BASKET_API_URL, {
         method: 'POST',
@@ -74,7 +114,8 @@ export const getRealTimePrices = async (
       });
 
       if (!response.ok) {
-        console.warn(`Failed to fetch ${supermarket} price: ${response.status}`);
+        console.error(`❌ Failed to fetch ${supermarket} price: HTTP ${response.status}`);
+        failedCalls++;
         continue;
       }
 
@@ -93,23 +134,59 @@ export const getRealTimePrices = async (
             image: item.matched_product.image
           });
           
-          console.log(`Found ${supermarket} price: £${priceValue} for ${item.matched_product.title}`);
+          console.log(`✅ Found ${supermarket} price: £${priceValue} for "${item.matched_product.title}"`);
+          successfulCalls++;
+        } else {
+          console.warn(`⚠️ No product match found for ${ingredientName} at ${supermarket}`);
+          
+          // Add fallback entry with "No Match" indicator
+          prices.push({
+            store: supermarket,
+            price: 2.50,
+            title: `${ingredientName} (No Match)`,
+            url: undefined,
+            image: undefined
+          });
+          failedCalls++;
         }
+      } else {
+        console.error(`❌ ${supermarket} API returned error:`, data.error || 'Unknown error');
+        failedCalls++;
       }
     } catch (error) {
-      console.error(`Error fetching ${supermarket} price for ${ingredientName}:`, error);
+      console.error(`💥 Network error fetching ${supermarket} price for ${ingredientName}:`, error);
+      failedCalls++;
     }
   }
 
-  // If no prices found, return fallback prices
+  // Log API usage summary
+  console.log(`📊 Price lookup summary for "${ingredientName}": ${successfulCalls} successful, ${failedCalls} failed out of ${supermarkets.length} calls`);
+  
+  // Alert if all calls failed
+  if (successfulCalls === 0) {
+    console.error(`🚨 ALL price lookups failed for "${ingredientName}" - check API connectivity`);
+  }
+
+  // If no prices found, return fallback prices for all stores
   if (prices.length === 0) {
-    console.log(`No real-time prices found for ${ingredientName}, using fallbacks`);
-    return supermarkets.map(store => ({
+    console.log(`🔄 No live prices found for ${ingredientName}, using fallbacks`);
+    const fallbackPrices = supermarkets.map(store => ({
       store,
       price: 2.50,
-      title: ingredientName
+      title: `${ingredientName} (No Match)`
     }));
+    
+    // Cache fallback results for shorter duration (1 minute)
+    priceCache.set(cacheKey, {
+      data: fallbackPrices,
+      timestamp: Date.now() - (CACHE_DURATION - 60000) // Expire in 1 minute instead of 5
+    });
+    
+    return fallbackPrices;
   }
+
+  // Cache successful results
+  setCachedPrice(cacheKey, prices);
 
   return prices;
 };
@@ -142,4 +219,18 @@ export const calculateTotalCostByStore = (
   });
   
   return storeTotals;
+};
+
+// Utility function to clear cache (useful for debugging)
+export const clearPriceCache = (): void => {
+  priceCache.clear();
+  console.log('🗑️ Price cache cleared');
+};
+
+// Utility function to get cache stats
+export const getCacheStats = (): { size: number; keys: string[] } => {
+  return {
+    size: priceCache.size,
+    keys: Array.from(priceCache.keys())
+  };
 };
