@@ -6,6 +6,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { WebhookResponse } from '@/utils/webhookService';
 import { SupermarketCredentialsModal } from '@/components/SupermarketCredentialsModal';
 import { addItemsToBasket, formatItemsForBasket } from '@/utils/shoppingBasketService';
+import { useUnifiedPriceCalculation } from '@/hooks/useUnifiedPriceCalculation';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ExternalLink } from 'lucide-react';
 import { MatchedProductsModal } from '@/components/MatchedProductsModal';
@@ -51,6 +53,7 @@ interface ShoppingItem {
   category: string;
   url?: string;
   image?: string;
+  storePrices?: {[key: string]: number};
 }
 
 export const ShoppingList: React.FC<ShoppingListProps> = ({ 
@@ -109,56 +112,60 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   useEffect(() => {
     console.log('ShoppingList useEffect triggered', { recipes, generatedData });
     
-    if (recipes.length > 0) {
-      console.log('Processing recipes:', recipes);
-      const hasEnhancedData = recipes.some(recipe => 
-        recipe.ingredients && 
-        recipe.ingredients.length > 0 && 
-        typeof recipe.ingredients[0] === 'object' &&
-        recipe.ingredients[0].prices
-      );
+    const loadShoppingData = async () => {
+      if (recipes.length > 0) {
+        console.log('Processing recipes:', recipes);
+        const hasEnhancedData = recipes.some(recipe => 
+          recipe.ingredients && 
+          recipe.ingredients.length > 0 && 
+          typeof recipe.ingredients[0] === 'object' &&
+          recipe.ingredients[0].prices
+        );
 
-      console.log('Has enhanced data:', hasEnhancedData);
+        console.log('Has enhanced data:', hasEnhancedData);
 
-      if (hasEnhancedData) {
-        try {
-          const { items, totals, best } = generateEnhancedShoppingList(recipes as EnhancedRecipe[]);
-          console.log('Generated enhanced shopping list:', { items, totals, best });
-          setShoppingItems(items);
-          setTotalWeekCost(totals);
-          setBestOption(best);
-        } catch (error) {
-          console.error('Error generating enhanced shopping list:', error);
-          const fallbackItems = generateShoppingListFromRecipes(recipes);
-          setShoppingItems(fallbackItems);
-          // Generate realistic cost estimates for fallback
-          const fallbackTotals = generateRealisticCostBreakdown(fallbackItems);
-          setTotalWeekCost(fallbackTotals);
-          setBestOption(getBestOption(fallbackTotals));
+        if (hasEnhancedData) {
+          try {
+            const { items, totals, best } = generateEnhancedShoppingList(recipes as EnhancedRecipe[]);
+            console.log('Generated enhanced shopping list:', { items, totals, best });
+            setShoppingItems(items);
+            setTotalWeekCost(totals);
+            setBestOption(best);
+          } catch (error) {
+            console.error('Error generating enhanced shopping list:', error);
+            const fallbackItems = await generateShoppingListFromRecipes(recipes);
+            setShoppingItems(fallbackItems);
+            // Generate realistic cost estimates for fallback
+            const fallbackTotals = generateRealisticCostBreakdownWithStorePrices(fallbackItems);
+            setTotalWeekCost(fallbackTotals);
+            setBestOption(getBestOption(fallbackTotals));
+          }
+        } else {
+          console.log('Using basic recipe format');
+          const generatedItems = await generateShoppingListFromRecipes(recipes);
+          setShoppingItems(generatedItems);
+          // Generate realistic cost estimates using store prices
+          const realisticTotals = generateRealisticCostBreakdownWithStorePrices(generatedItems);
+          setTotalWeekCost(realisticTotals);
+          setBestOption(getBestOption(realisticTotals));
         }
-      } else {
-        console.log('Using basic recipe format');
-        const generatedItems = generateShoppingListFromRecipes(recipes);
+      } else if (generatedData?.shoppingList) {
+        console.log('Using generated data shopping list');
+        const generatedItems = generateShoppingItemsFromData(generatedData.shoppingList);
         setShoppingItems(generatedItems);
-        // Generate realistic cost estimates
         const realisticTotals = generateRealisticCostBreakdown(generatedItems);
         setTotalWeekCost(realisticTotals);
         setBestOption(getBestOption(realisticTotals));
+      } else {
+        console.log('Using mock data');
+        setShoppingItems(mockShoppingItems);
+        const mockTotals = generateRealisticCostBreakdown(mockShoppingItems);
+        setTotalWeekCost(mockTotals);
+        setBestOption(getBestOption(mockTotals));
       }
-    } else if (generatedData?.shoppingList) {
-      console.log('Using generated data shopping list');
-      const generatedItems = generateShoppingItemsFromData(generatedData.shoppingList);
-      setShoppingItems(generatedItems);
-      const realisticTotals = generateRealisticCostBreakdown(generatedItems);
-      setTotalWeekCost(realisticTotals);
-      setBestOption(getBestOption(realisticTotals));
-    } else {
-      console.log('Using mock data');
-      setShoppingItems(mockShoppingItems);
-      const mockTotals = generateRealisticCostBreakdown(mockShoppingItems);
-      setTotalWeekCost(mockTotals);
-      setBestOption(getBestOption(mockTotals));
-    }
+    };
+
+    loadShoppingData();
   }, [recipes, generatedData]);
 
   // Generate realistic cost breakdown for stores
@@ -191,6 +198,29 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       totals[store] = parseFloat(total.toFixed(2));
     });
     
+    return totals;
+  };
+
+  // Enhanced cost breakdown using actual store prices from items
+  const generateRealisticCostBreakdownWithStorePrices = (items: {[key: string]: ShoppingItem[]}) => {
+    const allItems = Object.values(items).flat();
+    const stores = ['tesco', 'sainsburys', 'asda', 'morrisons'];
+    const totals: {[key: string]: number} = {};
+    
+    stores.forEach(store => {
+      let total = 0;
+      allItems.forEach(item => {
+        if (item.storePrices && item.storePrices[store]) {
+          total += item.storePrices[store];
+        } else {
+          // Fallback to item's main price if no store-specific price
+          total += item.price;
+        }
+      });
+      totals[store] = parseFloat(total.toFixed(2));
+    });
+    
+    console.log('Store price breakdown:', totals);
     return totals;
   };
 
@@ -534,7 +564,47 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   );
 };
 
-const generateShoppingListFromRecipes = (recipes: any[]): {[key: string]: ShoppingItem[]} => {
+// Function to get ingredient prices from all store tables
+const getIngredientPricesFromStores = async (ingredientName: string): Promise<{[store: string]: number}> => {
+  const storeTables = ['tesco_prices', 'sainsbury_prices', 'asda_prices', 'aldi_prices'];
+  const storePrices: {[store: string]: number} = {};
+  
+  for (const table of storeTables) {
+    try {
+      const { data, error } = await (supabase as any)
+        .from(table)
+        .select('average_price, price')
+        .ilike('ingredient_name', `%${ingredientName}%`)
+        .limit(1)
+        .single();
+
+      if (!error && data) {
+        const price = data.average_price || data.price;
+        if (price && typeof price === 'number') {
+          // Map table names to store names
+          const storeMapping: {[key: string]: string} = {
+            'tesco_prices': 'tesco',
+            'sainsbury_prices': 'sainsburys',
+            'asda_prices': 'asda',
+            'aldi_prices': 'aldi'
+          };
+          const storeName = storeMapping[table];
+          if (storeName) {
+            storePrices[storeName] = price;
+          }
+        }
+      }
+    } catch (tableError) {
+      // Continue checking other tables
+      continue;
+    }
+  }
+  
+  console.log(`Prices found for ${ingredientName}:`, storePrices);
+  return storePrices;
+};
+
+const generateShoppingListFromRecipes = async (recipes: any[]): Promise<{[key: string]: ShoppingItem[]}> => {
   const categorized: {[key: string]: ShoppingItem[]} = {};
   
   const allIngredients: string[] = [];
@@ -551,22 +621,40 @@ const generateShoppingListFromRecipes = (recipes: any[]): {[key: string]: Shoppi
 
   const uniqueIngredients = [...new Set(allIngredients)];
   
-  uniqueIngredients.forEach(ingredient => {
+  for (const ingredient of uniqueIngredients) {
     const category = categorizeIngredient(ingredient);
     if (!categorized[category]) {
       categorized[category] = [];
     }
     
+    // Get actual prices from database for all stores
+    const storePrices = await getIngredientPricesFromStores(ingredient);
+    
+    // Find the best price among stores
+    let bestStore = 'tesco';
+    let bestPrice = 2.50; // fallback
+    
+    if (Object.keys(storePrices).length > 0) {
+      const priceEntries = Object.entries(storePrices);
+      const best = priceEntries.reduce((min, [store, price]) => 
+        price < min.price ? { store, price } : min
+      , { store: priceEntries[0][0], price: priceEntries[0][1] });
+      
+      bestStore = best.store;
+      bestPrice = best.price;
+    }
+    
     categorized[category].push({
       name: ingredient,
       amount: '1 unit',
-      price: estimatePrice(ingredient),
-      store: getOptimalStore(ingredient),
+      price: bestPrice,
+      store: bestStore,
       checked: false,
       category,
-      image: generateMockImage(ingredient)
+      image: generateMockImage(ingredient),
+      storePrices: storePrices // Store all prices for cost breakdown
     });
-  });
+  }
   
   return categorized;
 };
