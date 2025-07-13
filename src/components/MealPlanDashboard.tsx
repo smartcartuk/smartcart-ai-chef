@@ -8,6 +8,7 @@ import { WeeklyPlan } from '@/components/WeeklyPlan';
 import { ShoppingList } from '@/components/ShoppingList';
 import { PriceComparison } from '@/components/PriceComparison';
 import { AIAssistant } from '@/components/AIAssistant';
+import { WeeklyPlanTester } from '@/components/WeeklyPlanTester';
 import { WebhookResponse } from '@/utils/webhookService';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -220,7 +221,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
 
         {/* Main Content Tabs - Enhanced visibility */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 h-14 bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl p-1 shadow-md border">
+          <TabsList className="grid w-full grid-cols-5 h-14 bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl p-1 shadow-md border">
             <TabsTrigger 
               value="plan" 
               className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
@@ -248,6 +249,13 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
             >
               <span className="text-xl">🤖</span>
               <span className="font-bold">AI Assistant</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="tester" 
+              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
+            >
+              <span className="text-xl">🧪</span>
+              <span className="font-bold">API Tester</span>
             </TabsTrigger>
           </TabsList>
 
@@ -278,6 +286,10 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
 
           <TabsContent value="assistant" className="space-y-6">
             <AIAssistant userProfile={userProfile} />
+          </TabsContent>
+
+          <TabsContent value="tester" className="space-y-6">
+            <WeeklyPlanTester />
           </TabsContent>
         </Tabs>
 
