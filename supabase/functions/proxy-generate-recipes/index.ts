@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -23,18 +22,41 @@ serve(async (req) => {
   try {
     const { preferences, userProfile } = await req.json();
     
-    console.log('Generating recipes with enhanced price data');
+    console.log('Generating recipes with user profile:', userProfile);
 
-    // Call the new API endpoint that includes price comparisons
+    // Structure the payload properly for the Vercel API
+    const apiPayload = {
+      userProfile: {
+        // Core preferences for meal generation
+        dietaryPreferences: userProfile?.dietaryPreferences || [],
+        allergies: userProfile?.allergies || [],
+        householdSize: userProfile?.householdSize || 2,
+        weeklyBudget: userProfile?.weeklyBudget || 50,
+        
+        // Additional context that might be useful
+        name: userProfile?.name || '',
+        address: userProfile?.address || {},
+        connectedStores: userProfile?.connectedStores?.map(store => ({
+          name: store.name,
+          hasLoyaltyCard: Boolean(store.credentials?.loyaltyCard)
+        })) || []
+      },
+      requestType: 'weekly-plan',
+      timestamp: new Date().toISOString(),
+      
+      // Keep legacy preferences string for backwards compatibility
+      preferences: preferences || ''
+    };
+
+    console.log('Sending structured payload to Vercel API:', apiPayload);
+
+    // Call the Vercel API endpoint
     const response = await fetch('https://smartcart-operator.vercel.app/api/meal-plan', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ 
-        preferences: preferences,
-        userProfile: userProfile || {}
-      }),
+      body: JSON.stringify(apiPayload),
     });
 
     console.log('API response status:', response.status);
