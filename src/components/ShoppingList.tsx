@@ -37,7 +37,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [addingToBasket, setAddingToBasket] = useState(false);
   const { toast } = useToast();
 
-  // Extract ingredients from recipes
+  // Extract ingredients from recipes with proper image handling
   const ingredients = React.useMemo(() => {
     const allIngredients: Array<{ name: string; amount: string; store: string; price: number; image: string }> = [];
     
@@ -247,12 +247,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                 value={store.id}
                 className="flex flex-col items-center space-y-2 p-4 data-[state=active]:bg-blue-50 data-[state=active]:border-blue-200"
               >
-                <div className="flex items-center justify-center w-8 h-8">
+                <div className="flex items-center justify-center w-12 h-8">
                   {logo ? (
                     <img 
                       src={logo} 
                       alt={store.name}
-                      className="w-full h-full object-contain"
+                      className="max-w-full max-h-full object-contain"
                       onError={(e) => {
                         const target = e.currentTarget as HTMLImageElement;
                         target.style.display = 'none';
@@ -289,12 +289,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               <Card className="p-4 bg-gradient-to-r from-blue-50 to-purple-50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 flex items-center justify-center">
+                    <div className="w-16 h-12 flex items-center justify-center">
                       {logo ? (
                         <img 
                           src={logo} 
                           alt={store.name}
-                          className="w-full h-full object-contain"
+                          className="max-w-full max-h-full object-contain"
                           onError={(e) => {
                             const target = e.currentTarget as HTMLImageElement;
                             target.style.display = 'none';
@@ -309,12 +309,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         {emoji}
                       </div>
                     </div>
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-lg">{store.name}</h3>
                       <div className="flex flex-col space-y-1 text-sm text-gray-600">
                         <div className="flex items-center space-x-1">
                           <MapPin className="w-4 h-4 flex-shrink-0" />
-                          <span>{store.address}</span>
+                          <span className="truncate">{store.address}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Clock className="w-4 h-4 flex-shrink-0" />
@@ -324,7 +324,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     </div>
                   </div>
                   
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0">
                     <div className="text-2xl font-bold text-blue-600">£{store.total.toFixed(2)}</div>
                     <div className="text-sm text-gray-600">{store.items} items</div>
                   </div>
@@ -371,7 +371,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                               }`}
                               onClick={() => toggleItem(item.name)}
                             >
-                              <div className="flex items-center space-x-3">
+                              <div className="flex items-center space-x-3 flex-1 min-w-0">
                                 {checkedItems.has(item.name) ? (
                                   <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                                 ) : (
@@ -392,7 +392,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                 </div>
                               </div>
                               
-                              <div className="text-right flex-shrink-0">
+                              <div className="text-right flex-shrink-0 ml-4">
                                 <div className="font-medium text-gray-900">£{item.price.toFixed(2)}</div>
                               </div>
                             </div>
@@ -413,7 +413,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         }`}
                         onClick={() => toggleItem(item.name)}
                       >
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
                           {checkedItems.has(item.name) ? (
                             <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                           ) : (
@@ -434,7 +434,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           </div>
                         </div>
                         
-                        <div className="text-right flex-shrink-0">
+                        <div className="text-right flex-shrink-0 ml-4">
                           <div className="font-medium text-gray-900">£{item.price.toFixed(2)}</div>
                         </div>
                       </div>
@@ -471,12 +471,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               const { logo, emoji } = getSupermarketLogo(store.id);
               return (
                 <div key={store.id} className="text-center p-4 bg-white rounded-lg shadow-sm">
-                  <div className="w-8 h-8 mx-auto mb-2 flex items-center justify-center">
+                  <div className="w-12 h-8 mx-auto mb-2 flex items-center justify-center">
                     {logo ? (
                       <img 
                         src={logo} 
                         alt={store.name}
-                        className="w-full h-full object-contain"
+                        className="max-w-full max-h-full object-contain"
                         onError={(e) => {
                           const target = e.currentTarget as HTMLImageElement;
                           target.style.display = 'none';

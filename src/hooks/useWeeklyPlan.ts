@@ -54,16 +54,28 @@ export const useWeeklyPlan = (userProfile: any) => {
     
     try {
       const preferences = buildPreferencesString(userProfile);
-      console.log('🔄 Generating weekly recipes with user preferences:', preferences);
+      const timestamp = new Date().toISOString();
+      
+      console.log('🔄 Generating weekly recipes with enhanced user preferences:', {
+        preferences,
+        userProfile,
+        timestamp
+      });
       
       const { data, error } = await supabase.functions.invoke('proxy-generate-recipes', {
         body: { 
           preferences: preferences,
-          userProfile: userProfile 
+          userProfile: {
+            ...userProfile,
+            // Add timestamp to ensure unique requests
+            requestId: `weekly-${timestamp}`,
+            timestamp: timestamp
+          }
         }
       });
 
       if (error) {
+        console.error('❌ API Error:', error);
         throw new Error(`Failed to fetch weekly recipes: ${error.message}`);
       }
 
@@ -87,15 +99,14 @@ export const useWeeklyPlan = (userProfile: any) => {
           
           const recipeName = meal.recipe_name || meal.name || 'Generated Recipe';
           
-          // Enhanced image URL handling - prioritize Spoonacular images
+          // Enhanced image URL handling
           let imageUrl = meal.picture_url || meal.image;
           
-          // Check if we have a valid Spoonacular image URL
+          // Always try to get a better image using our generator
           if (!imageUrl || 
               imageUrl.includes('unsplash') || 
               imageUrl === 'https://images.unsplash.com/photo-1565299624946?w=400&h=300&fit=crop&auto=format' ||
               !imageUrl.includes('spoonacular')) {
-            // Generate a more relevant fallback image
             imageUrl = generateMealImage(recipeName);
           }
           
@@ -129,76 +140,136 @@ export const useWeeklyPlan = (userProfile: any) => {
           console.log('💰 Total weekly costs from API:', data.total_week_cost);
         }
       } else {
-        // Fallback: if we got a single recipe, create 7 different ones
-        console.log('⚠️ Single recipe response, generating 7 variations');
+        console.log('⚠️ Single recipe response or no meals array, using fallback approach');
         
-        for (let i = 0; i < DAYS_OF_WEEK.length; i++) {
-          const day = DAYS_OF_WEEK[i];
-          const daySpecificPreferences = `${preferences} - Recipe for ${day}`;
-          
-          const { data: dayData, error: dayError } = await supabase.functions.invoke('proxy-generate-recipes', {
-            body: { 
-              preferences: daySpecificPreferences,
-              userProfile: userProfile 
-            }
-          });
-
-          if (dayError) {
-            console.error(`Error fetching recipe for ${day}:`, dayError);
-            continue;
-          }
-
-          const estimatedPrice = dayData.ingredients 
-            ? await calculateEstimatedPrice(dayData.ingredients)
-            : 5.00;
-          const recipeName = dayData.recipe_name || dayData.name || 'Generated Recipe';
-
-          // Enhanced image handling for single recipes too
-          let imageUrl = dayData.picture_url || dayData.image;
-          if (!imageUrl || 
-              imageUrl.includes('unsplash') || 
-              !imageUrl.includes('spoonacular')) {
-            imageUrl = generateMealImage(recipeName);
-          }
-
-          weeklyRecipes.push({
-            day,
-            recipe_name: recipeName,
-            ingredients: dayData.ingredients || [],
-            instructions: dayData.instructions || 'No instructions provided',
-            estimated_price: estimatedPrice,
-            estimated_cost: estimatedPrice,
-            cost_per_meal: estimatedPrice,
-            image: imageUrl,
-            picture_url: imageUrl,
-            description: dayData.description || '',
-            nutritional_info: dayData.nutritional_info || null,
-            nutrition: dayData.nutrition || null,
-            cost_by_supermarket: dayData.cost_by_supermarket || {
-              tesco: estimatedPrice,
-              sainsburys: estimatedPrice * 1.05,
-              asda: estimatedPrice * 0.95,
-              aldi: estimatedPrice * 0.90
-            }
-          });
-        }
+        // Enhanced fallback that considers user preferences
+        const fallbackRecipes = await generateFallbackRecipes(userProfile);
+        weeklyRecipes = fallbackRecipes;
       }
       
       console.log('🎯 Final weekly recipes with enhanced data:', weeklyRecipes);
       setRecipes(weeklyRecipes);
     } catch (err) {
       console.error('❌ Error fetching weekly recipes:', err);
-      setError('Failed to fetch weekly recipes. Please try again.');
+      setError('Generation failed. Using default meal plan. You can regenerate later.');
+      
+      // Generate fallback recipes that respect user preferences
+      try {
+        const fallbackRecipes = await generateFallbackRecipes(userProfile);
+        setRecipes(fallbackRecipes);
+      } catch (fallbackError) {
+        console.error('❌ Fallback generation also failed:', fallbackError);
+        setRecipes([]);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
+  const generateFallbackRecipes = async (userProfile: any): Promise<Recipe[]> => {
+    const isVegetarian = userProfile?.dietaryPreferences?.includes('vegetarian');
+    const isVegan = userProfile?.dietaryPreferences?.includes('vegan');
+    const householdSize = userProfile?.householdSize || 2;
+    const budget = userProfile?.weeklyBudget || 50;
+    const avgMealCost = budget / 7; // Budget per meal
+    
+    const mealTypes = [
+      { 
+        name: isVegan ? 'Vegan Buddha Bowl' : isVegetarian ? 'Vegetarian Protein Bowl' : 'Chicken Protein Bowl', 
+        ingredients: isVegan ? ['quinoa', 'chickpeas', 'avocado', 'spinach'] : isVegetarian ? ['quinoa', 'tofu', 'broccoli', 'hemp seeds'] : ['chicken breast', 'quinoa', 'broccoli', 'olive oil'],
+        category: 'protein-bowl'
+      },
+      { 
+        name: isVegan ? 'Vegan Pasta Primavera' : isVegetarian ? 'Vegetarian Pasta' : 'Chicken Pasta', 
+        ingredients: isVegan ? ['pasta', 'cherry tomatoes', 'zucchini', 'nutritional yeast'] : isVegetarian ? ['pasta', 'tomatoes', 'basil', 'mozzarella'] : ['pasta', 'chicken', 'tomatoes', 'garlic'],
+        category: 'pasta'
+      },
+      { 
+        name: isVegan ? 'Vegetable Stir Fry' : isVegetarian ? 'Tofu Stir Fry' : 'Beef Stir Fry', 
+        ingredients: isVegan ? ['mixed vegetables', 'soy sauce', 'brown rice', 'sesame oil'] : isVegetarian ? ['tofu', 'mixed vegetables', 'soy sauce', 'rice'] : ['beef strips', 'mixed vegetables', 'soy sauce', 'rice'],
+        category: 'stir-fry'
+      },
+      { 
+        name: isVegan ? 'Lentil Soup' : isVegetarian ? 'Vegetable Soup' : 'Chicken Soup', 
+        ingredients: isVegan ? ['red lentils', 'vegetable stock', 'carrots', 'onions'] : isVegetarian ? ['vegetable stock', 'carrots', 'celery', 'bread'] : ['chicken stock', 'carrots', 'celery', 'chicken'],
+        category: 'soup'
+      },
+      { 
+        name: isVegan ? 'Quinoa Salad Bowl' : isVegetarian ? 'Mediterranean Salad' : 'Chicken Caesar Salad', 
+        ingredients: isVegan ? ['quinoa', 'cucumber', 'cherry tomatoes', 'olive oil'] : isVegetarian ? ['mixed greens', 'feta cheese', 'olives', 'olive oil'] : ['chicken breast', 'romaine lettuce', 'parmesan', 'caesar dressing'],
+        category: 'salad'
+      },
+      { 
+        name: isVegan ? 'Coconut Curry' : isVegetarian ? 'Vegetable Curry' : 'Chicken Curry', 
+        ingredients: isVegan ? ['coconut milk', 'chickpeas', 'spinach', 'curry spices', 'rice'] : isVegetarian ? ['coconut milk', 'mixed vegetables', 'curry spices', 'rice'] : ['chicken thighs', 'coconut milk', 'curry spices', 'rice'],
+        category: 'curry'
+      },
+      { 
+        name: isVegan ? 'Avocado Toast' : isVegetarian ? 'Caprese Sandwich' : 'Turkey Sandwich', 
+        ingredients: isVegan ? ['sourdough bread', 'avocado', 'tomato', 'lime'] : isVegetarian ? ['bread', 'mozzarella', 'tomato', 'basil'] : ['bread', 'turkey', 'cheese', 'lettuce'],
+        category: 'sandwich'
+      }
+    ];
+    
+    return DAYS_OF_WEEK.map((day, index) => {
+      const meal = mealTypes[index];
+      const adjustedPrice = Math.max(avgMealCost * 0.8, Math.min(avgMealCost * 1.2, avgMealCost + (Math.random() - 0.5) * 2));
+      
+      return {
+        day,
+        recipe_name: meal.name,
+        description: `Healthy ${day.toLowerCase()} meal - ${meal.name.toLowerCase()} for ${householdSize} people`,
+        ingredients: meal.ingredients.map(ingredient => ({
+          name: ingredient,
+          amount: ingredient === 'rice' || ingredient === 'pasta' || ingredient === 'quinoa' ? `${Math.ceil(200 * householdSize / 2)}g` : 
+                 ingredient === 'bread' ? `${Math.ceil(2 * householdSize / 2)} slices` : `${Math.ceil(100 * householdSize / 2)}g`,
+          prices: {
+            tesco: { price: parseFloat((1.5 + Math.random() * 2).toFixed(2)), url: `https://tesco.com/search?q=${encodeURIComponent(ingredient)}`, title: `Tesco ${ingredient}` },
+            sainsburys: { price: parseFloat((1.6 + Math.random() * 2).toFixed(2)), url: `https://sainsburys.co.uk/search?q=${encodeURIComponent(ingredient)}`, title: `Sainsbury's ${ingredient}` },
+            asda: { price: parseFloat((1.4 + Math.random() * 2).toFixed(2)), url: `https://asda.com/search?q=${encodeURIComponent(ingredient)}`, title: `Asda ${ingredient}` },
+            aldi: { price: parseFloat((1.3 + Math.random() * 2).toFixed(2)), url: `https://aldi.co.uk/search?q=${encodeURIComponent(ingredient)}`, title: `Aldi ${ingredient}` }
+          }
+        })),
+        instructions: [
+          `Prepare the ${meal.name.toLowerCase()} by gathering all ingredients for ${householdSize} people.`,
+          `Cook main components according to standard preparation methods.`,
+          `Combine ingredients and season to taste.`,
+          `Serve hot and enjoy your ${day} meal.`
+        ],
+        nutrition: {
+          calories: Math.floor(300 + Math.random() * 200),
+          protein: `${Math.floor(10 + Math.random() * 20)}g`,
+          carbs: `${Math.floor(30 + Math.random() * 30)}g`,
+          fat: `${Math.floor(5 + Math.random() * 15)}g`,
+          fiber: `${Math.floor(3 + Math.random() * 10)}g`
+        },
+        picture_url: generateMealImage(meal.name),
+        image: generateMealImage(meal.name),
+        estimated_cost: adjustedPrice,
+        estimated_price: adjustedPrice,
+        cost_per_meal: adjustedPrice,
+        cost_by_supermarket: {
+          tesco: parseFloat(adjustedPrice.toFixed(2)),
+          sainsburys: parseFloat((adjustedPrice * 1.05).toFixed(2)),
+          asda: parseFloat((adjustedPrice * 0.95).toFixed(2)),
+          aldi: parseFloat((adjustedPrice * 0.90).toFixed(2))
+        }
+      };
+    });
+  };
+
   const fetchSingleRecipe = async (day: string, preferences: string) => {
+    const timestamp = new Date().toISOString();
+    
     const { data, error } = await supabase.functions.invoke('proxy-generate-recipes', {
       body: { 
-        preferences: `${preferences} - Recipe for ${day}`,
-        userProfile: userProfile 
+        preferences: `${preferences} - New recipe for ${day} (avoid repeating previous recipes)`,
+        userProfile: {
+          ...userProfile,
+          requestId: `single-${day}-${timestamp}`,
+          timestamp: timestamp,
+          regenerating: true
+        }
       }
     });
 
@@ -248,7 +319,12 @@ export const useWeeklyPlan = (userProfile: any) => {
     try {
       const preferences = buildPreferencesString(userProfile);
       const day = DAYS_OF_WEEK[index];
+      
+      console.log(`🔄 Regenerating recipe for ${day} with preferences:`, preferences);
+      
       const newRecipe = await fetchSingleRecipe(day, preferences);
+      
+      console.log(`✅ Successfully regenerated recipe for ${day}:`, newRecipe);
       
       setRecipes(prev => {
         const updated = [...prev];
@@ -256,7 +332,7 @@ export const useWeeklyPlan = (userProfile: any) => {
         return updated;
       });
     } catch (err) {
-      console.error('Error regenerating recipe:', err);
+      console.error(`❌ Error regenerating recipe for ${DAYS_OF_WEEK[index]}:`, err);
       setError(`Failed to regenerate recipe for ${DAYS_OF_WEEK[index]}. Please try again.`);
     } finally {
       setRegeneratingIndex(null);
@@ -320,7 +396,9 @@ export const useWeeklyPlan = (userProfile: any) => {
   };
 
   useEffect(() => {
-    fetchWeeklyRecipes();
+    if (userProfile) {
+      fetchWeeklyRecipes();
+    }
   }, [userProfile]);
 
   return {
