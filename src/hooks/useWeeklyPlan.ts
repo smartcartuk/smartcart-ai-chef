@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { buildPreferencesString, DAYS_OF_WEEK } from '@/utils/recipeHelpers';
@@ -43,6 +44,7 @@ export const useWeeklyPlan = (userProfile: any) => {
   const [expandedRecipes, setExpandedRecipes] = useState<Set<number>>(new Set());
   const [isComparingPrices, setIsComparingPrices] = useState(false);
   const [priceComparisonResult, setPriceComparisonResult] = useState<any>(null);
+  const [totalWeeklyCosts, setTotalWeeklyCosts] = useState<any>(null);
 
   const { calculateEstimatedPrice } = useUnifiedPriceCalculation();
 
@@ -54,7 +56,6 @@ export const useWeeklyPlan = (userProfile: any) => {
       const preferences = buildPreferencesString(userProfile);
       console.log('🔄 Generating weekly recipes with user preferences:', preferences);
       
-      // Make a single API call to get all 7 meals
       const { data, error } = await supabase.functions.invoke('proxy-generate-recipes', {
         body: { 
           preferences: preferences,
@@ -70,25 +71,28 @@ export const useWeeklyPlan = (userProfile: any) => {
 
       let weeklyRecipes: Recipe[] = [];
 
-      // Check if we got a meals array from the Operator API
       if (data.meals && Array.isArray(data.meals)) {
         console.log('✅ Processing meals array from Operator API:', data.meals.length, 'meals');
         
-        // Map the meals array to our Recipe format
         weeklyRecipes = data.meals.map((meal: any, index: number) => {
-          // Calculate price using the enhanced ingredients data
+          // Use the cost structure from the API response
           let estimatedPrice = meal.estimated_cost || meal.cost_per_meal || meal.estimated_price;
           
           if (!estimatedPrice && meal.cost_by_supermarket) {
-            // Use the cheapest supermarket price
             const prices = Object.values(meal.cost_by_supermarket) as number[];
             estimatedPrice = Math.min(...prices);
           }
           
-          // Ensure we have a valid price
-          estimatedPrice = estimatedPrice || 5.00; // Reasonable default for a meal
+          estimatedPrice = estimatedPrice || 5.00;
           
           const recipeName = meal.recipe_name || meal.name || 'Generated Recipe';
+          
+          // Fix image URL - ensure we use Spoonacular images when available
+          let imageUrl = meal.picture_url || meal.image;
+          if (!imageUrl || imageUrl.includes('unsplash')) {
+            // If no proper image from Spoonacular, generate a fallback
+            imageUrl = generateMealImage(recipeName);
+          }
           
           return {
             day: meal.day || DAYS_OF_WEEK[index],
@@ -98,8 +102,8 @@ export const useWeeklyPlan = (userProfile: any) => {
             estimated_cost: estimatedPrice,
             estimated_price: estimatedPrice,
             cost_per_meal: estimatedPrice,
-            image: meal.picture_url || meal.image || generateMealImage(recipeName),
-            picture_url: meal.picture_url || meal.image || generateMealImage(recipeName),
+            image: imageUrl,
+            picture_url: imageUrl,
             description: meal.description || '',
             nutritional_info: meal.nutritional_info || meal.nutrition || null,
             nutrition: meal.nutrition || meal.nutritional_info || null,
@@ -111,6 +115,12 @@ export const useWeeklyPlan = (userProfile: any) => {
             }
           };
         });
+
+        // Store the total weekly costs from the API response
+        if (data.total_week_cost) {
+          setTotalWeeklyCosts(data.total_week_cost);
+          console.log('💰 Total weekly costs from API:', data.total_week_cost);
+        }
       } else {
         // Fallback: if we got a single recipe, create 7 different ones
         console.log('⚠️ Single recipe response, generating 7 variations');
@@ -287,7 +297,6 @@ export const useWeeklyPlan = (userProfile: any) => {
   };
 
   useEffect(() => {
-    // Automatically generate recipes on component mount using onboarding data
     fetchWeeklyRecipes();
   }, [userProfile]);
 
@@ -300,6 +309,7 @@ export const useWeeklyPlan = (userProfile: any) => {
     expandedRecipes,
     isComparingPrices,
     priceComparisonResult,
+    totalWeeklyCosts,
     fetchWeeklyRecipes,
     regenerateSingleRecipe,
     toggleRecipeDetails,

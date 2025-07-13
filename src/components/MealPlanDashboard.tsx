@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -24,10 +23,16 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
   const [activeTab, setActiveTab] = useState('plan');
   const [recipes, setRecipes] = useState<any[]>([]);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
+  const [totalWeeklyCosts, setTotalWeeklyCosts] = useState<any>(null);
   const { toast } = useToast();
 
   const handleRecipesChange = (newRecipes: any[]) => {
     setRecipes(newRecipes);
+  };
+
+  const handleWeeklyCostsChange = (costs: any) => {
+    setTotalWeeklyCosts(costs);
+    console.log('📊 Weekly costs updated in dashboard:', costs);
   };
 
   const handleRegeneratePlan = () => {
@@ -111,9 +116,10 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
     }));
   };
 
-  const totalCost = generatedData?.meals?.reduce((sum, meal) => sum + meal.cost, 0) || 46.95;
+  const totalCost = totalWeeklyCosts?.tesco || generatedData?.meals?.reduce((sum, meal) => sum + meal.cost, 0) || 46.95;
   const totalMeals = generatedData?.meals?.length || 7;
-  const avgSavings = generatedData ? 12.50 : 12.50;
+  const avgSavings = totalWeeklyCosts ? 
+    Math.max(0, (totalWeeklyCosts.sainsburys - totalWeeklyCosts.aldi)) : 12.50;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -265,6 +271,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
               generatedData={generatedData}
               onRecipesChange={handleRecipesChange}
               onAddToPlan={handleAddToPlan}
+              onWeeklyCostsChange={handleWeeklyCostsChange}
             />
           </TabsContent>
 
@@ -273,6 +280,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
               userProfile={userProfile} 
               generatedData={generatedData}
               recipes={recipes}
+              totalWeeklyCosts={totalWeeklyCosts}
             />
           </TabsContent>
 
@@ -281,6 +289,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
               userProfile={userProfile} 
               generatedData={generatedData}
               recipes={recipes}
+              totalWeeklyCosts={totalWeeklyCosts}
             />
           </TabsContent>
 

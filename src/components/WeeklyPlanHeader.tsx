@@ -9,6 +9,7 @@ interface WeeklyPlanHeaderProps {
   onRegeneratePlan: () => void;
   onClearSelection: () => void;
   recipes?: any[];
+  totalWeeklyCosts?: any;
 }
 
 export const WeeklyPlanHeader: React.FC<WeeklyPlanHeaderProps> = ({
@@ -16,7 +17,8 @@ export const WeeklyPlanHeader: React.FC<WeeklyPlanHeaderProps> = ({
   selectedIngredientsCount,
   onRegeneratePlan,
   onClearSelection,
-  recipes = []
+  recipes = [],
+  totalWeeklyCosts
 }) => {
   const getPreferencesText = () => {
     const parts = [];
@@ -32,11 +34,20 @@ export const WeeklyPlanHeader: React.FC<WeeklyPlanHeaderProps> = ({
     return parts.length > 0 ? parts.join(' • ') : 'Personalized recipes';
   };
 
-  // Calculate total weekly cost
-  const totalWeeklyCost = recipes.reduce((total, recipe) => {
-    const recipeCost = recipe.estimated_cost || recipe.cost_per_meal || recipe.estimated_price || 0;
-    return total + recipeCost;
-  }, 0);
+  // Use the total weekly costs from the API if available, otherwise calculate from recipes
+  const getDisplayCost = () => {
+    if (totalWeeklyCosts?.tesco) {
+      return totalWeeklyCosts.tesco;
+    }
+    
+    // Fallback calculation from individual recipes
+    return recipes.reduce((total, recipe) => {
+      const recipeCost = recipe.estimated_cost || recipe.cost_per_meal || recipe.estimated_price || 0;
+      return total + recipeCost;
+    }, 0);
+  };
+
+  const displayCost = getDisplayCost();
 
   return (
     <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200">
@@ -47,12 +58,17 @@ export const WeeklyPlanHeader: React.FC<WeeklyPlanHeaderProps> = ({
             {getPreferencesText()}
           </p>
           <p className="text-sm text-gray-500 mt-1">
-            ✨ Automatically generated based on your onboarding preferences • Prices from cached ingredient data
+            ✨ Automatically generated based on your onboarding preferences • Live pricing from Spoonacular & SerpApi
           </p>
-          {recipes.length > 0 && (
+          {recipes.length > 0 && displayCost > 0 && (
             <div className="mt-2">
               <span className="text-lg font-semibold text-green-700">
-                Total Weekly Cost: £{totalWeeklyCost.toFixed(2)}
+                Total Weekly Cost: £{displayCost.toFixed(2)}
+                {totalWeeklyCosts && (
+                  <span className="text-sm text-gray-600 ml-2">
+                    (Tesco prices)
+                  </span>
+                )}
               </span>
             </div>
           )}

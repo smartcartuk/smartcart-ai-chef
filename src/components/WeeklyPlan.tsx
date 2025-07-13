@@ -14,13 +14,15 @@ interface WeeklyPlanProps {
   generatedData?: WebhookResponse | null;
   onRecipesChange?: (recipes: any[]) => void;
   onAddToPlan?: (recipe: any) => void;
+  onWeeklyCostsChange?: (costs: any) => void;
 }
 
 export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({ 
   userProfile, 
   generatedData,
   onRecipesChange,
-  onAddToPlan 
+  onAddToPlan,
+  onWeeklyCostsChange
 }) => {
   const { toast } = useToast();
   const {
@@ -32,6 +34,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
     expandedRecipes,
     isComparingPrices,
     priceComparisonResult,
+    totalWeeklyCosts,
     fetchWeeklyRecipes,
     regenerateSingleRecipe,
     toggleRecipeDetails,
@@ -45,6 +48,13 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
       onRecipesChange(recipes);
     }
   }, [recipes, onRecipesChange]);
+
+  // Pass weekly costs to parent component
+  React.useEffect(() => {
+    if (onWeeklyCostsChange && totalWeeklyCosts) {
+      onWeeklyCostsChange(totalWeeklyCosts);
+    }
+  }, [totalWeeklyCosts, onWeeklyCostsChange]);
 
   const handleAddToPlan = (recipe: any) => {
     addToPlan(recipe);
@@ -90,6 +100,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
         onRegeneratePlan={fetchWeeklyRecipes}
         onClearSelection={clearSelection}
         recipes={recipes}
+        totalWeeklyCosts={totalWeeklyCosts}
       />
 
       {error && (
