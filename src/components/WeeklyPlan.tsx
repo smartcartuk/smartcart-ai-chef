@@ -88,6 +88,22 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
     }
   };
 
+  const handleRegenerateSingleRecipe = async (index: number) => {
+    try {
+      await regenerateSingleRecipe(index);
+      toast({
+        title: "Recipe regenerated!",
+        description: "A new recipe has been generated for this day.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to regenerate recipe",
+        description: "Please try again in a moment.",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (isLoading) {
     return <WeeklyPlanLoading />;
   }
@@ -115,7 +131,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
         regeneratingIndex={regeneratingIndex}
         onToggleDetails={toggleRecipeDetails}
         onAddToPlan={handleAddToPlan}
-        onRegenerateSingleRecipe={regenerateSingleRecipe}
+        onRegenerateSingleRecipe={handleRegenerateSingleRecipe}
       />
 
       <PriceComparisonSection

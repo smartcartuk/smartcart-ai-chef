@@ -34,20 +34,30 @@ export const WeeklyPlanHeader: React.FC<WeeklyPlanHeaderProps> = ({
     return parts.length > 0 ? parts.join(' • ') : 'Personalized recipes';
   };
 
-  // Use the total weekly costs from the API if available, otherwise calculate from recipes
-  const getDisplayCost = () => {
-    if (totalWeeklyCosts?.tesco) {
-      return totalWeeklyCosts.tesco;
+  // Find the cheapest supermarket and its cost
+  const getCheapestCost = () => {
+    if (totalWeeklyCosts) {
+      const costs = Object.entries(totalWeeklyCosts) as [string, number][];
+      const cheapest = costs.reduce((min, [store, cost]) => {
+        return cost < min.cost ? { store, cost } : min;
+      }, { store: costs[0][0], cost: costs[0][1] });
+      
+      return {
+        cost: cheapest.cost,
+        store: cheapest.store.charAt(0).toUpperCase() + cheapest.store.slice(1)
+      };
     }
     
     // Fallback calculation from individual recipes
-    return recipes.reduce((total, recipe) => {
+    const totalCost = recipes.reduce((total, recipe) => {
       const recipeCost = recipe.estimated_cost || recipe.cost_per_meal || recipe.estimated_price || 0;
       return total + recipeCost;
     }, 0);
+    
+    return { cost: totalCost, store: 'Estimated' };
   };
 
-  const displayCost = getDisplayCost();
+  const { cost: displayCost, store: cheapestStore } = getCheapestCost();
 
   return (
     <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200">
@@ -64,11 +74,9 @@ export const WeeklyPlanHeader: React.FC<WeeklyPlanHeaderProps> = ({
             <div className="mt-2">
               <span className="text-lg font-semibold text-green-700">
                 Total Weekly Cost: £{displayCost.toFixed(2)}
-                {totalWeeklyCosts && (
-                  <span className="text-sm text-gray-600 ml-2">
-                    (Tesco prices)
-                  </span>
-                )}
+                <span className="text-sm text-gray-600 ml-2">
+                  ({cheapestStore} - Best Price)
+                </span>
               </span>
             </div>
           )}

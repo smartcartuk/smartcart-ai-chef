@@ -10,6 +10,8 @@ export const generateMealImage = (recipeName: string): string => {
     'soup': '1547592180-85f173990554',
     'pizza': '1513104890-7415063b982f',
     'stir-fry': '1512058564366-4f692b3b70e2',
+    'stir fry': '1512058564366-4f692b3b70e2',
+    'stirfry': '1512058564366-4f692b3b70e2',
     'quinoa': '1511690743698-d9d85f2fbeb7',
     'chickpea': '1546833999-b9fcb8a93c5e',
     'lentil': '1547592166-23ac45744acd',
@@ -22,7 +24,15 @@ export const generateMealImage = (recipeName: string): string => {
     'wrap': '1565299624946-b28f40334309',
     'sandwich': '1539252554453-80ab65ce3586',
     'burger': '1571091718767-18b5b1457add',
-    'tacos': '1565299507177-b0ac66763828'
+    'tacos': '1565299507177-b0ac66763828',
+    'chicken': '1598514982346-46d1c5a7e77a',
+    'beef': '1546833999-b9fcb8a93c5e',
+    'fish': '1544551763-77ef2d0f2476',
+    'salmon': '1467003909585-2f8a72700288',
+    'vegetarian': '1512621776402-57ad84f617e6',
+    'vegan': '1511690743698-d9d85f2fbeb7',
+    'protein': '1546833999-b9fcb8a93c5e',
+    'bowl': '1512621776402-57ad84f617e6'
   };
   
   // Find matching image category
@@ -35,4 +45,44 @@ export const generateMealImage = (recipeName: string): string => {
   }
   
   return `https://images.unsplash.com/photo-${photoId}?w=400&h=300&fit=crop&q=80&auto=format&ixlib=rb-4.0.3`;
+};
+
+// Helper function to get ingredient image from Unsplash
+export const getIngredientImage = (ingredientName: string): string => {
+  const ingredient = ingredientName.toLowerCase();
+  
+  const ingredientImages: Record<string, string> = {
+    'tomato': '1592841200221-21374d7bb7ae',
+    'tomatoes': '1592841200221-21374d7bb7ae',
+    'onion': '1618512496248-a07fe8a645c5',
+    'onions': '1618512496248-a07fe8a645c5',
+    'garlic': '1583203188411-c7325806b70c',
+    'carrot': '1598170845058-32b9d6a5da37',
+    'carrots': '1598170845058-32b9d6a5da37',
+    'potato': '1518977676601-b5a5f04e3948',
+    'potatoes': '1518977676601-b5a5f04e3948',
+    'chicken': '1604503468506-a8da13de3abd',
+    'beef': '1603048588665-791ca8aea617',
+    'salmon': '1467003909585-2f8d72700288',
+    'rice': '1586201375761-83865001e26f',
+    'pasta': '1551782367-19ded58aea74',
+    'cheese': '1486297678162-ce23b3eb5ebf',
+    'milk': '1550583808-6a8c4e6b4e9a',
+    'bread': '1549931319-a545dcf3bc73',
+    'lettuce': '1622103967-82b04e83a8f7',
+    'cucumber': '1449824904-23a37de5cf3e',
+    'bell pepper': '1518779578993-19c2c9f98429',
+    'peppers': '1518779578993-19c2c9f98429',
+    'mushroom': '1589628391284-2a3b9e5d4d8f',
+    'mushrooms': '1589628391284-2a3b9e5d4d8f'
+  };
+  
+  for (const [key, photoId] of Object.entries(ingredientImages)) {
+    if (ingredient.includes(key)) {
+      return `https://images.unsplash.com/photo-${photoId}?w=80&h=80&fit=crop&q=80&auto=format&ixlib=rb-4.0.3`;
+    }
+  }
+  
+  // Default ingredient image
+  return `https://images.unsplash.com/photo-1506368249209-abb61b0f9e5f?w=80&h=80&fit=crop&q=80&auto=format&ixlib=rb-4.0.3`;
 };

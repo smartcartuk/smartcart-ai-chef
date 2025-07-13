@@ -87,12 +87,19 @@ export const useWeeklyPlan = (userProfile: any) => {
           
           const recipeName = meal.recipe_name || meal.name || 'Generated Recipe';
           
-          // Fix image URL - ensure we use Spoonacular images when available
+          // Enhanced image URL handling - prioritize Spoonacular images
           let imageUrl = meal.picture_url || meal.image;
-          if (!imageUrl || imageUrl.includes('unsplash')) {
-            // If no proper image from Spoonacular, generate a fallback
+          
+          // Check if we have a valid Spoonacular image URL
+          if (!imageUrl || 
+              imageUrl.includes('unsplash') || 
+              imageUrl === 'https://images.unsplash.com/photo-1565299624946?w=400&h=300&fit=crop&auto=format' ||
+              !imageUrl.includes('spoonacular')) {
+            // Generate a more relevant fallback image
             imageUrl = generateMealImage(recipeName);
           }
+          
+          console.log(`🖼️ Image for ${recipeName}:`, imageUrl);
           
           return {
             day: meal.day || DAYS_OF_WEEK[index],
@@ -146,6 +153,14 @@ export const useWeeklyPlan = (userProfile: any) => {
             : 5.00;
           const recipeName = dayData.recipe_name || dayData.name || 'Generated Recipe';
 
+          // Enhanced image handling for single recipes too
+          let imageUrl = dayData.picture_url || dayData.image;
+          if (!imageUrl || 
+              imageUrl.includes('unsplash') || 
+              !imageUrl.includes('spoonacular')) {
+            imageUrl = generateMealImage(recipeName);
+          }
+
           weeklyRecipes.push({
             day,
             recipe_name: recipeName,
@@ -154,8 +169,8 @@ export const useWeeklyPlan = (userProfile: any) => {
             estimated_price: estimatedPrice,
             estimated_cost: estimatedPrice,
             cost_per_meal: estimatedPrice,
-            image: dayData.picture_url || generateMealImage(recipeName),
-            picture_url: dayData.picture_url || generateMealImage(recipeName),
+            image: imageUrl,
+            picture_url: imageUrl,
             description: dayData.description || '',
             nutritional_info: dayData.nutritional_info || null,
             nutrition: dayData.nutrition || null,
@@ -196,6 +211,14 @@ export const useWeeklyPlan = (userProfile: any) => {
       : 5.00;
     const recipeName = data.recipe_name || 'Generated Recipe';
 
+    // Enhanced image handling for regenerated recipes
+    let imageUrl = data.picture_url || data.image;
+    if (!imageUrl || 
+        imageUrl.includes('unsplash') || 
+        !imageUrl.includes('spoonacular')) {
+      imageUrl = generateMealImage(recipeName);
+    }
+
     return {
       day,
       recipe_name: recipeName,
@@ -204,8 +227,8 @@ export const useWeeklyPlan = (userProfile: any) => {
       estimated_price: estimatedPrice,
       estimated_cost: estimatedPrice,
       cost_per_meal: estimatedPrice,
-      image: data.picture_url || generateMealImage(recipeName),
-      picture_url: data.picture_url || generateMealImage(recipeName),
+      image: imageUrl,
+      picture_url: imageUrl,
       description: data.description || '',
       nutritional_info: data.nutritional_info || null,
       nutrition: data.nutrition || null,
