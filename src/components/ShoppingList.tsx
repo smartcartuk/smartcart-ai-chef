@@ -9,7 +9,7 @@ import { WebhookResponse } from '@/utils/webhookService';
 import { getSupermarketLogo } from '@/utils/supermarketLogos';
 import { getIngredientImage } from '@/utils/recipeImageGenerator';
 import { addItemsToBasket, formatItemsForBasket } from '@/utils/shoppingBasketService';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface ShoppingListProps {
   userProfile: any;
@@ -254,8 +254,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                       alt={store.name}
                       className="w-full h-full object-contain"
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        e.currentTarget.nextElementSibling!.style.display = 'block';
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.style.display = 'none';
+                        const nextElement = target.nextElementSibling as HTMLElement;
+                        if (nextElement) {
+                          nextElement.style.display = 'block';
+                        }
                       }}
                     />
                   ) : null}
@@ -292,8 +296,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           alt={store.name}
                           className="w-full h-full object-contain"
                           onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.nextElementSibling!.style.display = 'block';
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.style.display = 'none';
+                            const nextElement = target.nextElementSibling as HTMLElement;
+                            if (nextElement) {
+                              nextElement.style.display = 'block';
+                            }
                           }}
                         />
                       ) : null}
@@ -377,9 +385,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                   />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className={`font-medium ${
-                                    checkedItems.has(item.name) ? 'text-gray-500' : 'text-gray-900'
-                                  }`}>
+                                  <div className="font-medium text-gray-900">
                                     {item.name}
                                   </div>
                                   <div className="text-sm text-gray-600">{item.amount}</div>
@@ -421,9 +427,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                             />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className={`font-medium ${
-                              checkedItems.has(item.name) ? 'text-gray-500' : 'text-gray-900'
-                            }`}>
+                            <div className="font-medium text-gray-900">
                               {item.name}
                             </div>
                             <div className="text-sm text-gray-600">{item.amount}</div>
@@ -474,8 +478,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         alt={store.name}
                         className="w-full h-full object-contain"
                         onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          e.currentTarget.nextElementSibling!.style.display = 'block';
+                          const target = e.currentTarget as HTMLImageElement;
+                          target.style.display = 'none';
+                          const nextElement = target.nextElementSibling as HTMLElement;
+                          if (nextElement) {
+                            nextElement.style.display = 'block';
+                          }
                         }}
                       />
                     ) : null}
