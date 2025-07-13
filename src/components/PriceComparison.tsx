@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ interface PriceComparisonProps {
   userProfile: any;
   generatedData?: WebhookResponse | null;
   recipes?: any[];
+  totalWeeklyCosts?: any;
 }
 
 const storeLogos = {
@@ -24,7 +24,8 @@ const storeLogos = {
 export const PriceComparison: React.FC<PriceComparisonProps> = ({ 
   userProfile, 
   generatedData, 
-  recipes = [] 
+  recipes = [],
+  totalWeeklyCosts 
 }) => {
   const [sortBy, setSortBy] = useState<'price' | 'savings'>('price');
 
@@ -90,12 +91,19 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
   }, [comparisons]);
 
   const totalOptimizedCost = React.useMemo(() => {
+    // If we have totalWeeklyCosts from the API, use the lowest value
+    if (totalWeeklyCosts) {
+      const costs = Object.values(totalWeeklyCosts) as number[];
+      return Math.min(...costs);
+    }
+    
+    // Otherwise calculate from comparisons
     return comparisons.reduce((sum, item) => {
       if (item.prices.length === 0) return sum;
       const bestPrice = Math.min(...item.prices.map(p => p.price));
       return sum + bestPrice;
     }, 0);
-  }, [comparisons]);
+  }, [comparisons, totalWeeklyCosts]);
 
   if (isLoading) {
     return (
@@ -162,6 +170,26 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
           </div>
         </div>
       </Card>
+
+      {/* Weekly Costs Summary - if available from API */}
+      {totalWeeklyCosts && (
+        <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50">
+          <h3 className="font-semibold text-lg mb-4">API Weekly Cost Breakdown</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Object.entries(totalWeeklyCosts).map(([storeName, cost]) => (
+              <div key={storeName} className="text-center p-4 bg-white rounded-lg shadow-sm">
+                <div className="text-2xl mb-2">
+                  {storeLogos[storeName as keyof typeof storeLogos] || '🏪'}
+                </div>
+                <div className="font-medium text-sm capitalize">{storeName}</div>
+                <div className="text-lg font-bold text-blue-600 mt-1">
+                  £{(cost as number).toFixed(2)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Sort Options */}
       <div className="flex items-center justify-between">
