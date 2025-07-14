@@ -1,1 +1,7 @@
 project_id = "sqdjteugxarustivcpqs"
+
+[functions.proxy-generate-recipes]
+verify_jwt = false
+
+[functions.ai-shopping-agent]
+verify_jwt = false

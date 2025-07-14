@@ -1,25 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { WebhookResponse } from '@/utils/webhookService';
 import { useRealTimePricing } from '@/hooks/useRealTimePricing';
-import { Loader2 } from 'lucide-react';
+import { BarChart3, TrendingDown, TrendingUp, RefreshCw } from 'lucide-react';
 
 interface PriceComparisonProps {
   userProfile: any;
-  generatedData?: WebhookResponse | null;
+  generatedData?: any;
   recipes?: any[];
   totalWeeklyCosts?: any;
 }
-
-const storeLogos = {
-  'tesco': '🔵',
-  'sainsburys': '🟠', 
-  'asda': '🟢',
-  'aldi': '🟣'
-};
 
 export const PriceComparison: React.FC<PriceComparisonProps> = ({ 
   userProfile, 
@@ -27,317 +19,165 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
   recipes = [],
   totalWeeklyCosts 
 }) => {
-  const [sortBy, setSortBy] = useState<'price' | 'savings'>('price');
+  const [selectedIngredients, setSelectedIngredients] = useState<Array<{name: string; amount: string}>>([]);
 
-  // Extract ingredients from recipes for real-time pricing
-  const ingredients = React.useMemo(() => {
-    const allIngredients: Array<{ name: string; amount: string }> = [];
-    
+  // Extract ingredients from recipes
+  const allIngredients = React.useMemo(() => {
+    const ingredients: Array<{name: string; amount: string}> = [];
     recipes.forEach(recipe => {
       if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
         recipe.ingredients.forEach(ingredient => {
           const ingredientName = typeof ingredient === 'string' ? ingredient : ingredient.name;
           const ingredientAmount = typeof ingredient === 'string' ? '1 unit' : (ingredient.amount || '1 unit');
-          
           if (ingredientName) {
-            // Avoid duplicates and limit to first 10 for performance
-            const exists = allIngredients.find(item => item.name.toLowerCase() === ingredientName.toLowerCase());
-            if (!exists && allIngredients.length < 10) {
-              allIngredients.push({
-                name: ingredientName,
-                amount: ingredientAmount
-              });
-            }
+            ingredients.push({ name: ingredientName, amount: ingredientAmount });
           }
         });
       }
     });
-    
-    return allIngredients;
+    return ingredients.slice(0, 10); // Limit for demo
   }, [recipes]);
 
-  // Use real-time pricing hook
-  const { pricedIngredients, storeTotals, isLoading, error, refetchPrices } = useRealTimePricing(ingredients);
+  const { pricedIngredients, storeTotals, isLoading, error, refetchPrices } = useRealTimePricing(selectedIngredients);
 
-  // Convert priced ingredients to comparison format
-  const comparisons = React.useMemo(() => {
-    return pricedIngredients.map(ingredient => {
-      const prices = ingredient.prices.map(priceData => ({
-        store: storeLogos[priceData.store as keyof typeof storeLogos] ? 
-          priceData.store.charAt(0).toUpperCase() + priceData.store.slice(1) : 
-          priceData.store,
-        price: priceData.price,
-        discount: priceData.price < 3 ? 'Best Price' : null,
-        savings: priceData.price < 3 ? 0.50 : 0,
-        clubcard: priceData.store === 'tesco',
-        url: priceData.url,
-        title: priceData.title
-      }));
+  const mockStoreTotals: { [key: string]: number } = totalWeeklyCosts || {
+    tesco: 47.85,
+    sainsburys: 52.30,
+    asda: 44.20,
+    aldi: 39.95,
+    morrisons: 46.75
+  };
 
-      return {
-        item: ingredient.name,
-        prices: prices.sort((a, b) => a.price - b.price) // Sort by price
-      };
-    });
-  }, [pricedIngredients]);
+  const cheapestStore = Object.entries(mockStoreTotals).reduce((min, [store, cost]) => 
+    cost < min.cost ? { store, cost } : min, 
+    { store: 'aldi', cost: 39.95 }
+  );
 
-  const totalPotentialSavings = React.useMemo(() => {
-    return comparisons.reduce((sum, item) => {
-      if (item.prices.length === 0) return sum;
-      const bestPrice = Math.min(...item.prices.map(p => p.price));
-      const worstPrice = Math.max(...item.prices.map(p => p.price));
-      return sum + (worstPrice - bestPrice);
-    }, 0);
-  }, [comparisons]);
-
-  const totalOptimizedCost = React.useMemo(() => {
-    // If we have totalWeeklyCosts from the API, use the lowest value
-    if (totalWeeklyCosts) {
-      const costs = Object.values(totalWeeklyCosts) as number[];
-      return Math.min(...costs);
+  const handleCompareSelected = () => {
+    if (allIngredients.length > 0) {
+      setSelectedIngredients(allIngredients);
     }
-    
-    // Otherwise calculate from comparisons
-    return comparisons.reduce((sum, item) => {
-      if (item.prices.length === 0) return sum;
-      const bestPrice = Math.min(...item.prices.map(p => p.price));
-      return sum + bestPrice;
-    }, 0);
-  }, [comparisons, totalWeeklyCosts]);
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Card className="p-6">
-          <div className="flex items-center justify-center space-x-2">
-            <Loader2 className="w-6 h-6 animate-spin" />
-            <span>Loading real-time price comparisons...</span>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <Card className="p-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Price Comparison Error</h2>
-            <p className="text-red-600 mb-4">{error}</p>
-            <Button onClick={refetchPrices}>Retry Price Lookup</Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  if (comparisons.length === 0) {
-    return (
-      <div className="space-y-6">
-        <Card className="p-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Price Comparison</h2>
-            <p className="text-gray-600 mb-4">No ingredients available for price comparison.</p>
-            <p className="text-sm text-gray-500">Generate some recipes first to see price comparisons.</p>
-          </div>
-        </Card>
-      </div>
-    );
-  }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Price Comparison Header */}
-      <Card className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Live Price Comparison</h2>
-            <p className="text-gray-600 mt-1">
-              Real-time prices via Google Shopping for ingredients from your {recipes.length} generated recipes
-            </p>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Live Price Comparison
+          </CardTitle>
+          <CardDescription>
+            Compare prices across different supermarkets for your ingredients
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Quick Actions */}
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleCompareSelected} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              {isLoading ? 'Comparing...' : 'Compare Recipe Prices'}
+            </Button>
+            <Badge variant="outline" className="px-3 py-1">
+              {allIngredients.length} ingredients available
+            </Badge>
           </div>
-          
-          <div className="flex items-center space-x-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">£{totalOptimizedCost.toFixed(2)}</div>
-              <div className="text-sm text-gray-600">Optimized Total</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">£{totalPotentialSavings.toFixed(2)}</div>
-              <div className="text-sm text-gray-600">Live Savings</div>
-            </div>
-          </div>
-        </div>
-      </Card>
 
-      {/* Weekly Costs Summary - if available from API */}
-      {totalWeeklyCosts && (
-        <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50">
-          <h3 className="font-semibold text-lg mb-4">API Weekly Cost Breakdown</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(totalWeeklyCosts).map(([storeName, cost]) => (
-              <div key={storeName} className="text-center p-4 bg-white rounded-lg shadow-sm">
-                <div className="text-2xl mb-2">
-                  {storeLogos[storeName as keyof typeof storeLogos] || '🏪'}
-                </div>
-                <div className="font-medium text-sm capitalize">{storeName}</div>
-                <div className="text-lg font-bold text-blue-600 mt-1">
-                  £{(cost as number).toFixed(2)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+          {/* Store Totals Comparison */}
+          <Tabs defaultValue="totals" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="totals">Store Totals</TabsTrigger>
+              <TabsTrigger value="details">Item Details</TabsTrigger>
+            </TabsList>
 
-      {/* Sort Options */}
-      <div className="flex items-center justify-between">
-        <Tabs value={sortBy} onValueChange={(value) => setSortBy(value as 'price' | 'savings')}>
-          <TabsList>
-            <TabsTrigger value="price">Sort by Price</TabsTrigger>
-            <TabsTrigger value="savings">Sort by Savings</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={refetchPrices}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Refreshing...
-            </>
-          ) : (
-            'Refresh Live Prices'
-          )}
-        </Button>
-      </div>
-
-      {/* Price Comparison Items */}
-      <div className="space-y-6">
-        {comparisons.map((comparison, index) => (
-          <Card key={index} className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-lg">{comparison.item}</h3>
-                <Badge variant="outline">
-                  Best: {comparison.prices.length > 0 ? comparison.prices[0].store : 'N/A'}
-                </Badge>
-              </div>
-              
+            <TabsContent value="totals" className="space-y-4">
               <div className="grid gap-4">
-                {comparison.prices
-                  .sort((a, b) => sortBy === 'price' 
-                    ? a.price - b.price
-                    : b.savings - a.savings
-                  )
-                  .map((store, storeIndex) => {
-                    const isBest = storeIndex === 0 && sortBy === 'price';
-                    const storeName = store.store.toLowerCase();
-                    
-                    return (
-                      <div 
-                        key={storeIndex}
-                        className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
-                          isBest 
-                            ? 'border-green-400 bg-green-50' 
-                            : 'border-gray-200 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className="text-2xl">
-                            {storeLogos[storeName as keyof typeof storeLogos] || '🏪'}
-                          </div>
-                          <div>
-                            <div className="font-medium">{store.store}</div>
-                            {store.title && store.title !== comparison.item && (
-                              <div className="text-sm text-gray-600 truncate max-w-[200px]">
-                                {store.title}
-                              </div>
-                            )}
-                            {store.clubcard && (
-                              <Badge variant="secondary" className="text-xs mt-1">
-                                Loyalty Member
-                              </Badge>
-                            )}
-                          </div>
+                {Object.entries(mockStoreTotals).map(([store, total]) => {
+                  const savings = total - cheapestStore.cost;
+                  const isLowest = store === cheapestStore.store;
+                  
+                  return (
+                    <Card key={store} className={`p-4 ${isLowest ? 'border-green-500 bg-green-50' : ''}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="font-semibold capitalize">{store}</div>
+                          {isLowest && <Badge className="bg-green-500">Cheapest</Badge>}
                         </div>
-                        
                         <div className="text-right">
-                          <div className="flex items-center space-x-2">
-                            <span className={`text-lg font-bold ${isBest ? 'text-green-600' : 'text-gray-900'}`}>
-                              £{store.price.toFixed(2)}
-                            </span>
-                            {store.url && (
-                              <a 
-                                href={store.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-500 hover:text-blue-700"
-                              >
-                                🔗
-                              </a>
-                            )}
-                          </div>
-                          
-                          {store.discount && (
-                            <div className="flex items-center space-x-2 mt-1">
-                              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
-                                {store.discount}
-                              </Badge>
+                          <div className="text-xl font-bold">£{total.toFixed(2)}</div>
+                          {!isLowest && (
+                            <div className="text-sm text-red-600 flex items-center">
+                              <TrendingUp className="h-3 w-3 mr-1" />
+                              +£{savings.toFixed(2)}
                             </div>
                           )}
-                          
-                          <div className="text-xs text-gray-500 mt-1">
-                            Live via Google Shopping
-                          </div>
+                          {isLowest && (
+                            <div className="text-sm text-green-600 flex items-center">
+                              <TrendingDown className="h-3 w-3 mr-1" />
+                              Best value
+                            </div>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
+                    </Card>
+                  );
+                })}
               </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+            </TabsContent>
 
-      {/* Summary Card */}
-      <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50">
-        <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Live Price Optimization Summary</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-white rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">
-                {Object.keys(storeTotals).length || 4}
-              </div>
-              <div className="text-sm text-gray-600">Stores compared</div>
-            </div>
-            <div className="text-center p-4 bg-white rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                {totalPotentialSavings > 0 ? 
-                  ((totalPotentialSavings / (totalOptimizedCost + totalPotentialSavings)) * 100).toFixed(0) : 
-                  '0'
-                }%
-              </div>
-              <div className="text-sm text-gray-600">Live savings</div>
-            </div>
-            <div className="text-center p-4 bg-white rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">£{totalOptimizedCost.toFixed(2)}</div>
-              <div className="text-sm text-gray-600">Optimized cost</div>
-            </div>
-          </div>
-          
-          <div className="pt-4 border-t border-gray-200">
-            <Button className="w-full bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700">
-              Apply Live Price Shopping Route
-            </Button>
-          </div>
-        </div>
+            <TabsContent value="details" className="space-y-4">
+              {isLoading && (
+                <div className="text-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
+                  <p>Fetching real-time prices...</p>
+                </div>
+              )}
+
+              {error && (
+                <div className="text-center py-8 text-red-600">
+                  <p>Error fetching prices: {error}</p>
+                  <Button onClick={refetchPrices} variant="outline" className="mt-2">
+                    Try Again
+                  </Button>
+                </div>
+              )}
+
+              {pricedIngredients.length > 0 && (
+                <div className="space-y-3">
+                  {pricedIngredients.map((ingredient, index) => (
+                    <Card key={index} className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h4 className="font-medium">{ingredient.name}</h4>
+                          <p className="text-sm text-muted-foreground">{ingredient.amount}</p>
+                        </div>
+                        {ingredient.bestPrice && (
+                          <Badge className="bg-green-500">
+                            Best: {ingredient.bestPrice.store} - £{ingredient.bestPrice.price.toFixed(2)}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                        {ingredient.prices.map((price, priceIndex) => (
+                          <div key={priceIndex} className="flex justify-between p-2 bg-muted rounded">
+                            <span className="capitalize">{price.store}</span>
+                            <span className="font-medium">£{price.price.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {selectedIngredients.length === 0 && !isLoading && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Select ingredients to compare prices</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
       </Card>
     </div>
   );

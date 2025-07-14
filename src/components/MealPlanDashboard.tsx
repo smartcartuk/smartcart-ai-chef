@@ -9,7 +9,7 @@ import { PriceComparison } from '@/components/PriceComparison';
 import { AIAssistant } from '@/components/AIAssistant';
 import { WeeklyPlanTester } from '@/components/WeeklyPlanTester';
 import { WebhookResponse } from '@/utils/webhookService';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface MealPlanDashboardProps {
   userProfile: any;

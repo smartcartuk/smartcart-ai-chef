@@ -206,7 +206,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   useEffect(() => {
     generateOptimizedRoute();
-  }, [activeStore, currentIngredients]);
+  }, [activeStore, ingredients.length]); // Fixed: use ingredients.length instead of currentIngredients
 
   return (
     <div className="space-y-6">
