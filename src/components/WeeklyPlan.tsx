@@ -7,7 +7,7 @@ import { WeeklyPlanLoading } from '@/components/WeeklyPlanLoading';
 import { RecipeGrid } from '@/components/RecipeGrid';
 import { useWeeklyPlan } from '@/hooks/useWeeklyPlan';
 import { WebhookResponse } from '@/utils/webhookService';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface WeeklyPlanProps {
   userProfile: any;
@@ -89,6 +89,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
   };
 
   const handleRegenerateSingleRecipe = async (index: number) => {
+    console.log(`🔄 Attempting to regenerate recipe at index ${index}`);
     try {
       await regenerateSingleRecipe(index);
       toast({
@@ -96,6 +97,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
         description: "A new recipe has been generated for this day.",
       });
     } catch (error) {
+      console.error('❌ Error in handleRegenerateSingleRecipe:', error);
       toast({
         title: "Failed to regenerate recipe",
         description: "Please try again in a moment.",

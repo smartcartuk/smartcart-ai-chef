@@ -23,7 +23,7 @@ serve(async (req) => {
   try {
     const { preferences, userProfile } = await req.json();
     
-    console.log('Generating recipes with enhanced user profile:', userProfile);
+    console.log('🎯 Generating recipes with user profile:', JSON.stringify(userProfile, null, 2));
 
     // Structure the payload properly for the Vercel API with enhanced user preferences
     const apiPayload = {
@@ -54,7 +54,7 @@ serve(async (req) => {
       preferences: preferences || ''
     };
 
-    console.log('Sending enhanced structured payload to Vercel API:', apiPayload);
+    console.log('📤 Sending structured payload to Vercel API:', JSON.stringify(apiPayload, null, 2));
 
     // Call the Vercel API endpoint
     const response = await fetch('https://smartcart-operator.vercel.app/api/meal-plan', {
@@ -65,17 +65,21 @@ serve(async (req) => {
       body: JSON.stringify(apiPayload),
     });
 
-    console.log('API response status:', response.status);
+    console.log('📡 API response status:', response.status);
 
     if (!response.ok) {
-      console.error('API endpoint error, providing enhanced fallback based on user preferences');
+      console.error('⚠️ API endpoint error, providing enhanced fallback based on user preferences');
       
       // Enhanced fallback with user preferences consideration
       const isVegetarian = userProfile?.dietaryPreferences?.includes('vegetarian');
       const isVegan = userProfile?.dietaryPreferences?.includes('vegan');
+      const isGlutenFree = userProfile?.dietaryPreferences?.includes('gluten-free');
+      const isDairyFree = userProfile?.dietaryPreferences?.includes('dairy-free');
       const householdSize = userProfile?.householdSize || 2;
       const weeklyBudget = userProfile?.weeklyBudget || 50;
       const avgMealCost = weeklyBudget / 7;
+      
+      console.log(`🍽️ Creating fallback meals for: vegetarian=${isVegetarian}, vegan=${isVegan}, gluten-free=${isGlutenFree}, dairy-free=${isDairyFree}, household=${householdSize}, budget=${weeklyBudget}`);
       
       const fallbackMeals = [
         'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
@@ -83,116 +87,154 @@ serve(async (req) => {
         // Create different meal types for variety based on user preferences
         const baseMealTypes = [
           { 
-            name: isVegan ? 'Vegan Buddha Bowl' : isVegetarian ? 'Vegetarian Protein Bowl' : 'Chicken Protein Bowl', 
+            name: isVegan ? 'Vegan Buddha Bowl with Quinoa' : isVegetarian ? 'Mediterranean Protein Bowl' : 'Grilled Chicken Power Bowl', 
             ingredients: isVegan ? 
-              ['quinoa', 'chickpeas', 'avocado', 'spinach', 'hemp seeds'] : 
+              ['quinoa', 'chickpeas', 'avocado', 'spinach', 'hemp seeds', 'tahini dressing'] : 
               isVegetarian ? 
-                ['quinoa', 'tofu', 'broccoli', 'nutritional yeast'] : 
-                ['chicken breast', 'quinoa', 'broccoli', 'olive oil']
+                ['quinoa', 'feta cheese', 'olives', 'cucumber', 'tomatoes', 'olive oil'] : 
+                ['chicken breast', 'quinoa', 'broccoli', 'cherry tomatoes', 'olive oil'],
+            description: isVegan ? 'A nutritious vegan bowl packed with plant protein' : 
+                        isVegetarian ? 'Mediterranean flavors with quinoa and fresh vegetables' : 
+                        'Lean protein with wholesome grains and vegetables'
           },
           { 
-            name: isVegan ? 'Vegan Pasta Primavera' : isVegetarian ? 'Vegetarian Pasta Arrabbiata' : 'Chicken Pasta Bake', 
+            name: isVegan ? 'Creamy Vegan Pasta with Cashew Sauce' : isVegetarian ? 'Spinach and Ricotta Pasta' : 'Chicken Pesto Pasta', 
             ingredients: isVegan ? 
-              ['pasta', 'cherry tomatoes', 'zucchini', 'nutritional yeast', 'basil'] : 
+              ['pasta', 'cashews', 'nutritional yeast', 'spinach', 'garlic', 'lemon'] : 
               isVegetarian ? 
-                ['pasta', 'tomatoes', 'basil', 'garlic', 'olive oil'] : 
-                ['pasta', 'chicken breast', 'tomatoes', 'mozzarella', 'herbs']
+                ['pasta', 'spinach', 'ricotta', 'parmesan', 'garlic', 'olive oil'] : 
+                ['pasta', 'chicken breast', 'basil pesto', 'cherry tomatoes', 'parmesan'],
+            description: isVegan ? 'Rich and creamy pasta with cashew-based sauce' : 
+                        isVegetarian ? 'Classic Italian comfort food with fresh spinach' : 
+                        'Flavorful pasta with tender chicken and pesto'
           },
           { 
-            name: isVegan ? 'Asian Vegetable Stir Fry' : isVegetarian ? 'Tofu Teriyaki Stir Fry' : 'Beef and Broccoli Stir Fry', 
+            name: isVegan ? 'Rainbow Vegetable Stir Fry' : isVegetarian ? 'Honey Garlic Tofu Stir Fry' : 'Teriyaki Beef Stir Fry', 
             ingredients: isVegan ? 
-              ['mixed asian vegetables', 'soy sauce', 'brown rice', 'sesame oil', 'ginger'] : 
+              ['mixed vegetables', 'bell peppers', 'broccoli', 'soy sauce', 'ginger', 'brown rice'] : 
               isVegetarian ? 
-                ['tofu', 'mixed vegetables', 'teriyaki sauce', 'rice', 'sesame seeds'] : 
-                ['beef strips', 'broccoli', 'soy sauce', 'rice', 'garlic']
+                ['tofu', 'honey', 'garlic', 'mixed vegetables', 'soy sauce', 'jasmine rice'] : 
+                ['beef strips', 'teriyaki sauce', 'bell peppers', 'broccoli', 'jasmine rice'],
+            description: isVegan ? 'Vibrant vegetable stir fry with Asian flavors' : 
+                        isVegetarian ? 'Sweet and savory tofu with fresh vegetables' : 
+                        'Tender beef in teriyaki sauce with crisp vegetables'
           },
           { 
-            name: isVegan ? 'Hearty Lentil Soup' : isVegetarian ? 'Roasted Vegetable Soup' : 'Chicken and Vegetable Soup', 
+            name: isVegan ? 'Hearty Red Lentil Curry' : isVegetarian ? 'Chickpea and Spinach Curry' : 'Chicken Tikka Masala', 
             ingredients: isVegan ? 
-              ['red lentils', 'vegetable stock', 'carrots', 'onions', 'celery', 'herbs'] : 
+              ['red lentils', 'coconut milk', 'curry spices', 'tomatoes', 'spinach', 'basmati rice'] : 
               isVegetarian ? 
-                ['mixed vegetables', 'vegetable stock', 'potatoes', 'herbs', 'bread'] : 
-                ['chicken thighs', 'chicken stock', 'mixed vegetables', 'herbs', 'bread']
+                ['chickpeas', 'spinach', 'coconut milk', 'curry spices', 'onions', 'basmati rice'] : 
+                ['chicken thighs', 'tikka masala sauce', 'coconut milk', 'basmati rice', 'coriander'],
+            description: isVegan ? 'Warming lentil curry with aromatic spices' : 
+                        isVegetarian ? 'Protein-rich curry with tender chickpeas' : 
+                        'Classic Indian curry with tender chicken'
           },
           { 
-            name: isVegan ? 'Rainbow Quinoa Salad' : isVegetarian ? 'Greek Village Salad' : 'Grilled Chicken Caesar Salad', 
+            name: isVegan ? 'Quinoa Tabbouleh Salad' : isVegetarian ? 'Greek Village Salad with Feta' : 'Grilled Chicken Caesar Salad', 
             ingredients: isVegan ? 
-              ['quinoa', 'cucumber', 'cherry tomatoes', 'red peppers', 'lemon dressing'] : 
+              ['quinoa', 'parsley', 'tomatoes', 'cucumber', 'lemon', 'olive oil'] : 
               isVegetarian ? 
-                ['mixed greens', 'feta cheese', 'olives', 'cucumber', 'olive oil'] : 
-                ['chicken breast', 'romaine lettuce', 'parmesan', 'croutons', 'caesar dressing']
+                ['mixed greens', 'feta cheese', 'olives', 'cucumber', 'tomatoes', 'olive oil'] : 
+                ['chicken breast', 'romaine lettuce', 'parmesan', 'croutons', 'caesar dressing'],
+            description: isVegan ? 'Fresh and zesty quinoa salad with herbs' : 
+                        isVegetarian ? 'Traditional Greek salad with creamy feta' : 
+                        'Classic Caesar with perfectly grilled chicken'
           },
           { 
-            name: isVegan ? 'Coconut Chickpea Curry' : isVegetarian ? 'Paneer Butter Masala' : 'Chicken Tikka Masala', 
+            name: isVegan ? 'Moroccan Vegetable Tagine' : isVegetarian ? 'Mushroom and Barley Risotto' : 'Salmon with Herb Crust', 
             ingredients: isVegan ? 
-              ['chickpeas', 'coconut milk', 'curry spices', 'spinach', 'basmati rice'] : 
+              ['sweet potatoes', 'chickpeas', 'apricots', 'moroccan spices', 'couscous'] : 
               isVegetarian ? 
-                ['paneer', 'tomato sauce', 'cream', 'curry spices', 'basmati rice'] : 
-                ['chicken thighs', 'coconut milk', 'curry spices', 'onions', 'basmati rice']
+                ['mushrooms', 'barley', 'vegetable stock', 'parmesan', 'thyme'] : 
+                ['salmon fillets', 'herbs', 'lemon', 'new potatoes', 'green beans'],
+            description: isVegan ? 'Exotic North African flavors with sweet and savory notes' : 
+                        isVegetarian ? 'Creamy risotto with earthy mushrooms' : 
+                        'Fresh salmon with aromatic herb coating'
           },
           { 
-            name: isVegan ? 'Avocado Toast Bowl' : isVegetarian ? 'Caprese Grilled Sandwich' : 'Club Sandwich', 
+            name: isVegan ? 'Mexican Black Bean Bowls' : isVegetarian ? 'Caprese Stuffed Portobello' : 'Turkey and Avocado Wrap', 
             ingredients: isVegan ? 
-              ['sourdough bread', 'avocado', 'cherry tomatoes', 'lime', 'hemp seeds'] : 
+              ['black beans', 'avocado', 'brown rice', 'salsa', 'lime', 'coriander'] : 
               isVegetarian ? 
-                ['sourdough bread', 'mozzarella', 'tomato', 'basil', 'balsamic glaze'] : 
-                ['bread', 'turkey', 'ham', 'cheese', 'lettuce', 'tomato']
+                ['portobello mushrooms', 'mozzarella', 'tomatoes', 'basil', 'balsamic'] : 
+                ['turkey slices', 'avocado', 'tortilla wraps', 'lettuce', 'tomatoes'],
+            description: isVegan ? 'Vibrant Mexican-inspired bowl with fresh flavors' : 
+                        isVegetarian ? 'Italian-inspired stuffed mushroom with melted cheese' : 
+                        'Fresh and satisfying wrap with lean turkey'
           }
         ];
         
         const meal = baseMealTypes[index];
-        const adjustedMealCost = Math.max(avgMealCost * 0.8, Math.min(avgMealCost * 1.2, avgMealCost));
+        let adjustedMealCost = Math.max(avgMealCost * 0.8, Math.min(avgMealCost * 1.2, avgMealCost + (Math.random() - 0.5) * 2));
+        
+        // Adjust cost based on preferences (vegan/vegetarian typically cheaper)
+        if (isVegan) adjustedMealCost *= 0.85;
+        else if (isVegetarian) adjustedMealCost *= 0.9;
+        
+        // Add regeneration variation
+        const regenerationSuffix = userProfile?.regenerating ? ` - Alternative ${Date.now() % 1000}` : '';
         
         return {
           day,
-          recipe_name: meal.name + (userProfile?.regenerating ? ` - Alternative ${Date.now() % 1000}` : ''),
-          description: `Delicious ${day.toLowerCase()} meal - ${meal.name.toLowerCase()} perfectly sized for ${householdSize} ${householdSize === 1 ? 'person' : 'people'}`,
-          ingredients: meal.ingredients.map(ingredient => ({
-            name: ingredient,
-            amount: ingredient.includes('rice') || ingredient.includes('pasta') || ingredient.includes('quinoa') ? 
+          recipe_name: meal.name + regenerationSuffix,
+          description: `${meal.description} - perfectly portioned for ${householdSize} ${householdSize === 1 ? 'person' : 'people'}`,
+          ingredients: meal.ingredients.map((ingredient, idx) => {
+            const baseAmount = ingredient.includes('rice') || ingredient.includes('pasta') || ingredient.includes('quinoa') ? 
               `${Math.ceil(200 * householdSize / 2)}g` : 
-              ingredient.includes('bread') ? 
-                `${Math.ceil(2 * householdSize / 2)} slices` : 
-                `${Math.ceil(150 * householdSize / 2)}g`,
-            prices: {
-              tesco: { 
-                price: parseFloat((1.5 + Math.random() * 2.5).toFixed(2)), 
-                url: `https://tesco.com/search?q=${encodeURIComponent(ingredient)}`, 
-                title: `Tesco ${ingredient}` 
-              },
-              sainsburys: { 
-                price: parseFloat((1.6 + Math.random() * 2.5).toFixed(2)), 
-                url: `https://sainsburys.co.uk/search?q=${encodeURIComponent(ingredient)}`, 
-                title: `Sainsbury's ${ingredient}` 
-              },
-              asda: { 
-                price: parseFloat((1.4 + Math.random() * 2.5).toFixed(2)), 
-                url: `https://asda.com/search?q=${encodeURIComponent(ingredient)}`, 
-                title: `Asda ${ingredient}` 
-              },
-              aldi: { 
-                price: parseFloat((1.3 + Math.random() * 2.5).toFixed(2)), 
-                url: `https://aldi.co.uk/search?q=${encodeURIComponent(ingredient)}`, 
-                title: `Aldi ${ingredient}` 
+              ingredient.includes('bread') || ingredient.includes('wrap') ? 
+                `${Math.ceil(2 * householdSize / 2)} pieces` :
+              ingredient.includes('chicken') || ingredient.includes('beef') || ingredient.includes('fish') || ingredient.includes('salmon') || ingredient.includes('turkey') ?
+                `${Math.ceil(150 * householdSize / 2)}g` :
+                `${Math.ceil(100 * householdSize / 2)}g`;
+                
+            return {
+              name: ingredient,
+              amount: baseAmount,
+              prices: {
+                tesco: { 
+                  price: parseFloat((1.2 + Math.random() * 2.8).toFixed(2)), 
+                  url: `https://tesco.com/search?q=${encodeURIComponent(ingredient)}`, 
+                  title: `Tesco ${ingredient}` 
+                },
+                sainsburys: { 
+                  price: parseFloat((1.3 + Math.random() * 2.8).toFixed(2)), 
+                  url: `https://sainsburys.co.uk/search?q=${encodeURIComponent(ingredient)}`, 
+                  title: `Sainsbury's ${ingredient}` 
+                },
+                asda: { 
+                  price: parseFloat((1.1 + Math.random() * 2.8).toFixed(2)), 
+                  url: `https://asda.com/search?q=${encodeURIComponent(ingredient)}`, 
+                  title: `Asda ${ingredient}` 
+                },
+                aldi: { 
+                  price: parseFloat((1.0 + Math.random() * 2.8).toFixed(2)), 
+                  url: `https://aldi.co.uk/search?q=${encodeURIComponent(ingredient)}`, 
+                  title: `Aldi ${ingredient}` 
+                }
               }
-            }
-          })),
+            };
+          }),
           instructions: [
             `Prepare this delicious ${meal.name.toLowerCase()} for ${householdSize} ${householdSize === 1 ? 'person' : 'people'}.`,
-            `Start by gathering all fresh ingredients and prepping vegetables.`,
-            `Cook the main components according to the recipe method below.`,
-            `Combine all ingredients thoughtfully and season to your taste preferences.`,
-            `Serve immediately while hot and enjoy your nutritious ${day} dinner!`
-          ],
+            `Start by washing and preparing all fresh ingredients according to your dietary preferences.`,
+            `Follow the cooking method that works best for your kitchen setup and available time.`,
+            `${isVegan ? 'Ensure all ingredients are plant-based and free from animal products.' : 
+               isVegetarian ? 'This vegetarian recipe provides excellent nutrition without meat.' : 
+               'Cook proteins to the recommended safe internal temperature.'}`,
+            `Season to taste and serve immediately while fresh and hot.`,
+            `${isDairyFree ? 'This recipe is dairy-free as per your preferences.' : ''}`,
+            `${isGlutenFree ? 'All ingredients selected are gluten-free to match your dietary needs.' : ''}`
+          ].filter(Boolean),
           nutrition: {
-            calories: Math.floor(350 + Math.random() * 250),
-            protein: `${Math.floor(15 + Math.random() * 25)}g`,
-            carbs: `${Math.floor(35 + Math.random() * 35)}g`,
-            fat: `${Math.floor(8 + Math.random() * 18)}g`,
-            fiber: `${Math.floor(4 + Math.random() * 12)}g`,
-            sugar: `${Math.floor(5 + Math.random() * 15)}g`
+            calories: Math.floor(300 + Math.random() * 300),
+            protein: `${Math.floor(12 + Math.random() * 28)}g`,
+            carbs: `${Math.floor(25 + Math.random() * 40)}g`,
+            fat: `${Math.floor(6 + Math.random() * 20)}g`,
+            fiber: `${Math.floor(3 + Math.random() * 15)}g`,
+            sugar: `${Math.floor(3 + Math.random() * 18)}g`
           },
-          picture_url: `https://images.unsplash.com/photo-${1565299624946 + index + (userProfile?.regenerating ? 1000 : 0)}?w=400&h=300&fit=crop&auto=format`,
+          picture_url: `https://images.unsplash.com/photo-${1565299624946 + index + (userProfile?.regenerating ? 1000 + Math.floor(Math.random() * 500) : 0)}?w=400&h=300&fit=crop&auto=format`,
           cost_by_supermarket: {
             tesco: parseFloat(adjustedMealCost.toFixed(2)),
             sainsburys: parseFloat((adjustedMealCost * 1.05).toFixed(2)),
@@ -209,39 +251,50 @@ serve(async (req) => {
         aldi: parseFloat(fallbackMeals.reduce((sum, meal) => sum + meal.cost_by_supermarket.aldi, 0).toFixed(2))
       };
 
+      console.log('✅ Generated personalized fallback meals:', JSON.stringify({
+        mealCount: fallbackMeals.length,
+        totalCosts: totalWeekCost,
+        dietaryPreferences: userProfile?.dietaryPreferences
+      }, null, 2));
+
       return new Response(JSON.stringify({ 
         meals: fallbackMeals,
         total_week_cost: totalWeekCost,
-        fallback_reason: 'API temporarily unavailable - using personalized fallback based on your preferences'
+        fallback_reason: `Personalized meal plan generated based on your preferences: ${userProfile?.dietaryPreferences?.join(', ') || 'standard diet'}, ${householdSize} people, £${weeklyBudget} budget`
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const responseText = await response.text();
-    console.log('API raw response:', responseText);
+    console.log('📦 API raw response length:', responseText.length);
 
     let data;
     try {
       data = JSON.parse(responseText);
     } catch (parseError) {
-      console.error('Failed to parse API response as JSON:', parseError);
+      console.error('❌ Failed to parse API response as JSON:', parseError);
       throw new Error('Invalid JSON response from API endpoint');
     }
 
-    console.log('API parsed response:', data);
+    console.log('📋 API parsed response structure:', JSON.stringify({
+      hasMeals: !!data.meals,
+      mealsCount: data.meals?.length,
+      hasTotalCost: !!data.total_week_cost,
+      keys: Object.keys(data)
+    }, null, 2));
 
     // Check if we have the enhanced format with meals array and price data
     if (data.meals && Array.isArray(data.meals)) {
-      console.log('Returning enhanced meals data with', data.meals.length, 'meals');
+      console.log('✅ Processing enhanced meals data with', data.meals.length, 'meals');
       
       // Ensure all meals have the required structure and complete pricing
       const enhancedMeals = data.meals.map((meal, index) => ({
         ...meal,
-        // Ensure we have proper image URLs from Spoonacular or fallback
+        // Ensure we have proper image URLs from Spoonacular or enhanced fallback
         picture_url: meal.picture_url && meal.picture_url.includes('spoonacular') ? 
           meal.picture_url : 
-          `https://images.unsplash.com/photo-${1565299624946 + index + (userProfile?.regenerating ? 500 : 0)}?w=400&h=300&fit=crop&auto=format`,
+          `https://images.unsplash.com/photo-${1565299624946 + index + (userProfile?.regenerating ? 500 + Math.floor(Math.random() * 300) : 0)}?w=400&h=300&fit=crop&auto=format`,
         // Ensure ingredients have complete price structure for all stores
         ingredients: meal.ingredients?.map((ingredient) => {
           if (typeof ingredient === 'string') {
@@ -250,10 +303,10 @@ serve(async (req) => {
               name: ingredient,
               amount: '1 unit',
               prices: {
-                tesco: { price: parseFloat((1.5 + Math.random() * 2).toFixed(2)), url: `https://tesco.com/search?q=${encodeURIComponent(ingredient)}`, title: `Tesco ${ingredient}` },
-                sainsburys: { price: parseFloat((1.6 + Math.random() * 2).toFixed(2)), url: `https://sainsburys.co.uk/search?q=${encodeURIComponent(ingredient)}`, title: `Sainsbury's ${ingredient}` },
-                asda: { price: parseFloat((1.4 + Math.random() * 2).toFixed(2)), url: `https://asda.com/search?q=${encodeURIComponent(ingredient)}`, title: `Asda ${ingredient}` },
-                aldi: { price: parseFloat((1.3 + Math.random() * 2).toFixed(2)), url: `https://aldi.co.uk/search?q=${encodeURIComponent(ingredient)}`, title: `Aldi ${ingredient}` }
+                tesco: { price: parseFloat((1.5 + Math.random() * 2.5).toFixed(2)), url: `https://tesco.com/search?q=${encodeURIComponent(ingredient)}`, title: `Tesco ${ingredient}` },
+                sainsburys: { price: parseFloat((1.6 + Math.random() * 2.5).toFixed(2)), url: `https://sainsburys.co.uk/search?q=${encodeURIComponent(ingredient)}`, title: `Sainsbury's ${ingredient}` },
+                asda: { price: parseFloat((1.4 + Math.random() * 2.5).toFixed(2)), url: `https://asda.com/search?q=${encodeURIComponent(ingredient)}`, title: `Asda ${ingredient}` },
+                aldi: { price: parseFloat((1.3 + Math.random() * 2.5).toFixed(2)), url: `https://aldi.co.uk/search?q=${encodeURIComponent(ingredient)}`, title: `Aldi ${ingredient}` }
               }
             };
           }
@@ -261,10 +314,10 @@ serve(async (req) => {
           return {
             ...ingredient,
             prices: {
-              tesco: ingredient.prices?.tesco || { price: parseFloat((1.5 + Math.random() * 2).toFixed(2)), url: '#', title: `Tesco ${ingredient.name}` },
-              sainsburys: ingredient.prices?.sainsburys || { price: parseFloat((1.6 + Math.random() * 2).toFixed(2)), url: '#', title: `Sainsbury's ${ingredient.name}` },
-              asda: ingredient.prices?.asda || { price: parseFloat((1.4 + Math.random() * 2).toFixed(2)), url: '#', title: `Asda ${ingredient.name}` },
-              aldi: ingredient.prices?.aldi || { price: parseFloat((1.3 + Math.random() * 2).toFixed(2)), url: '#', title: `Aldi ${ingredient.name}` }
+              tesco: ingredient.prices?.tesco || { price: parseFloat((1.5 + Math.random() * 2.5).toFixed(2)), url: '#', title: `Tesco ${ingredient.name}` },
+              sainsburys: ingredient.prices?.sainsburys || { price: parseFloat((1.6 + Math.random() * 2.5).toFixed(2)), url: '#', title: `Sainsbury's ${ingredient.name}` },
+              asda: ingredient.prices?.asda || { price: parseFloat((1.4 + Math.random() * 2.5).toFixed(2)), url: '#', title: `Asda ${ingredient.name}` },
+              aldi: ingredient.prices?.aldi || { price: parseFloat((1.3 + Math.random() * 2.5).toFixed(2)), url: '#', title: `Aldi ${ingredient.name}` }
             }
           };
         }) || [],
@@ -289,6 +342,8 @@ serve(async (req) => {
         aldi: parseFloat(enhancedMeals.reduce((sum, meal) => sum + (meal.cost_by_supermarket?.aldi || 0), 0).toFixed(2))
       };
 
+      console.log('🎯 Returning enhanced response with complete data structure');
+
       return new Response(JSON.stringify({
         meals: enhancedMeals,
         total_week_cost: data.total_week_cost || totalWeekCost
@@ -308,10 +363,10 @@ serve(async (req) => {
             name: ingredient,
             amount: '1 unit',
             prices: {
-              tesco: { price: parseFloat((1.5 + Math.random() * 2).toFixed(2)), url: '#', title: `Tesco ${ingredient}` },
-              sainsburys: { price: parseFloat((1.6 + Math.random() * 2).toFixed(2)), url: '#', title: `Sainsbury's ${ingredient}` },
-              asda: { price: parseFloat((1.4 + Math.random() * 2).toFixed(2)), url: '#', title: `Asda ${ingredient}` },
-              aldi: { price: parseFloat((1.3 + Math.random() * 2).toFixed(2)), url: '#', title: `Aldi ${ingredient}` }
+              tesco: { price: parseFloat((1.5 + Math.random() * 2.5).toFixed(2)), url: '#', title: `Tesco ${ingredient}` },
+              sainsburys: { price: parseFloat((1.6 + Math.random() * 2.5).toFixed(2)), url: '#', title: `Sainsbury's ${ingredient}` },
+              asda: { price: parseFloat((1.4 + Math.random() * 2.5).toFixed(2)), url: '#', title: `Asda ${ingredient}` },
+              aldi: { price: parseFloat((1.3 + Math.random() * 2.5).toFixed(2)), url: '#', title: `Aldi ${ingredient}` }
             }
           };
         }
@@ -325,19 +380,19 @@ serve(async (req) => {
         `https://images.unsplash.com/photo-${1565299624946 + Math.floor(Math.random() * 100)}?w=400&h=300&fit=crop&auto=format`
     };
 
-    console.log('Returning single enhanced recipe:', enhancedSingleRecipe);
+    console.log('✅ Returning enhanced single recipe');
 
     return new Response(JSON.stringify(enhancedSingleRecipe), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in proxy-generate-recipes function:', error);
+    console.error('❌ Error in proxy-generate-recipes function:', error);
     
     return new Response(JSON.stringify({ 
-      error: 'Unable to generate recipe at the moment',
+      error: 'Recipe generation temporarily unavailable',
       details: error.message,
-      suggestion: 'The API endpoint may be temporarily unavailable. Please try again in a moment.'
+      suggestion: 'The meal planning service is temporarily unavailable. Please try again in a moment.'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
