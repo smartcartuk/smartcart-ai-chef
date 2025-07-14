@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -244,40 +245,33 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               <TabsTrigger 
                 key={store.id}
                 value={store.id}
-                className="flex flex-col items-center space-y-2 p-4 data-[state=active]:bg-blue-50 data-[state=active]:border-blue-200"
+                className="flex flex-col items-center space-y-1 p-3 data-[state=active]:bg-blue-50 data-[state=active]:border-blue-200"
               >
-                <div className="flex items-center justify-center w-16 h-12 relative">
-                  {logo && (
-                    <img 
-                      src={logo} 
-                      alt={store.name}
-                      className="max-w-full max-h-full object-contain absolute inset-0"
-                      style={{ display: 'block' }}
-                      onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
-                        target.style.display = 'none';
-                        const parent = target.parentElement;
-                        if (parent) {
-                          const emojiSpan = parent.querySelector('.emoji-fallback') as HTMLElement;
-                          if (emojiSpan) {
-                            emojiSpan.style.display = 'block';
-                          }
-                        }
-                      }}
-                    />
-                  )}
+                <div className="flex items-center justify-center w-16 h-10 mb-1">
+                  <img 
+                    src={logo} 
+                    alt={store.name}
+                    className="max-w-full max-h-full object-contain"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.style.display = 'none';
+                      const fallback = target.nextElementSibling as HTMLElement;
+                      if (fallback) {
+                        fallback.style.display = 'block';
+                      }
+                    }}
+                  />
                   <span 
-                    className="text-2xl emoji-fallback" 
-                    style={{ display: logo ? 'none' : 'block' }}
+                    className="text-2xl hidden" 
                   >
                     {emoji}
                   </span>
                 </div>
-                <div className="text-center min-w-0">
-                  <div className="font-medium text-sm truncate">{store.name}</div>
+                <div className="text-center min-w-0 space-y-0.5">
+                  <div className="font-medium text-xs truncate">{store.name}</div>
                   <div className="text-xs text-gray-600">£{store.total.toFixed(2)}</div>
                   {store.savings > 0 && (
-                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 mt-1">
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0 bg-green-100 text-green-700">
                       Save £{store.savings.toFixed(2)}
                     </Badge>
                   )}
@@ -295,29 +289,22 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               <Card className="p-4 bg-gradient-to-r from-blue-50 to-purple-50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className="w-20 h-16 flex items-center justify-center relative flex-shrink-0">
-                      {logo && (
-                        <img 
-                          src={logo} 
-                          alt={store.name}
-                          className="max-w-full max-h-full object-contain absolute inset-0"
-                          style={{ display: 'block' }}
-                          onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement;
-                            target.style.display = 'none';
-                            const parent = target.parentElement;
-                            if (parent) {
-                              const emojiSpan = parent.querySelector('.emoji-fallback') as HTMLElement;
-                              if (emojiSpan) {
-                                emojiSpan.style.display = 'block';
-                              }
-                            }
-                          }}
-                        />
-                      )}
+                    <div className="w-20 h-12 flex items-center justify-center flex-shrink-0">
+                      <img 
+                        src={logo} 
+                        alt={store.name}
+                        className="max-w-full max-h-full object-contain"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          const fallback = target.nextElementSibling as HTMLElement;
+                          if (fallback) {
+                            fallback.style.display = 'block';
+                          }
+                        }}
+                      />
                       <span 
-                        className="text-4xl emoji-fallback" 
-                        style={{ display: logo ? 'none' : 'block' }}
+                        className="text-4xl hidden"
                       >
                         {emoji}
                       </span>
@@ -398,7 +385,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                   />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className={`font-medium text-gray-900 ${checkedItems.has(item.name) ? '' : ''}`}>
+                                  <div className="font-medium text-gray-900">
                                     {item.name}
                                   </div>
                                   <div className="text-sm text-gray-600">{item.amount}</div>
@@ -440,7 +427,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                             />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className={`font-medium text-gray-900 ${checkedItems.has(item.name) ? '' : ''}`}>
+                            <div className="font-medium text-gray-900">
                               {item.name}
                             </div>
                             <div className="text-sm text-gray-600">{item.amount}</div>
@@ -484,42 +471,37 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               const { logo, emoji } = getSupermarketLogo(store.id);
               return (
                 <div key={store.id} className="text-center p-4 bg-white rounded-lg shadow-sm">
-                  <div className="w-16 h-12 mx-auto mb-2 flex items-center justify-center relative">
-                    {logo && (
-                      <img 
-                        src={logo} 
-                        alt={store.name}
-                        className="max-w-full max-h-full object-contain absolute inset-0"
-                        style={{ display: 'block' }}
-                        onError={(e) => {
-                          const target = e.currentTarget as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            const emojiSpan = parent.querySelector('.emoji-fallback') as HTMLElement;
-                            if (emojiSpan) {
-                              emojiSpan.style.display = 'block';
-                            }
-                          }
-                        }}
-                      />
-                    )}
+                  <div className="w-16 h-10 mx-auto mb-3 flex items-center justify-center">
+                    <img 
+                      src={logo} 
+                      alt={store.name}
+                      className="max-w-full max-h-full object-contain"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) {
+                          fallback.style.display = 'block';
+                        }
+                      }}
+                    />
                     <span 
-                      className="text-2xl emoji-fallback" 
-                      style={{ display: logo ? 'none' : 'block' }}
+                      className="text-2xl hidden"
                     >
                       {emoji}
                     </span>
                   </div>
-                  <div className="font-medium text-sm">{store.name}</div>
-                  <div className="text-lg font-bold text-blue-600 mt-1">
-                    £{store.total.toFixed(2)}
-                  </div>
-                  {store.savings > 0 && (
-                    <div className="text-xs text-green-600 mt-1">
-                      Save £{store.savings.toFixed(2)}
+                  <div className="space-y-1">
+                    <div className="font-medium text-sm">{store.name}</div>
+                    <div className="text-lg font-bold text-blue-600">
+                      £{store.total.toFixed(2)}
                     </div>
-                  )}
+                    {store.savings > 0 && (
+                      <div className="text-xs text-green-600">
+                        Save £{store.savings.toFixed(2)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
