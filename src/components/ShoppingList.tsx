@@ -9,6 +9,7 @@ import { WebhookResponse } from '@/utils/webhookService';
 import { getSupermarketLogo } from '@/utils/supermarketLogos';
 import { getIngredientImage } from '@/utils/recipeImageGenerator';
 import { addItemsToBasket, formatItemsForBasket } from '@/utils/shoppingBasketService';
+import { AIShoppingAgent } from './AIShoppingAgent';
 import { useToast } from '@/hooks/use-toast';
 
 interface ShoppingListProps {
@@ -461,6 +462,44 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           );
         })}
       </Tabs>
+
+      {/* AI Shopping Agent */}
+      <AIShoppingAgent 
+        ingredients={ingredients.reduce((acc, ingredient) => {
+          const existing = acc.find(item => item.name === ingredient.name);
+          if (existing) {
+            const existingPrice = existing.prices.find(p => p.store === ingredient.store);
+            if (!existingPrice) {
+              existing.prices.push({
+                store: ingredient.store,
+                price: ingredient.price,
+                title: ingredient.name,
+                url: `https://${ingredient.store}.com/search?q=${encodeURIComponent(ingredient.name)}`
+              });
+            }
+          } else {
+            acc.push({
+              name: ingredient.name,
+              amount: ingredient.amount,
+              prices: [{
+                store: ingredient.store,
+                price: ingredient.price,
+                title: ingredient.name,
+                url: `https://${ingredient.store}.com/search?q=${encodeURIComponent(ingredient.name)}`
+              }]
+            });
+          }
+          return acc;
+        }, [] as Array<{name: string; amount: string; prices: Array<{store: string; price: number; url?: string; title?: string}>}>)}
+        connectedStores={userProfile?.connectedStores || []}
+        onShoppingComplete={(results) => {
+          console.log('AI Shopping completed:', results);
+          toast({
+            title: "AI Shopping Results",
+            description: `Completed shopping tasks for ${results.filter((r: any) => r.success).length} stores.`
+          });
+        }}
+      />
 
       {/* Live Weekly Cost Comparison */}
       {totalWeeklyCosts && (
