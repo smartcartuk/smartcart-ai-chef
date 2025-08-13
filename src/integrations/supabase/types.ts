@@ -107,6 +107,33 @@ export type Database = {
         }
         Relationships: []
       }
+      connected_stores: {
+        Row: {
+          created_at: string
+          has_loyalty_card: boolean | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          has_loyalty_card?: boolean | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          has_loyalty_card?: boolean | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       coop_prices: {
         Row: {
           created_at: string | null
@@ -188,6 +215,33 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_plans: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          updated_at?: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       morrisons_prices: {
         Row: {
           created_at: string | null
@@ -242,6 +296,45 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          address: Json | null
+          allergies: string[] | null
+          created_at: string
+          dietary_preferences: string[] | null
+          email: string | null
+          full_name: string | null
+          household_size: number | null
+          id: string
+          updated_at: string
+          weekly_budget: number | null
+        }
+        Insert: {
+          address?: Json | null
+          allergies?: string[] | null
+          created_at?: string
+          dietary_preferences?: string[] | null
+          email?: string | null
+          full_name?: string | null
+          household_size?: number | null
+          id: string
+          updated_at?: string
+          weekly_budget?: number | null
+        }
+        Update: {
+          address?: Json | null
+          allergies?: string[] | null
+          created_at?: string
+          dietary_preferences?: string[] | null
+          email?: string | null
+          full_name?: string | null
+          household_size?: number | null
+          id?: string
+          updated_at?: string
+          weekly_budget?: number | null
+        }
+        Relationships: []
+      }
       sainsbury_prices: {
         Row: {
           average_price: number | null
@@ -269,6 +362,33 @@ export type Database = {
           ingredient_name?: string
           last_updated?: string | null
           product_url?: string | null
+        }
+        Relationships: []
+      }
+      shopping_lists: {
+        Row: {
+          created_at: string
+          id: string
+          items: Json
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          items: Json
+          updated_at?: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          items?: Json
+          updated_at?: string
+          user_id?: string
+          week_start?: string
         }
         Relationships: []
       }
