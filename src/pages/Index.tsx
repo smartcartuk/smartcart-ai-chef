@@ -1,25 +1,38 @@
-
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Header } from '@/components/Header';
 import { Hero } from '@/components/Hero';
 import { OnboardingWizard } from '@/components/OnboardingWizard';
 import { MealPlanDashboard } from '@/components/MealPlanDashboard';
 import { Toaster } from '@/components/ui/toaster';
 import { WebhookResponse } from '@/utils/webhookService';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
   const [userProfile, setUserProfile] = useState(null);
   const [generatedData, setGeneratedData] = useState<WebhookResponse | null>(null);
+  const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+    });
+    supabase.auth.getSession().then(({ data }) => setIsAuthenticated(!!data.session));
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleGetStarted = () => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     setCurrentView('onboarding');
   };
 
   const handleSignIn = () => {
-    // For now, simulate sign in by going directly to onboarding
-    // In a real app, this would open a sign-in modal or redirect to auth page
-    setCurrentView('onboarding');
+    navigate('/auth');
   };
 
   const handleOnboardingComplete = (profile: any, webhookData?: WebhookResponse) => {

@@ -11,6 +11,7 @@ import { WeeklyPlanOverviewStep } from './onboarding/WeeklyPlanOverviewStep';
 import { OptimizeCompareStep } from './onboarding/OptimizeCompareStep';
 import { ExportShopStep } from './onboarding/ExportShopStep';
 import { sendUserPreferences, WebhookResponse } from '@/utils/webhookService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OnboardingWizardProps {
   onComplete: (profile: any, generatedData?: WebhookResponse) => void;
@@ -102,6 +103,59 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
         });
 
         const generatedData = await sendUserPreferences(profile);
+        
+        // Persist profile and generated data
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.from('profiles').upsert({
+              id: user.id,
+              full_name: profile.name,
+              email: profile.email,
+              address: profile.address,
+              dietary_preferences: profile.dietaryPreferences,
+              allergies: profile.allergies,
+              household_size: profile.householdSize,
+              weekly_budget: profile.weeklyBudget
+            });
+
+            if (profile.connectedStores?.length) {
+              const stores = profile.connectedStores.map((s: any) => ({
+                user_id: user.id,
+                name: s.name,
+                has_loyalty_card: Boolean(s.credentials?.loyaltyCard)
+              }));
+              await supabase.from('connected_stores').upsert(stores as any, { onConflict: 'user_id,name' } as any);
+            }
+
+            const weekStart = (() => {
+              const d = new Date();
+              const day = d.getDay();
+              const diff = (day === 0 ? -6 : 1) - day; // Monday as start of week
+              d.setDate(d.getDate() + diff);
+              d.setHours(0,0,0,0);
+              return d.toISOString().slice(0,10);
+            })();
+
+            if ((generatedData as any)?.meals) {
+              await supabase.from('meal_plans').upsert({
+                user_id: user.id,
+                week_start: weekStart,
+                data: (generatedData as any).meals
+              } as any, { onConflict: 'user_id,week_start' } as any);
+            }
+
+            if ((generatedData as any)?.shoppingList) {
+              await supabase.from('shopping_lists').upsert({
+                user_id: user.id,
+                week_start: weekStart,
+                items: (generatedData as any).shoppingList
+              } as any, { onConflict: 'user_id,week_start' } as any);
+            }
+          }
+        } catch (e) {
+          console.warn('Persistence warning:', e);
+        }
         
         toast({
           title: "Welcome to SmartCart! 🎉",
