@@ -9,6 +9,9 @@ import { EnhancedPriceComparison } from '@/components/EnhancedPriceComparison';
 import { PriceAnalyticsDashboard } from '@/components/PriceAnalyticsDashboard';
 import { SmartNotifications } from '@/components/SmartNotifications';
 import { PerformanceOptimizer } from '@/components/PerformanceOptimizer';
+import { SupermarketCredentialsModal } from '@/components/SupermarketCredentialsModal';
+import { ShoppingBasketExporter } from '@/components/ShoppingBasketExporter';
+import { AIShoppingAgent } from '@/components/AIShoppingAgent';
 import { AIAssistant } from '@/components/AIAssistant';
 import { WeeklyPlanTester } from '@/components/WeeklyPlanTester';
 import { WebhookResponse } from '@/utils/webhookService';
@@ -27,6 +30,10 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
   const [recipes, setRecipes] = useState<any[]>([]);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [totalWeeklyCosts, setTotalWeeklyCosts] = useState<any>(null);
+  const [showAIAgent, setShowAIAgent] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [userCredentials, setUserCredentials] = useState({});
+  const [connectedStores, setConnectedStores] = useState<any[]>([]);
   const { toast } = useToast();
 
   const handleRecipesChange = (newRecipes: any[]) => {
@@ -148,6 +155,12 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
           </div>
           
           <div className="flex items-center space-x-4">
+            <Button onClick={() => setShowAIAgent(true)}>
+              🤖 AI Assistant
+            </Button>
+            <Button variant="outline" onClick={() => setShowCredentialsModal(true)}>
+              ⚙️ Store Settings
+            </Button>
             <Button 
               variant="outline" 
               className="flex items-center space-x-2"
@@ -230,7 +243,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
 
         {/* Main Content Tabs - Enhanced visibility */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 h-14 bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl p-1 shadow-md border">
+          <TabsList className="grid w-full grid-cols-8 h-14 bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl p-1 shadow-md border">
             <TabsTrigger 
               value="plan" 
               className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
@@ -272,6 +285,13 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
             >
               <span className="text-xl">⚡</span>
               <span className="font-bold">Optimize</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="export" 
+              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
+            >
+              <span className="text-xl">🚀</span>
+              <span className="font-bold">Export</span>
             </TabsTrigger>
             <TabsTrigger 
               value="tester" 
@@ -343,6 +363,21 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
             <PerformanceOptimizer />
           </TabsContent>
 
+          <TabsContent value="export" className="space-y-6">
+            <ShoppingBasketExporter 
+              shoppingItems={recipes.reduce((acc, recipe) => {
+                const ingredients = recipe.ingredients || [];
+                acc[recipe.recipe_name || 'Items'] = ingredients.map((ing: any) => ({
+                  name: typeof ing === 'string' ? ing : ing?.name || 'Unknown',
+                  amount: typeof ing === 'object' ? ing?.amount || '1' : '1'
+                }));
+                return acc;
+              }, {})}
+              userCredentials={userCredentials}
+              connectedStores={connectedStores}
+            />
+          </TabsContent>
+
           <TabsContent value="tester" className="space-y-6">
             <WeeklyPlanTester />
           </TabsContent>
@@ -364,6 +399,43 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
           </div>
         </Card>
       </div>
+
+      {showAIAgent && (
+        <AIShoppingAgent 
+          ingredients={recipes.map(recipe => ({
+            name: typeof recipe.ingredients?.[0] === 'string' 
+              ? recipe.ingredients?.[0] 
+              : recipe.ingredients?.[0]?.name || 'Unknown',
+            amount: '1 unit',
+            prices: []
+          })).filter(ing => ing.name !== 'Unknown')}
+          connectedStores={connectedStores.map(store => ({
+            name: store.name,
+            credentials: { username: '', password: '' }
+          }))}
+          onShoppingComplete={(results) => {
+            console.log('Shopping completed:', results);
+            setShowAIAgent(false);
+            toast({
+              title: "Shopping automation complete!",
+              description: "Your items have been added to store baskets.",
+            });
+          }}
+          smartRecommendations={true}
+        />
+      )}
+
+      <SupermarketCredentialsModal
+        isOpen={showCredentialsModal}
+        onClose={() => setShowCredentialsModal(false)}
+        onSave={(credentials) => {
+          setUserCredentials(credentials);
+          // Update connected stores based on credentials
+          const stores = Object.keys(credentials).map(storeName => ({ name: storeName }));
+          setConnectedStores(stores);
+        }}
+        initialCredentials={userCredentials}
+      />
     </div>
   );
 };

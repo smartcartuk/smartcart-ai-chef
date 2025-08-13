@@ -12,6 +12,7 @@ const Index = () => {
   const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
   const [userProfile, setUserProfile] = useState(null);
   const [generatedData, setGeneratedData] = useState<WebhookResponse | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -28,6 +29,7 @@ const Index = () => {
       navigate('/auth');
       return;
     }
+    setShowOnboarding(true);
     setCurrentView('onboarding');
   };
 
@@ -38,6 +40,7 @@ const Index = () => {
   const handleOnboardingComplete = (profile: any, webhookData?: WebhookResponse) => {
     setUserProfile(profile);
     setGeneratedData(webhookData || null);
+    setShowOnboarding(false);
     setCurrentView('dashboard');
   };
 
@@ -64,9 +67,14 @@ const Index = () => {
         </>
       )}
       
-      {currentView === 'onboarding' && (
-        <OnboardingWizard onComplete={handleOnboardingComplete} />
-      )}
+      <OnboardingWizard 
+        isOpen={showOnboarding}
+        onClose={() => {
+          setShowOnboarding(false);
+          setCurrentView('landing');
+        }}
+        onComplete={handleOnboardingComplete}
+      />
       
       {currentView === 'dashboard' && (
         <MealPlanDashboard 

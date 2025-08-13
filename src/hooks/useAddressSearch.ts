@@ -1,46 +1,54 @@
-
 import { useState } from 'react';
 
-export const useAddressSearch = () => {
-  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
-  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+interface AddressSearchResult {
+  formatted_address: string;
+  place_id: string;
+}
 
-  const searchAddresses = async (query: string) => {
-    if (query.length < 3) {
-      setAddressSuggestions([]);
-      setShowAddressSuggestions(false);
+export const useAddressSearch = () => {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const searchAddress = async (query: string) => {
+    if (!query || query.length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
 
-    // Mock API call - in real app would use postcode.io or similar
-    const mockAddresses = [
-      '123 High Street, London, SW1A 1AA',
-      '456 Queen\'s Road, London, SW1A 1AB',
-      '789 King\'s Avenue, London, SW1A 1AC',
-      '321 Prince Street, London, SW1A 1AD',
-      '654 Royal Lane, London, SW1A 1AE'
-    ].filter(addr => 
-      addr.toLowerCase().includes(query.toLowerCase()) ||
-      query.toLowerCase().includes('sw1a')
-    );
+    setIsLoading(true);
+    try {
+      // Mock address suggestions for demonstration
+      // In a real app, you would use Google Places API or similar
+      const mockSuggestions = [
+        `${query} Street, London, UK`,
+        `${query} Road, Manchester, UK`,
+        `${query} Avenue, Birmingham, UK`,
+        `${query} Close, Edinburgh, UK`,
+        `${query} Gardens, Cardiff, UK`
+      ];
 
-    setAddressSuggestions(mockAddresses);
-    setShowAddressSuggestions(true);
+      setSuggestions(mockSuggestions);
+      setShowSuggestions(true);
+    } catch (error) {
+      console.error('Address search error:', error);
+      setSuggestions([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const selectAddress = (address: string, updateAddress: (field: string, value: string) => void) => {
-    const parts = address.split(', ');
-    updateAddress('street', parts[0] || '');
-    updateAddress('city', parts[1] || '');
-    updateAddress('postcode', parts[2] || '');
-    setShowAddressSuggestions(false);
-    setAddressSuggestions([]);
+  const selectAddress = (address: string) => {
+    setShowSuggestions(false);
+    setSuggestions([]);
   };
 
   return {
-    addressSuggestions,
-    showAddressSuggestions,
-    searchAddresses,
+    suggestions,
+    showSuggestions,
+    isLoading,
+    searchAddress,
     selectAddress
   };
 };
