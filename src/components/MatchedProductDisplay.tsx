@@ -48,12 +48,13 @@ export const MatchedProductDisplay: React.FC<MatchedProductDisplayProps> = ({
   }
 
   return (
-    <Card className="p-4 border-green-200 bg-green-50">
+    <Card className="p-4 border-green-200 bg-green-50" aria-label={`Matched product for ${originalItem.name}`}>
       <div className="flex items-center gap-4">
         {matchedProduct.image && (
           <img 
             src={matchedProduct.image} 
             alt={matchedProduct.title}
+            loading="lazy"
             className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';

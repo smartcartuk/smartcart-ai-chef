@@ -1,3 +1,4 @@
+import { supabase } from '@/integrations/supabase/client';
 
 interface ShoppingItem {
   name: string;
@@ -36,42 +37,32 @@ interface AddToBasketResponse {
   items?: BasketItemResponse[];
 }
 
-const BASKET_API_URL = 'https://smartcart-operator.vercel.app/api/add-to-basket';
+const AI_FN = 'ai-shopping-agent';
 
 export const addItemsToBasket = async (
   supermarket: string,
   credentials: BasketCredentials,
   items: ShoppingItem[]
 ): Promise<AddToBasketResponse> => {
-  console.log('Adding items to basket:', { supermarket, itemCount: items.length });
-  
-  try {
-    const requestBody: AddToBasketRequest = {
-      supermarket: supermarket.toLowerCase(),
-      credentials,
-      items
-    };
+  console.log('Adding items to basket via edge function:', { supermarket, itemCount: items.length });
 
-    const response = await fetch(BASKET_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
+  try {
+    const { data, error } = await supabase.functions.invoke(AI_FN, {
+      body: {
+        action: 'execute',
+        store: supermarket,
+        credentials,
+        items
+      }
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (error) throw error;
 
-    const data = await response.json();
-    console.log('Basket API response:', data);
-    
     return {
       success: true,
-      basketUrl: data.basketUrl,
-      message: data.message,
-      items: data.items // Include the matched products data
+      basketUrl: data?.basketUrl,
+      message: data?.message,
+      items: data?.items
     };
   } catch (error) {
     console.error('Error adding items to basket:', error);

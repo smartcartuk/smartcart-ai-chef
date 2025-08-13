@@ -1,3 +1,4 @@
+import { supabase } from '@/integrations/supabase/client';
 
 interface RealTimePrice {
   store: string;
@@ -35,7 +36,7 @@ interface PriceLookupResponse {
   error?: string;
 }
 
-const BASKET_API_URL = 'https://smartcart-operator.vercel.app/api/add-to-basket';
+const PRICE_LOOKUP_FN = 'price-lookup';
 
 // Simple in-memory cache with 5-minute expiration
 interface CacheEntry {
@@ -71,125 +72,51 @@ export const getRealTimePrices = async (
   quantity: string = '1'
 ): Promise<RealTimePrice[]> => {
   const cacheKey = getCacheKey(ingredientName, quantity);
-  
-  // Check cache first
+
   const cachedResult = getCachedPrice(cacheKey);
   if (cachedResult) {
     return cachedResult;
   }
 
-  const supermarkets = ['tesco', 'sainsburys', 'asda', 'aldi'];
-  const prices: RealTimePrice[] = [];
-  
-  // Default credentials for price lookup (these would normally come from user profile)
-  const defaultCredentials = {
-    username: 'price_lookup@example.com',
-    password: 'lookup123'
-  };
+  console.log(`🔍 Looking up live prices via edge function for: ${ingredientName} (${quantity})`);
 
-  console.log(`🔍 Looking up live prices for: ${ingredientName} (${quantity})`);
+  try {
+    const { data, error } = await supabase.functions.invoke(PRICE_LOOKUP_FN, {
+      body: { ingredientName, quantity }
+    });
 
-  const results = await Promise.allSettled(
-    supermarkets.map(async (supermarket) => {
-      try {
-        const requestBody: PriceLookupRequest = {
-          supermarket: supermarket.toLowerCase(),
-          credentials: defaultCredentials,
-          items: [{
-            name: ingredientName,
-            quantity: quantity
-          }]
-        };
-
-        console.log(`📡 Fetching ${supermarket} price for ${ingredientName}`);
-
-        const response = await fetch(BASKET_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data: PriceLookupResponse = await response.json();
-        if (data.success && data.items && data.items.length > 0) {
-          const item = data.items[0];
-          if (item.matched_product) {
-            const priceValue = parseFloat(item.matched_product.price.replace(/[£$€,]/g, ''));
-            return {
-              ok: true as const,
-              value: {
-                store: supermarket,
-                price: isNaN(priceValue) ? 2.50 : priceValue,
-                url: item.matched_product.url,
-                title: item.matched_product.title,
-                image: (item as any).matched_product.image
-              } as RealTimePrice
-            };
-          } else {
-            console.warn(`⚠️ No product match found for ${ingredientName} at ${supermarket}`);
-            return {
-              ok: true as const,
-              value: {
-                store: supermarket,
-                price: 2.50,
-                title: `${ingredientName} (No Match)`
-              } as RealTimePrice
-            };
-          }
-        } else {
-          throw new Error(data.error || 'Unknown error');
-        }
-      } catch (err) {
-        console.error(`💥 Error fetching ${supermarket} price for ${ingredientName}:`, err);
-        return { ok: false as const };
-      }
-    })
-  );
-
-  let successfulCalls = 0;
-  let failedCalls = 0;
-  results.forEach((res) => {
-    if (res.status === 'fulfilled' && res.value.ok) {
-      prices.push(res.value.value);
-      successfulCalls++;
-    } else {
-      failedCalls++;
+    if (error) {
+      console.error('price-lookup invocation error:', error);
+      throw error;
     }
-  });
 
-  // Log API usage summary
-  console.log(`📊 Price lookup summary for "${ingredientName}": ${successfulCalls} successful, ${failedCalls} failed out of ${supermarkets.length} calls`);
-  
-  // Alert if all calls failed
-  if (successfulCalls === 0) {
-    console.error(`🚨 ALL price lookups failed for "${ingredientName}" - check API connectivity`);
-  }
+    const prices: RealTimePrice[] = Array.isArray(data?.prices) ? data.prices : [];
 
-  // If no prices found, return fallback prices for all stores
-  if (prices.length === 0) {
-    console.log(`🔄 No live prices found for ${ingredientName}, using fallbacks`);
-    const fallbackPrices = supermarkets.map(store => ({
+    if (prices.length === 0) {
+      console.warn(`No live prices returned for ${ingredientName}, using fallbacks`);
+      const fallback = ['tesco', 'sainsburys', 'asda', 'aldi'].map((store) => ({
+        store,
+        price: 2.5,
+        title: `${ingredientName} (No Match)`
+      }));
+      // Shorter cache for fallbacks
+      priceCache.set(cacheKey, { data: fallback, timestamp: Date.now() - (CACHE_DURATION - 60000) });
+      return fallback;
+    }
+
+    setCachedPrice(cacheKey, prices);
+    return prices;
+  } catch (err) {
+    console.error('💥 Edge price-lookup failed, returning fallbacks:', err);
+    const fallback = ['tesco', 'sainsburys', 'asda', 'aldi'].map((store) => ({
       store,
-      price: 2.50,
+      price: 2.5,
       title: `${ingredientName} (No Match)`
     }));
-    
-    // Cache fallback results for shorter duration (1 minute)
-    priceCache.set(cacheKey, {
-      data: fallbackPrices,
-      timestamp: Date.now() - (CACHE_DURATION - 60000) // Expire in 1 minute instead of 5
-    });
-    
-    return fallbackPrices;
+    // Shorter cache for fallbacks
+    priceCache.set(cacheKey, { data: fallback, timestamp: Date.now() - (CACHE_DURATION - 60000) });
+    return fallback;
   }
-
-  // Cache successful results
-  setCachedPrice(cacheKey, prices);
-
-  return prices;
 };
 
 export const getBestPrice = (prices: RealTimePrice[]): RealTimePrice | null => {

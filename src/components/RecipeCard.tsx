@@ -74,6 +74,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
         <img 
           src={recipe.image} 
           alt={recipe.recipe_name}
+          loading="lazy"
           className="w-full h-full object-cover"
         />
       </div>

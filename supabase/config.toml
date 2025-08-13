@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.ai-shopping-agent]
 verify_jwt = true
+
+[functions.price-lookup]
+verify_jwt = true
