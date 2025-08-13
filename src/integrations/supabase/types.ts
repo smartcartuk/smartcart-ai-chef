@@ -296,6 +296,80 @@ export type Database = {
         }
         Relationships: []
       }
+      price_history: {
+        Row: {
+          id: string
+          price: number
+          price_id: string | null
+          recorded_at: string | null
+        }
+        Insert: {
+          id?: string
+          price: number
+          price_id?: string | null
+          recorded_at?: string | null
+        }
+        Update: {
+          id?: string
+          price?: number
+          price_id?: string | null
+          recorded_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_history_price_id_fkey"
+            columns: ["price_id"]
+            isOneToOne: false
+            referencedRelation: "prices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prices: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          ingredient_name: string
+          last_updated: string | null
+          price: number
+          product_image: string | null
+          product_title: string | null
+          product_url: string | null
+          quantity: string | null
+          store_name: string
+          unit: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name: string
+          last_updated?: string | null
+          price: number
+          product_image?: string | null
+          product_title?: string | null
+          product_url?: string | null
+          quantity?: string | null
+          store_name: string
+          unit?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          ingredient_name?: string
+          last_updated?: string | null
+          price?: number
+          product_image?: string | null
+          product_title?: string | null
+          product_url?: string | null
+          quantity?: string | null
+          store_name?: string
+          unit?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           address: Json | null
@@ -454,7 +528,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_latest_prices_by_store: {
+        Args: { ingredient_name_param: string }
+        Returns: {
+          store_name: string
+          price: number
+          product_url: string
+          product_title: string
+          last_updated: string
+        }[]
+      }
+      get_price_trends: {
+        Args: {
+          ingredient_name_param: string
+          store_name_param: string
+          days_back?: number
+        }
+        Returns: {
+          price: number
+          recorded_at: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
