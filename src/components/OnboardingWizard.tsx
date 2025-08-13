@@ -1,258 +1,139 @@
 import React, { useState } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { useAddressSearch } from '@/hooks/useAddressSearch';
-import { OnboardingProgress } from './onboarding/OnboardingProgress';
-import { PersonalDetailsStep } from './onboarding/PersonalDetailsStep';
-import { DietaryPreferencesStep } from './onboarding/DietaryPreferencesStep';
-import { ConnectStoresStep } from './onboarding/ConnectStoresStep';
-import { WeeklyPlanOverviewStep } from './onboarding/WeeklyPlanOverviewStep';
-import { OptimizeCompareStep } from './onboarding/OptimizeCompareStep';
-import { ExportShopStep } from './onboarding/ExportShopStep';
-import { sendUserPreferences, WebhookResponse } from '@/utils/webhookService';
-import { supabase } from '@/integrations/supabase/client';
+import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChevronRight, ChevronLeft, Users, Target, ShoppingCart } from 'lucide-react';
 
 interface OnboardingWizardProps {
-  onComplete: (profile: any, generatedData?: WebhookResponse) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  onComplete: (data: any) => void;
 }
 
-export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }) => {
-  const [step, setStep] = useState(1);
-  const [showPassword, setShowPassword] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [profile, setProfile] = useState({
-    // Personal details
-    name: '',
-    email: '',
-    password: '',
-    address: {
-      street: '',
-      city: '',
-      postcode: '',
-      country: 'United Kingdom'
-    },
-    // Existing fields
-    dietaryPreferences: [] as string[],
-    allergies: [] as string[],
-    householdSize: 2,
-    weeklyBudget: 50,
-    connectedStores: [] as any[]
+export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onClose, onComplete }) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [data, setData] = useState({
+    personalDetails: { name: '', email: '', household: 2, budget: 80 },
+    dietaryPreferences: { diet: 'omnivore', allergies: [], cuisines: [] },
+    connectedStores: {},
+    preferences: { notifications: true, priceAlerts: true }
   });
-  const { toast } = useToast();
-  const { addressSuggestions, showAddressSuggestions, searchAddresses, selectAddress } = useAddressSearch();
 
-  const updateAddress = (field: string, value: string) => {
-    setProfile(prev => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        [field]: value
-      }
-    }));
-  };
+  const steps = [
+    { title: 'Personal Details', icon: Users },
+    { title: 'Dietary Preferences', icon: Target },
+    { title: 'Connect Stores', icon: ShoppingCart }
+  ];
 
-  const handleAddressSelect = (address: string) => {
-    selectAddress(address, updateAddress);
-  };
+  const progress = ((currentStep + 1) / steps.length) * 100;
 
-  const togglePreference = (item: string, type: 'dietary' | 'allergies') => {
-    const key = type === 'dietary' ? 'dietaryPreferences' : 'allergies';
-    
-    setProfile(prev => ({
-      ...prev,
-      [key]: prev[key].includes(item) 
-        ? prev[key].filter((i: string) => i !== item)
-        : [...prev[key], item]
-    }));
-  };
-
-  const toggleStore = (store: any) => {
-    setProfile(prev => {
-      const isConnected = prev.connectedStores.some(s => s.name === store.name);
-      return {
-        ...prev,
-        connectedStores: isConnected
-          ? prev.connectedStores.filter(s => s.name !== store.name)
-          : [...prev.connectedStores, { ...store, credentials: { username: '', password: '', loyaltyCard: '' } }]
-      };
-    });
-  };
-
-  const updateStoreCredentials = (storeName: string, field: string, value: string) => {
-    setProfile(prev => ({
-      ...prev,
-      connectedStores: prev.connectedStores.map(store =>
-        store.name === storeName
-          ? { ...store, credentials: { ...store.credentials, [field]: value } }
-          : store
-      )
-    }));
-  };
-
-  const handleNext = async () => {
-    if (step < 6) {
-      setStep(step + 1);
+  const handleNext = () => {
+    if (currentStep === steps.length - 1) {
+      onComplete(data);
+      onClose();
     } else {
-      setIsGenerating(true);
-      
-      try {
-        toast({
-          title: "Generating your meal plan... 🤖",
-          description: "AI is analyzing your preferences and comparing prices.",
-        });
-
-        const generatedData = await sendUserPreferences(profile);
-        
-        // Persist profile and generated data
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            await supabase.from('profiles').upsert({
-              id: user.id,
-              full_name: profile.name,
-              email: profile.email,
-              address: profile.address,
-              dietary_preferences: profile.dietaryPreferences,
-              allergies: profile.allergies,
-              household_size: profile.householdSize,
-              weekly_budget: profile.weeklyBudget
-            });
-
-            if (profile.connectedStores?.length) {
-              const stores = profile.connectedStores.map((s: any) => ({
-                user_id: user.id,
-                name: s.name,
-                has_loyalty_card: Boolean(s.credentials?.loyaltyCard)
-              }));
-              await supabase.from('connected_stores').upsert(stores as any, { onConflict: 'user_id,name' } as any);
-            }
-
-            const weekStart = (() => {
-              const d = new Date();
-              const day = d.getDay();
-              const diff = (day === 0 ? -6 : 1) - day; // Monday as start of week
-              d.setDate(d.getDate() + diff);
-              d.setHours(0,0,0,0);
-              return d.toISOString().slice(0,10);
-            })();
-
-            if ((generatedData as any)?.meals) {
-              await supabase.from('meal_plans').upsert({
-                user_id: user.id,
-                week_start: weekStart,
-                data: (generatedData as any).meals
-              } as any, { onConflict: 'user_id,week_start' } as any);
-            }
-
-            if ((generatedData as any)?.shoppingList) {
-              await supabase.from('shopping_lists').upsert({
-                user_id: user.id,
-                week_start: weekStart,
-                items: (generatedData as any).shoppingList
-              } as any, { onConflict: 'user_id,week_start' } as any);
-            }
-          }
-        } catch (e) {
-          console.warn('Persistence warning:', e);
-        }
-        
-        toast({
-          title: "Welcome to SmartCart! 🎉",
-          description: "Your personalized meal plan is ready!",
-        });
-        
-        onComplete(profile, generatedData);
-      } catch (error) {
-        console.error('Error generating meal plan:', error);
-        toast({
-          title: "Generation failed",
-          description: "Using default meal plan. You can regenerate later.",
-          variant: "destructive",
-        });
-        
-        // Fall back to completing without generated data
-        onComplete(profile);
-      } finally {
-        setIsGenerating(false);
-      }
+      setCurrentStep(prev => prev + 1);
     }
   };
 
-  const handleBack = () => {
-    if (step > 1) setStep(step - 1);
-  };
-
-  const isStep1Valid = profile.name && profile.email && profile.password && 
-                       profile.address.street && profile.address.city && profile.address.postcode;
-
-  const renderStep = () => {
-    switch (step) {
-      case 1:
-        return (
-          <PersonalDetailsStep
-            profile={profile}
-            setProfile={setProfile}
-            showPassword={showPassword}
-            setShowPassword={setShowPassword}
-            addressSuggestions={addressSuggestions}
-            showAddressSuggestions={showAddressSuggestions}
-            onAddressSearch={searchAddresses}
-            onAddressSelect={handleAddressSelect}
-          />
-        );
-      case 2:
-        return (
-          <DietaryPreferencesStep
-            profile={profile}
-            onTogglePreference={togglePreference}
-          />
-        );
-      case 3:
-        return (
-          <ConnectStoresStep
-            profile={profile}
-            onToggleStore={toggleStore}
-            onUpdateStoreCredentials={updateStoreCredentials}
-          />
-        );
-      case 4:
-        return <WeeklyPlanOverviewStep />;
-      case 5:
-        return <OptimizeCompareStep />;
-      case 6:
-        return <ExportShopStep />;
-      default:
-        return null;
-    }
+  const handlePrevious = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 0));
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-2xl mx-auto">
-        <OnboardingProgress currentStep={step} totalSteps={6} />
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold">Welcome to MealPlanner Pro</h2>
+            <p className="text-muted-foreground">Let's get you set up in just a few steps</p>
+            <Progress value={progress} className="mt-4" />
+          </div>
 
-        <Card className="p-8 shadow-xl border border-emerald-100">
-          {renderStep()}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {React.createElement(steps[currentStep].icon, { className: "h-5 w-5" })}
+                {steps[currentStep].title}
+              </CardTitle>
+              <CardDescription>Step {currentStep + 1} of {steps.length}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentStep === 0 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Name</label>
+                    <input 
+                      className="w-full p-2 border rounded"
+                      value={data.personalDetails.name}
+                      onChange={(e) => setData(prev => ({
+                        ...prev,
+                        personalDetails: { ...prev.personalDetails, name: e.target.value }
+                      }))}
+                      placeholder="Enter your name"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Email</label>
+                    <input 
+                      type="email"
+                      className="w-full p-2 border rounded"
+                      value={data.personalDetails.email}
+                      onChange={(e) => setData(prev => ({
+                        ...prev,
+                        personalDetails: { ...prev.personalDetails, email: e.target.value }
+                      }))}
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                </div>
+              )}
 
-          <div className="flex justify-between mt-8">
-            <Button
-              variant="outline"
-              onClick={handleBack}
-              disabled={step === 1 || isGenerating}
-            >
-              Back
+              {currentStep === 1 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Diet Type</label>
+                    <select 
+                      className="w-full p-2 border rounded"
+                      value={data.dietaryPreferences.diet}
+                      onChange={(e) => setData(prev => ({
+                        ...prev,
+                        dietaryPreferences: { ...prev.dietaryPreferences, diet: e.target.value }
+                      }))}
+                    >
+                      <option value="omnivore">Omnivore</option>
+                      <option value="vegetarian">Vegetarian</option>
+                      <option value="vegan">Vegan</option>
+                      <option value="keto">Keto</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {currentStep === 2 && (
+                <div className="text-center">
+                  <h3 className="font-medium">Connect Your Store Accounts</h3>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    You can connect your supermarket accounts later to enable automatic basket creation.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={handlePrevious} disabled={currentStep === 0}>
+              <ChevronLeft className="h-4 w-4" />
+              Previous
             </Button>
-            <Button
-              onClick={handleNext}
-              className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
-              disabled={(step === 1 && !isStep1Valid) || isGenerating}
-            >
-              {isGenerating ? 'Generating...' : (step === 6 ? 'Start Planning' : 'Continue')}
+            <Button onClick={handleNext}>
+              {currentStep === steps.length - 1 ? 'Complete Setup' : 'Next'}
+              {currentStep < steps.length - 1 && <ChevronRight className="h-4 w-4" />}
             </Button>
           </div>
-        </Card>
-      </div>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };

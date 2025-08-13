@@ -1,127 +1,115 @@
-
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Lock } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Shield, Store, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface SupermarketCredentialsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (credentials: { username: string; password: string }) => void;
-  supermarket: string;
-  isLoading: boolean;
+  onSave: (credentials: any) => void;
+  initialCredentials?: any;
 }
 
 export const SupermarketCredentialsModal: React.FC<SupermarketCredentialsModalProps> = ({
   isOpen,
   onClose,
-  onSubmit,
-  supermarket,
-  isLoading
+  onSave,
+  initialCredentials = {}
 }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [credentials, setCredentials] = useState(initialCredentials);
+  const [showPasswords, setShowPasswords] = useState<{[key: string]: boolean}>({});
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (username && password) {
-      onSubmit({ username, password });
-    }
-  };
+  const STORES = [
+    { id: 'tesco', name: 'Tesco', status: 'active' },
+    { id: 'sainsburys', name: 'Sainsbury\'s', status: 'active' },
+    { id: 'asda', name: 'ASDA', status: 'active' },
+    { id: 'aldi', name: 'Aldi', status: 'beta' }
+  ];
 
-  const resetForm = () => {
-    setUsername('');
-    setPassword('');
-    setShowPassword(false);
-  };
-
-  const handleClose = () => {
-    resetForm();
+  const handleSave = () => {
+    onSave(credentials);
+    toast({ title: "Credentials saved successfully" });
     onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Lock className="h-5 w-5" />
-            <span>Login to {supermarket}</span>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Store Account Credentials
           </DialogTitle>
           <DialogDescription>
-            Enter your {supermarket} credentials to add items to your basket automatically.
+            Connect your supermarket accounts for automatic basket creation.
           </DialogDescription>
         </DialogHeader>
 
-        <Alert className="bg-blue-50 border-blue-200">
-          <AlertDescription className="text-sm">
-            🔒 Your credentials are sent securely and not stored on our servers.
-          </AlertDescription>
-        </Alert>
+        <div className="space-y-4">
+          {STORES.map(store => (
+            <Card key={store.id}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Store className="h-4 w-4" />
+                    {store.name}
+                    <Badge variant={store.status === 'active' ? 'secondary' : 'outline'}>
+                      {store.status}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Username/Email</Label>
+                    <Input
+                      value={credentials[store.id]?.username || ''}
+                      onChange={(e) => setCredentials(prev => ({
+                        ...prev,
+                        [store.id]: { ...prev[store.id], username: e.target.value }
+                      }))}
+                      placeholder="Enter username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Password</Label>
+                    <div className="relative">
+                      <Input
+                        type={showPasswords[store.id] ? 'text' : 'password'}
+                        value={credentials[store.id]?.password || ''}
+                        onChange={(e) => setCredentials(prev => ({
+                          ...prev,
+                          [store.id]: { ...prev[store.id], password: e.target.value }
+                        }))}
+                        placeholder="Enter password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setShowPasswords(prev => ({ ...prev, [store.id]: !prev[store.id] }))}
+                      >
+                        {showPasswords[store.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="username">Email / Username</Label>
-            <Input
-              id="username"
-              type="email"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder={`Your ${supermarket} email`}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Your password"
-                required
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={isLoading}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={!username || !password || isLoading}
-              className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
-            >
-              {isLoading ? 'Adding to Basket...' : 'Start Shopping'}
-            </Button>
-          </div>
-        </form>
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave}>Save Credentials</Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
