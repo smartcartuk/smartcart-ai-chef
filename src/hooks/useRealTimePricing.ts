@@ -64,7 +64,8 @@ export const useRealTimePricing = (ingredients: Array<{ name: string; amount: st
 
   useEffect(() => {
     fetchPrices();
-  }, [ingredients.length]); // Re-fetch when ingredient count changes
+    // Re-fetch when the ingredient set changes (name/amount), not just count
+  }, [JSON.stringify(ingredients)]);
 
   return {
     pricedIngredients,

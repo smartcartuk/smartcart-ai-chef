@@ -40,17 +40,19 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
 
   const { pricedIngredients, storeTotals, isLoading, error, refetchPrices } = useRealTimePricing(selectedIngredients);
 
-  const mockStoreTotals: { [key: string]: number } = totalWeeklyCosts || {
-    tesco: 47.85,
-    sainsburys: 52.30,
-    asda: 44.20,
-    aldi: 39.95,
-    morrisons: 46.75
-  };
+  // Prefer live store totals from hook, then provided weekly costs, then fallback
+  const computedTotals: { [key: string]: number } =
+    (storeTotals && Object.keys(storeTotals).length > 0 ? storeTotals : (totalWeeklyCosts || {
+      tesco: 47.85,
+      sainsburys: 52.30,
+      asda: 44.20,
+      aldi: 39.95,
+      morrisons: 46.75
+    }));
 
-  const cheapestStore = Object.entries(mockStoreTotals).reduce((min, [store, cost]) => 
+  const cheapestStore = Object.entries(computedTotals).reduce((min, [store, cost]) => 
     cost < min.cost ? { store, cost } : min, 
-    { store: 'aldi', cost: 39.95 }
+    { store: Object.keys(computedTotals)[0], cost: Object.values(computedTotals)[0] as number }
   );
 
   const handleCompareSelected = () => {
@@ -92,8 +94,9 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
 
             <TabsContent value="totals" className="space-y-4">
               <div className="grid gap-4">
-                {Object.entries(mockStoreTotals).map(([store, total]) => {
-                  const savings = total - cheapestStore.cost;
+                {(Object.entries(computedTotals) as Array<[string, number]>).map(([store, total]) => {
+                  const t = Number(total);
+                  const savings = t - cheapestStore.cost;
                   const isLowest = store === cheapestStore.store;
                   
                   return (
@@ -104,7 +107,7 @@ export const PriceComparison: React.FC<PriceComparisonProps> = ({
                           {isLowest && <Badge className="bg-green-500">Cheapest</Badge>}
                         </div>
                         <div className="text-right">
-                          <div className="text-xl font-bold">£{total.toFixed(2)}</div>
+                          <div className="text-xl font-bold">£{t.toFixed(2)}</div>
                           {!isLowest && (
                             <div className="text-sm text-red-600 flex items-center">
                               <TrendingUp className="h-3 w-3 mr-1" />

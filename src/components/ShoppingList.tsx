@@ -8,7 +8,7 @@ import { CheckCircle, Circle, ShoppingCart, MapPin, Clock } from 'lucide-react';
 import { WebhookResponse } from '@/utils/webhookService';
 import { getSupermarketLogo } from '@/utils/supermarketLogos';
 import { getIngredientImage } from '@/utils/recipeImageGenerator';
-import { addItemsToBasket, formatItemsForBasket } from '@/utils/shoppingBasketService';
+import { supabase } from '@/integrations/supabase/client';
 import { AIShoppingAgent } from './AIShoppingAgent';
 import { useToast } from '@/hooks/use-toast';
 
@@ -171,33 +171,34 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     try {
       const shoppingItems = currentIngredients.map(item => ({
         name: item.name,
-        quantity: item.amount
+        amount: item.amount || '1'
       }));
 
-      const result = await addItemsToBasket(
-        activeStore,
-        connectedStore.credentials,
-        shoppingItems
-      );
-
-      if (result.success) {
-        toast({
-          title: "Items added to basket!",
-          description: `Successfully added ${shoppingItems.length} items to your ${currentStore.name} basket.`,
-        });
-        
-        if (result.basketUrl) {
-          window.open(result.basketUrl, '_blank');
+      const { data, error } = await supabase.functions.invoke('ai-shopping-agent', {
+        body: {
+          action: 'execute',
+          store: activeStore,
+          items: shoppingItems,
+          credentials: connectedStore.credentials
         }
-      } else {
-        throw new Error(result.error || 'Failed to add items to basket');
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Items added to basket!',
+        description: `Successfully added ${shoppingItems.length} items to your ${currentStore.name} basket.`,
+      });
+
+      if (data?.basketUrl) {
+        window.open(data.basketUrl, '_blank');
       }
     } catch (error) {
       console.error('Error adding to basket:', error);
       toast({
-        title: "Failed to add to basket",
-        description: "There was an error adding items to your basket. Please try again.",
-        variant: "destructive"
+        title: 'Failed to add to basket',
+        description: 'There was an error adding items to your basket. Please try again.',
+        variant: 'destructive'
       });
     } finally {
       setAddingToBasket(false);
@@ -252,6 +253,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   <img 
                     src={logo} 
                     alt={store.name}
+                    loading="lazy"
                     className="max-w-full max-h-full object-contain"
                     onError={(e) => {
                       const target = e.currentTarget;
@@ -294,6 +296,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                       <img 
                         src={logo} 
                         alt={store.name}
+                        loading="lazy"
                         className="max-w-full max-h-full object-contain"
                         onError={(e) => {
                           const target = e.currentTarget;
@@ -382,6 +385,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                   <img 
                                     src={item.image} 
                                     alt={item.name}
+                                    loading="lazy"
                                     className="w-full h-full object-cover rounded-md"
                                   />
                                 </div>
@@ -421,11 +425,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                             <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />
                           )}
                           <div className="w-12 h-12 flex-shrink-0">
-                            <img 
-                              src={item.image} 
-                              alt={item.name}
-                              className="w-full h-full object-cover rounded-md"
-                            />
+                             <img 
+                               src={item.image} 
+                               alt={item.name}
+                               loading="lazy"
+                               className="w-full h-full object-cover rounded-md"
+                             />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="font-medium text-gray-900">
@@ -514,6 +519,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     <img 
                       src={logo} 
                       alt={store.name}
+                      loading="lazy"
                       className="max-w-full max-h-full object-contain"
                       onError={(e) => {
                         const target = e.currentTarget;

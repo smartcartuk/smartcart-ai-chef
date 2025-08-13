@@ -89,75 +89,76 @@ export const getRealTimePrices = async (
 
   console.log(`🔍 Looking up live prices for: ${ingredientName} (${quantity})`);
 
+  const results = await Promise.allSettled(
+    supermarkets.map(async (supermarket) => {
+      try {
+        const requestBody: PriceLookupRequest = {
+          supermarket: supermarket.toLowerCase(),
+          credentials: defaultCredentials,
+          items: [{
+            name: ingredientName,
+            quantity: quantity
+          }]
+        };
+
+        console.log(`📡 Fetching ${supermarket} price for ${ingredientName}`);
+
+        const response = await fetch(BASKET_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data: PriceLookupResponse = await response.json();
+        if (data.success && data.items && data.items.length > 0) {
+          const item = data.items[0];
+          if (item.matched_product) {
+            const priceValue = parseFloat(item.matched_product.price.replace(/[£$€,]/g, ''));
+            return {
+              ok: true as const,
+              value: {
+                store: supermarket,
+                price: isNaN(priceValue) ? 2.50 : priceValue,
+                url: item.matched_product.url,
+                title: item.matched_product.title,
+                image: (item as any).matched_product.image
+              } as RealTimePrice
+            };
+          } else {
+            console.warn(`⚠️ No product match found for ${ingredientName} at ${supermarket}`);
+            return {
+              ok: true as const,
+              value: {
+                store: supermarket,
+                price: 2.50,
+                title: `${ingredientName} (No Match)`
+              } as RealTimePrice
+            };
+          }
+        } else {
+          throw new Error(data.error || 'Unknown error');
+        }
+      } catch (err) {
+        console.error(`💥 Error fetching ${supermarket} price for ${ingredientName}:`, err);
+        return { ok: false as const };
+      }
+    })
+  );
+
   let successfulCalls = 0;
   let failedCalls = 0;
-
-  for (const supermarket of supermarkets) {
-    try {
-      const requestBody: PriceLookupRequest = {
-        supermarket: supermarket.toLowerCase(),
-        credentials: defaultCredentials,
-        items: [{
-          name: ingredientName,
-          quantity: quantity
-        }]
-      };
-
-      console.log(`📡 Fetching ${supermarket} price for ${ingredientName}`);
-
-      const response = await fetch(BASKET_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        console.error(`❌ Failed to fetch ${supermarket} price: HTTP ${response.status}`);
-        failedCalls++;
-        continue;
-      }
-
-      const data: PriceLookupResponse = await response.json();
-      
-      if (data.success && data.items && data.items.length > 0) {
-        const item = data.items[0];
-        if (item.matched_product) {
-          const priceValue = parseFloat(item.matched_product.price.replace(/[£$€,]/g, ''));
-          
-          prices.push({
-            store: supermarket,
-            price: isNaN(priceValue) ? 2.50 : priceValue,
-            url: item.matched_product.url,
-            title: item.matched_product.title,
-            image: item.matched_product.image
-          });
-          
-          console.log(`✅ Found ${supermarket} price: £${priceValue} for "${item.matched_product.title}"`);
-          successfulCalls++;
-        } else {
-          console.warn(`⚠️ No product match found for ${ingredientName} at ${supermarket}`);
-          
-          // Add fallback entry with "No Match" indicator
-          prices.push({
-            store: supermarket,
-            price: 2.50,
-            title: `${ingredientName} (No Match)`,
-            url: undefined,
-            image: undefined
-          });
-          failedCalls++;
-        }
-      } else {
-        console.error(`❌ ${supermarket} API returned error:`, data.error || 'Unknown error');
-        failedCalls++;
-      }
-    } catch (error) {
-      console.error(`💥 Network error fetching ${supermarket} price for ${ingredientName}:`, error);
+  results.forEach((res) => {
+    if (res.status === 'fulfilled' && res.value.ok) {
+      prices.push(res.value.value);
+      successfulCalls++;
+    } else {
       failedCalls++;
     }
-  }
+  });
 
   // Log API usage summary
   console.log(`📊 Price lookup summary for "${ingredientName}": ${successfulCalls} successful, ${failedCalls} failed out of ${supermarkets.length} calls`);
