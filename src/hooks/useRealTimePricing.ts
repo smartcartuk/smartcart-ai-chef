@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { getRealTimePrices, getBestPrice, calculateTotalCostByStore } from '@/utils/realTimePriceService';
+import { getEnhancedRealTimePrices, getBestPrice, calculateTotalCostByStore, useRealTimePriceUpdates } from '@/utils/enhancedPriceService';
 
 interface RealTimePrice {
   store: string;
@@ -23,6 +23,10 @@ export const useRealTimePricing = (ingredients: Array<{ name: string; amount: st
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Use enhanced real-time updates
+  const ingredientNames = ingredients.map(ing => ing.name);
+  const { prices: realtimePrices, isLoading: realtimeLoading } = useRealTimePriceUpdates(ingredientNames);
+
   const fetchPrices = async () => {
     if (ingredients.length === 0) return;
     
@@ -30,11 +34,21 @@ export const useRealTimePricing = (ingredients: Array<{ name: string; amount: st
     setError(null);
     
     try {
-      console.log('Fetching real-time prices for ingredients:', ingredients);
+      console.log('Fetching enhanced real-time prices for ingredients:', ingredients);
       
       const pricedItems = await Promise.all(
         ingredients.map(async (ingredient) => {
-          const prices = await getRealTimePrices(ingredient.name, ingredient.amount);
+          // First check if we have real-time data
+          const realtimeData = realtimePrices[ingredient.name];
+          let prices;
+          
+          if (realtimeData && realtimeData.length > 0) {
+            prices = realtimeData;
+          } else {
+            // Fallback to API call
+            prices = await getEnhancedRealTimePrices(ingredient.name, ingredient.amount);
+          }
+          
           const bestPrice = getBestPrice(prices);
           
           return {
@@ -52,10 +66,10 @@ export const useRealTimePricing = (ingredients: Array<{ name: string; amount: st
       const totals = calculateTotalCostByStore(pricedItems);
       setStoreTotals(totals);
       
-      console.log('Real-time pricing complete:', { pricedItems, totals });
+      console.log('Enhanced real-time pricing complete:', { pricedItems, totals });
       
     } catch (err) {
-      console.error('Error fetching real-time prices:', err);
+      console.error('Error fetching enhanced real-time prices:', err);
       setError('Failed to fetch real-time prices');
     } finally {
       setIsLoading(false);

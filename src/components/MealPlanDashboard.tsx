@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WeeklyPlan } from '@/components/WeeklyPlan';
 import { ShoppingList } from '@/components/ShoppingList';
-import { PriceComparison } from '@/components/PriceComparison';
+import { EnhancedPriceComparison } from '@/components/EnhancedPriceComparison';
 import { AIAssistant } from '@/components/AIAssistant';
 import { WeeklyPlanTester } from '@/components/WeeklyPlanTester';
 import { WebhookResponse } from '@/utils/webhookService';
@@ -285,9 +285,8 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
           </TabsContent>
 
           <TabsContent value="prices" className="space-y-6">
-            <PriceComparison 
+            <EnhancedPriceComparison 
               userProfile={userProfile} 
-              generatedData={generatedData}
               recipes={recipes}
               totalWeeklyCosts={totalWeeklyCosts}
             />

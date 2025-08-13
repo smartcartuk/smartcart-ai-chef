@@ -8,3 +8,6 @@ verify_jwt = true
 
 [functions.price-lookup]
 verify_jwt = true
+
+[functions.unified-price-lookup]
+verify_jwt = false
