@@ -26,6 +26,7 @@ interface AIShoppingAgentProps {
     };
   }>;
   onShoppingComplete: (results: any) => void;
+  smartRecommendations?: boolean;
 }
 
 interface ShoppingTask {
@@ -40,7 +41,8 @@ interface ShoppingTask {
 export const AIShoppingAgent: React.FC<AIShoppingAgentProps> = ({
   ingredients,
   connectedStores,
-  onShoppingComplete
+  onShoppingComplete,
+  smartRecommendations = true
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -65,13 +67,19 @@ export const AIShoppingAgent: React.FC<AIShoppingAgentProps> = ({
     setCurrentTask('AI agent analyzing shopping options...');
 
     try {
-      // Step 1: AI Analysis
+      // Step 1: Enhanced AI Analysis with ML
       setProgress(20);
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-shopping-agent', {
         body: {
           action: 'analyze',
           ingredients,
-          connectedStores: connectedStores.map(store => ({ name: store.name }))
+          connectedStores: connectedStores.map(store => ({ name: store.name })),
+          smartRecommendations,
+          preferences: {
+            prioritizeSavings: true,
+            preferredStores: connectedStores.slice(0, 2).map(s => s.name),
+            budgetOptimization: true
+          }
         }
       });
 

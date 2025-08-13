@@ -6,6 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WeeklyPlan } from '@/components/WeeklyPlan';
 import { ShoppingList } from '@/components/ShoppingList';
 import { EnhancedPriceComparison } from '@/components/EnhancedPriceComparison';
+import { PriceAnalyticsDashboard } from '@/components/PriceAnalyticsDashboard';
+import { SmartNotifications } from '@/components/SmartNotifications';
+import { PerformanceOptimizer } from '@/components/PerformanceOptimizer';
 import { AIAssistant } from '@/components/AIAssistant';
 import { WeeklyPlanTester } from '@/components/WeeklyPlanTester';
 import { WebhookResponse } from '@/utils/webhookService';
@@ -227,7 +230,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
 
         {/* Main Content Tabs - Enhanced visibility */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 h-14 bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl p-1 shadow-md border">
+          <TabsList className="grid w-full grid-cols-7 h-14 bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl p-1 shadow-md border">
             <TabsTrigger 
               value="plan" 
               className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
@@ -255,6 +258,20 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
             >
               <span className="text-xl">🤖</span>
               <span className="font-bold">AI Assistant</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="analytics" 
+              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
+            >
+              <span className="text-xl">📊</span>
+              <span className="font-bold">Analytics</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="optimize" 
+              className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all duration-200 rounded-lg font-semibold"
+            >
+              <span className="text-xl">⚡</span>
+              <span className="font-bold">Optimize</span>
             </TabsTrigger>
             <TabsTrigger 
               value="tester" 
@@ -294,6 +311,36 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
 
           <TabsContent value="assistant" className="space-y-6">
             <AIAssistant userProfile={userProfile} />
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            <PriceAnalyticsDashboard 
+              ingredients={recipes.map(recipe => ({
+                name: typeof recipe.ingredients?.[0] === 'string' 
+                  ? recipe.ingredients?.[0] 
+                  : recipe.ingredients?.[0]?.name || 'Unknown',
+                amount: '1 unit'
+              })).filter(ing => ing.name !== 'Unknown')}
+              selectedStores={userProfile?.connectedStores?.map((store: any) => store.name) || ['tesco', 'sainsburys', 'asda', 'aldi']}
+            />
+            <SmartNotifications 
+              ingredients={recipes.map(recipe => 
+                typeof recipe.ingredients?.[0] === 'string' 
+                  ? recipe.ingredients?.[0] 
+                  : recipe.ingredients?.[0]?.name || 'Unknown'
+              ).filter(ing => ing !== 'Unknown')}
+              onNotificationAction={(notification) => {
+                console.log('Notification action:', notification);
+                toast({
+                  title: "Action Applied",
+                  description: `Applied action for ${notification.title}`,
+                });
+              }}
+            />
+          </TabsContent>
+
+          <TabsContent value="optimize" className="space-y-6">
+            <PerformanceOptimizer />
           </TabsContent>
 
           <TabsContent value="tester" className="space-y-6">
