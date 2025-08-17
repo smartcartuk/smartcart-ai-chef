@@ -4,6 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronRight, ChevronLeft, Users, Target, ShoppingCart } from 'lucide-react';
+import { PersonalDetailsStep } from '@/components/onboarding/PersonalDetailsStep';
+import { DietaryPreferencesStep } from '@/components/onboarding/DietaryPreferencesStep';
+import { ConnectStoresStep } from '@/components/onboarding/ConnectStoresStep';
+import { useAddressSearch } from '@/hooks/useAddressSearch';
 
 interface OnboardingWizardProps {
   isOpen: boolean;
@@ -13,12 +17,29 @@ interface OnboardingWizardProps {
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onClose, onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [data, setData] = useState({
-    personalDetails: { name: '', email: '', household: 2, budget: 80 },
-    dietaryPreferences: { diet: 'omnivore', allergies: [], cuisines: [] },
-    connectedStores: {},
-    preferences: { notifications: true, priceAlerts: true }
+  const [showPassword, setShowPassword] = useState(false);
+  const [profile, setProfile] = useState({
+    name: '',
+    email: '',
+    password: '',
+    address: {
+      street: '',
+      city: '',
+      postcode: ''
+    },
+    householdSize: 2,
+    weeklyBudget: 80,
+    dietaryPreferences: [],
+    allergies: [],
+    connectedStores: []
   });
+
+  const { 
+    suggestions: addressSuggestions, 
+    showSuggestions: showAddressSuggestions, 
+    searchAddress, 
+    selectAddress 
+  } = useAddressSearch();
 
   const steps = [
     { title: 'Personal Details', icon: Users },
@@ -30,8 +51,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
 
   const handleNext = () => {
     if (currentStep === steps.length - 1) {
-      onComplete(data);
-      onClose();
+      console.log('Completing onboarding with profile:', profile);
+      onComplete(profile);
     } else {
       setCurrentStep(prev => prev + 1);
     }
@@ -41,12 +62,80 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
     setCurrentStep(prev => Math.max(prev - 1, 0));
   };
 
+  const handleTogglePreference = (item: string, type: 'dietary' | 'allergies') => {
+    setProfile(prev => {
+      const currentList = type === 'dietary' ? prev.dietaryPreferences : prev.allergies;
+      const newList = currentList.includes(item)
+        ? currentList.filter(i => i !== item)
+        : [...currentList, item];
+      
+      return {
+        ...prev,
+        [type === 'dietary' ? 'dietaryPreferences' : 'allergies']: newList
+      };
+    });
+  };
+
+  const handleToggleStore = (store: any) => {
+    setProfile(prev => {
+      const isAlreadyConnected = prev.connectedStores.some(s => s.name === store.name);
+      
+      if (isAlreadyConnected) {
+        return {
+          ...prev,
+          connectedStores: prev.connectedStores.filter(s => s.name !== store.name)
+        };
+      } else {
+        return {
+          ...prev,
+          connectedStores: [...prev.connectedStores, { 
+            ...store, 
+            credentials: { username: '', password: '', loyaltyCard: '' }
+          }]
+        };
+      }
+    });
+  };
+
+  const handleUpdateStoreCredentials = (storeName: string, field: string, value: string) => {
+    setProfile(prev => ({
+      ...prev,
+      connectedStores: prev.connectedStores.map(store =>
+        store.name === storeName
+          ? {
+              ...store,
+              credentials: {
+                ...store.credentials,
+                [field]: value
+              }
+            }
+          : store
+      )
+    }));
+  };
+
+  const handleAddressSearch = (query: string) => {
+    searchAddress(query);
+  };
+
+  const handleAddressSelect = (address: string) => {
+    selectAddress(address);
+    // Update the profile with the selected address
+    setProfile(prev => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        street: address
+      }
+    }));
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="space-y-6">
           <div>
-            <h2 className="text-2xl font-bold">Welcome to MealPlanner Pro</h2>
+            <h2 className="text-2xl font-bold">Welcome to SmartCart</h2>
             <p className="text-muted-foreground">Let's get you set up in just a few steps</p>
             <Progress value={progress} className="mt-4" />
           </div>
@@ -61,63 +150,31 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
             </CardHeader>
             <CardContent className="space-y-4">
               {currentStep === 0 && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">Name</label>
-                    <input 
-                      className="w-full p-2 border rounded"
-                      value={data.personalDetails.name}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        personalDetails: { ...prev.personalDetails, name: e.target.value }
-                      }))}
-                      placeholder="Enter your name"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Email</label>
-                    <input 
-                      type="email"
-                      className="w-full p-2 border rounded"
-                      value={data.personalDetails.email}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        personalDetails: { ...prev.personalDetails, email: e.target.value }
-                      }))}
-                      placeholder="Enter your email"
-                    />
-                  </div>
-                </div>
+                <PersonalDetailsStep
+                  profile={profile}
+                  setProfile={setProfile}
+                  showPassword={showPassword}
+                  setShowPassword={setShowPassword}
+                  addressSuggestions={addressSuggestions}
+                  showAddressSuggestions={showAddressSuggestions}
+                  onAddressSearch={handleAddressSearch}
+                  onAddressSelect={handleAddressSelect}
+                />
               )}
 
               {currentStep === 1 && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">Diet Type</label>
-                    <select 
-                      className="w-full p-2 border rounded"
-                      value={data.dietaryPreferences.diet}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        dietaryPreferences: { ...prev.dietaryPreferences, diet: e.target.value }
-                      }))}
-                    >
-                      <option value="omnivore">Omnivore</option>
-                      <option value="vegetarian">Vegetarian</option>
-                      <option value="vegan">Vegan</option>
-                      <option value="keto">Keto</option>
-                    </select>
-                  </div>
-                </div>
+                <DietaryPreferencesStep
+                  profile={profile}
+                  onTogglePreference={handleTogglePreference}
+                />
               )}
 
               {currentStep === 2 && (
-                <div className="text-center">
-                  <h3 className="font-medium">Connect Your Store Accounts</h3>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    You can connect your supermarket accounts later to enable automatic basket creation.
-                  </p>
-                </div>
+                <ConnectStoresStep
+                  profile={profile}
+                  onToggleStore={handleToggleStore}
+                  onUpdateStoreCredentials={handleUpdateStoreCredentials}
+                />
               )}
             </CardContent>
           </Card>
