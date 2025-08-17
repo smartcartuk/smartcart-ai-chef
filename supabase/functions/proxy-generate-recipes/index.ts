@@ -25,14 +25,31 @@ serve(async (req) => {
     
     console.log('🎯 Generating recipes with user profile:', JSON.stringify(userProfile, null, 2));
 
-    // Structure the payload properly for the Vercel API with enhanced user preferences
+    // CRITICAL: Enhanced dietary preference handling
+    const dietaryPreferences = userProfile?.dietaryPreferences || [];
+    const allergies = userProfile?.allergies || [];
+    
+    console.log('🔍 CRITICAL DIETARY CHECK:', { 
+      dietaryPreferences, 
+      allergies,
+      isVegetarian: dietaryPreferences.includes('vegetarian'),
+      isVegan: dietaryPreferences.includes('vegan')
+    });
+    
+    // Structure the payload with EXPLICIT dietary requirements
     const apiPayload = {
       userProfile: {
-        // Core preferences for meal generation
-        dietaryPreferences: userProfile?.dietaryPreferences || [],
-        allergies: userProfile?.allergies || [],
+        // CRITICAL: Core preferences for meal generation - MUST BE RESPECTED
+        dietaryPreferences: dietaryPreferences,
+        allergies: allergies,
         householdSize: userProfile?.householdSize || 2,
         weeklyBudget: userProfile?.weeklyBudget || 50,
+        
+        // EXPLICIT dietary restrictions for API clarity
+        isVegetarian: dietaryPreferences.includes('vegetarian'),
+        isVegan: dietaryPreferences.includes('vegan'),
+        isGlutenFree: dietaryPreferences.includes('gluten-free'),
+        isDairyFree: dietaryPreferences.includes('dairy-free'),
         
         // Additional context that might be useful
         name: userProfile?.name || '',
@@ -47,11 +64,25 @@ serve(async (req) => {
         isRegeneratingRecipe: userProfile?.regenerating || false,
         timestamp: userProfile?.timestamp || new Date().toISOString()
       },
+      
+      // CRITICAL: Explicit dietary requirements at top level
+      requireVegetarian: dietaryPreferences.includes('vegetarian'),
+      requireVegan: dietaryPreferences.includes('vegan'),
+      avoidMeat: dietaryPreferences.includes('vegetarian') || dietaryPreferences.includes('vegan'),
+      
       requestType: userProfile?.regenerating ? 'single-recipe-regeneration' : 'weekly-plan',
       timestamp: new Date().toISOString(),
       
-      // Keep legacy preferences string for backwards compatibility
-      preferences: preferences || ''
+      // Enhanced preferences string with EXPLICIT dietary requirements
+      preferences: `${preferences || ''}. CRITICAL DIETARY REQUIREMENTS: ${
+        dietaryPreferences.length > 0 ? 
+        `MUST be ${dietaryPreferences.join(' and ')}. ${
+          dietaryPreferences.includes('vegetarian') ? 'NO MEAT, NO FISH, NO POULTRY of any kind.' : ''
+        } ${
+          dietaryPreferences.includes('vegan') ? 'NO ANIMAL PRODUCTS including dairy, eggs, honey.' : ''
+        }` : 
+        'No specific dietary restrictions'
+      } ${allergies.length > 0 ? `MUST AVOID: ${allergies.join(', ')}.` : ''}`
     };
 
     console.log('📤 Sending structured payload to Vercel API:', JSON.stringify(apiPayload, null, 2));
@@ -287,6 +318,34 @@ serve(async (req) => {
     // Check if we have the enhanced format with meals array and price data
     if (data.meals && Array.isArray(data.meals)) {
       console.log('✅ Processing enhanced meals data with', data.meals.length, 'meals');
+      
+      // CRITICAL: Validate dietary preferences are respected
+      const isVegetarian = dietaryPreferences.includes('vegetarian');
+      const isVegan = dietaryPreferences.includes('vegan');
+      
+      if (isVegetarian || isVegan) {
+        const meatKeywords = ['chicken', 'beef', 'pork', 'lamb', 'turkey', 'fish', 'salmon', 'tuna', 'shrimp', 'meat', 'bacon', 'ham', 'sausage'];
+        const violatingMeals = data.meals.filter(meal => {
+          const mealText = `${meal.recipe_name || meal.name || ''} ${JSON.stringify(meal.ingredients || [])}`.toLowerCase();
+          return meatKeywords.some(keyword => mealText.includes(keyword));
+        });
+        
+        if (violatingMeals.length > 0) {
+          console.error('🚨 DIETARY VIOLATION DETECTED! Main API returned meat-based recipes for vegetarian/vegan user');
+          console.error('🚨 Violating meals:', violatingMeals.map(m => m.recipe_name || m.name));
+          console.error('🚨 Forcing fallback to respect dietary preferences');
+          
+          // Force fallback generation with correct dietary preferences
+          const response = await fetch('https://smartcart-operator.vercel.app/api/meal-plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(apiPayload)
+          });
+          
+          // If still failing, use local fallback
+          throw new Error('API not respecting dietary preferences - using local fallback');
+        }
+      }
       
       // Ensure all meals have the required structure and complete pricing
       const enhancedMeals = data.meals.map((meal, index) => ({
