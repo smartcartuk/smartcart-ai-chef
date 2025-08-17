@@ -48,24 +48,21 @@ export const DietaryPreferencesStep: React.FC<DietaryPreferencesStepProps> = ({
         <p className="text-gray-600">Select any that apply to your household</p>
       </div>
       
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         {dietaryOptions.map((option) => (
-          <div
-            key={option}
-            onClick={() => onTogglePreference(option, 'dietary')}
-            className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-              profile.dietaryPreferences.includes(option)
-                ? 'border-emerald-500 bg-emerald-50'
-                : 'border-gray-200 hover:border-emerald-300'
-            }`}
-          >
-            <div className="flex items-center space-x-3">
-              <Checkbox 
-                checked={profile.dietaryPreferences.includes(option)}
-                disabled={true}
-              />
-              <span className="font-medium">{option}</span>
-            </div>
+          <div key={option} className="flex items-center space-x-3">
+            <Checkbox 
+              id={option}
+              checked={profile.dietaryPreferences.includes(option)}
+              onCheckedChange={() => onTogglePreference(option, 'dietary')}
+              className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+            />
+            <label 
+              htmlFor={option}
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              {option}
+            </label>
           </div>
         ))}
       </div>
