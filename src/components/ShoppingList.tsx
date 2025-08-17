@@ -38,37 +38,57 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [addingToBasket, setAddingToBasket] = useState(false);
   const { toast } = useToast();
 
-  // Extract ingredients from recipes with proper image handling
+  // Extract and consolidate ingredients from recipes
   const ingredients = React.useMemo(() => {
-    const allIngredients: Array<{ name: string; amount: string; store: string; price: number; image: string }> = [];
+    const ingredientMap = new Map<string, { name: string; totalAmount: number; unit: string; store: string; price: number; image: string; count: number }>();
     
     recipes.forEach(recipe => {
       if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
         recipe.ingredients.forEach(ingredient => {
           const ingredientName = typeof ingredient === 'string' ? ingredient : ingredient.name;
-          const ingredientAmount = typeof ingredient === 'string' ? '1 unit' : (ingredient.amount || '1 unit');
+          const ingredientAmount = typeof ingredient === 'string' ? '150g' : (ingredient.amount || '150g');
           
           if (ingredientName) {
-            // Add ingredient for each store with estimated prices
             const stores = ['tesco', 'sainsburys', 'asda', 'aldi'];
             stores.forEach(store => {
-              const basePrice = Math.random() * 3 + 1; // Random price between £1-4
+              const key = `${ingredientName.toLowerCase()}-${store}`;
+              const basePrice = 1.5 + Math.sin(ingredientName.length + store.length) * 1.5; // Consistent pricing per ingredient
               const storeMultiplier = store === 'aldi' ? 0.9 : store === 'asda' ? 0.95 : store === 'sainsburys' ? 1.05 : 1;
               
-              allIngredients.push({
-                name: capitalizeWords(ingredientName),
-                amount: ingredientAmount,
-                store: store,
-                price: basePrice * storeMultiplier,
-                image: getIngredientImage(ingredientName)
-              });
+              // Extract numeric amount and unit
+              const amountMatch = ingredientAmount.match(/(\d+)\s*(\w+)/);
+              const numericAmount = amountMatch ? parseInt(amountMatch[1]) : 150;
+              const unit = amountMatch ? amountMatch[2] : 'g';
+              
+              if (ingredientMap.has(key)) {
+                const existing = ingredientMap.get(key)!;
+                existing.totalAmount += numericAmount;
+                existing.count += 1;
+                existing.price = basePrice * storeMultiplier * (existing.totalAmount / 150); // Scale price by total amount
+              } else {
+                ingredientMap.set(key, {
+                  name: capitalizeWords(ingredientName),
+                  totalAmount: numericAmount,
+                  unit: unit,
+                  store: store,
+                  price: basePrice * storeMultiplier,
+                  image: getIngredientImage(ingredientName),
+                  count: 1
+                });
+              }
             });
           }
         });
       }
     });
     
-    return allIngredients;
+    return Array.from(ingredientMap.values()).map(item => ({
+      name: item.name,
+      amount: item.count > 1 ? `${item.totalAmount}${item.unit} (${item.count} recipes)` : `${item.totalAmount}${item.unit}`,
+      store: item.store,
+      price: item.price,
+      image: item.image
+    }));
   }, [recipes]);
 
   // Store information with enhanced data

@@ -65,6 +65,10 @@ export const useWeeklyPlan = (userProfile: any) => {
       const { data, error } = await supabase.functions.invoke('proxy-generate-recipes', {
         body: { 
           preferences: preferences,
+          dietaryPreferences: userProfile?.dietaryPreferences || [],
+          allergies: userProfile?.allergies || [],
+          householdSize: userProfile?.householdSize || 2,
+          weeklyBudget: userProfile?.weeklyBudget || 50,
           userProfile: {
             ...userProfile,
             // Add timestamp to ensure unique requests
@@ -264,6 +268,10 @@ export const useWeeklyPlan = (userProfile: any) => {
     const { data, error } = await supabase.functions.invoke('proxy-generate-recipes', {
       body: { 
         preferences: `${preferences} - New recipe for ${day} (avoid repeating previous recipes)`,
+        dietaryPreferences: userProfile?.dietaryPreferences || [],
+        allergies: userProfile?.allergies || [],
+        householdSize: userProfile?.householdSize || 2,
+        weeklyBudget: userProfile?.weeklyBudget || 50,
         userProfile: {
           ...userProfile,
           requestId: `single-${day}-${timestamp}`,

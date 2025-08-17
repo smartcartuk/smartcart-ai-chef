@@ -27,6 +27,7 @@ interface Recipe {
   estimated_price?: number;
   estimated_cost?: number;
   image?: string;
+  picture_url?: string;
   description?: string;
   nutritional_info?: NutritionalInfo;
   cost_per_meal?: number;
@@ -72,10 +73,14 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <div className="aspect-video overflow-hidden">
         <img 
-          src={recipe.image} 
+          src={recipe.image || recipe.picture_url || `https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop&seed=${recipe.recipe_name}`} 
           alt={recipe.recipe_name}
           loading="lazy"
           className="w-full h-full object-cover"
+          onError={(e) => {
+            const target = e.currentTarget;
+            target.src = `https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop&seed=${recipe.recipe_name}`;
+          }}
         />
       </div>
       
