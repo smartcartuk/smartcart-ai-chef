@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.ai-shopping-assistant]
 verify_jwt = false
+
+[functions.ai-price-lookup]
+verify_jwt = false

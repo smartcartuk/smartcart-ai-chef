@@ -22,27 +22,34 @@ serve(async (req) => {
     console.log('AI Meal Planner called with preferences:', userPreferences);
 
     const systemPrompt = `You are an expert meal planning assistant for SmartCart. 
-Your role is to create personalized weekly meal plans based on user preferences.
+Your role is to create REAL, AUTHENTIC, and DELICIOUS meal plans.
 
 User Profile:
 - Dietary Preferences: ${userPreferences.dietaryPreferences?.join(', ') || 'None'}
 - Allergies: ${userPreferences.allergies?.join(', ') || 'None'}
-- Household Size: ${userPreferences.householdSize || 2}
+- Household Size: ${userPreferences.householdSize || 2} people
 - Weekly Budget: £${userPreferences.weeklyBudget || 50}
 - Connected Stores: ${userPreferences.connectedStores?.map(s => s.name).join(', ') || 'Tesco, Sainsbury\'s'}
 
-CRITICAL RULES:
-1. ALWAYS respect dietary preferences (vegetarian = no meat, vegan = no animal products)
-2. NEVER include allergens in any recipe
-3. Keep total weekly cost within budget
-4. Generate exactly 7 meals (one per day)
-5. Provide detailed ingredients with quantities scaled for household size
-6. Include prep time, difficulty, and nutritional info
+CRITICAL REQUIREMENTS:
+1. Generate 7 REAL recipes from established cuisines (Italian, Indian, Chinese, Mediterranean, etc.)
+2. STRICTLY respect dietary preferences:
+   - Vegetarian = NO meat, poultry, or fish (dairy/eggs OK)
+   - Vegan = NO animal products at all (no meat, dairy, eggs, honey)
+3. NEVER include allergens listed above
+4. Scale all ingredient quantities for ${userPreferences.householdSize || 2} people
+5. Provide step-by-step cooking instructions (5-8 steps)
+6. Calculate realistic costs based on UK supermarket prices
+7. Include prep time, cook time, and difficulty level
+8. Ensure nutritional balance across the week
+9. Vary cuisines and cooking methods throughout the week
 
-Response format (use tool calling):
-- Generate a complete week of meals
-- Each meal must have: name, description, ingredients (with quantities), instructions, prep_time, difficulty, calories, estimated_cost, tags
-- Ensure variety and nutritional balance`;
+Budget Considerations:
+- Total weekly cost should be around £${userPreferences.weeklyBudget || 50}
+- Cost per meal: £${((userPreferences.weeklyBudget || 50) / 7).toFixed(2)}
+- Include both budget-friendly and slightly premium meals
+
+IMPORTANT: Generate authentic, tried-and-tested recipes that real people cook, not generic or made-up dishes.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -84,21 +91,31 @@ Response format (use tool calling):
                           items: {
                             type: 'object',
                             properties: {
-                              name: { type: 'string' },
-                              amount: { type: 'string' },
-                              category: { type: 'string' }
+                              name: { type: 'string', description: 'Ingredient name' },
+                              amount: { type: 'string', description: 'Quantity with unit (e.g., "200g", "2 cups", "1 large")' },
+                              category: { type: 'string', description: 'Food category (e.g., "Proteins", "Vegetables", "Dairy")' }
                             },
                             required: ['name', 'amount', 'category']
-                          }
+                          },
+                          description: 'Complete list of ingredients with precise quantities'
                         },
-                        instructions: { type: 'array', items: { type: 'string' } },
-                        prep_time: { type: 'string' },
+                        instructions: { 
+                          type: 'array', 
+                          items: { type: 'string' },
+                          description: 'Step-by-step cooking instructions (5-8 steps)'
+                        },
+                        prep_time: { type: 'string', description: 'Preparation time (e.g., "15 mins")' },
+                        cook_time: { type: 'string', description: 'Cooking time (e.g., "30 mins")' },
                         difficulty: { type: 'string', enum: ['Easy', 'Medium', 'Hard'] },
-                        calories: { type: 'number' },
-                        estimated_cost: { type: 'number' },
-                        tags: { type: 'array', items: { type: 'string' } }
+                        calories: { type: 'number', description: 'Calories per serving' },
+                        protein: { type: 'number', description: 'Protein in grams' },
+                        carbs: { type: 'number', description: 'Carbohydrates in grams' },
+                        fat: { type: 'number', description: 'Fat in grams' },
+                        estimated_cost: { type: 'number', description: 'Cost in GBP for the household size' },
+                        tags: { type: 'array', items: { type: 'string' }, description: 'Tags like "Quick", "Healthy", "Family-friendly"' },
+                        cuisine: { type: 'string', description: 'Cuisine type (e.g., "Italian", "Indian")' }
                       },
-                      required: ['day', 'name', 'description', 'ingredients', 'instructions', 'prep_time', 'difficulty', 'calories', 'estimated_cost', 'tags']
+                      required: ['day', 'name', 'description', 'ingredients', 'instructions', 'prep_time', 'cook_time', 'difficulty', 'calories', 'estimated_cost', 'tags', 'cuisine']
                     }
                   }
                 },
@@ -129,10 +146,13 @@ Response format (use tool calling):
     const mealPlan = JSON.parse(toolCall.function.arguments);
     
     // Generate images for meals using AI
+    console.log('Generating food images for meals...');
     const mealsWithImages = await Promise.all(
       mealPlan.meals.map(async (meal, index) => {
         try {
-          const imagePrompt = `Food photography of ${meal.name}, ${meal.description}, professional food styling, appetizing, high quality, 16:9 aspect ratio`;
+          const imagePrompt = `Professional food photography: ${meal.name}, ${meal.cuisine} cuisine, ${meal.description}. Plated beautifully on a white dish, natural lighting, appetizing, restaurant quality, overhead angle, 16:9 aspect ratio, ultra high resolution`;
+          
+          console.log(`Generating image for: ${meal.name}`);
           
           const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
             method: 'POST',
@@ -150,15 +170,30 @@ Response format (use tool calling):
           if (imageResponse.ok) {
             const imageData = await imageResponse.json();
             const imageUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-            return { ...meal, id: index + 1, image: imageUrl || '/placeholder.svg' };
+            console.log(`Image generated successfully for ${meal.name}`);
+            return { 
+              ...meal, 
+              id: index + 1, 
+              image: imageUrl || '/placeholder.svg',
+              recipe_name: meal.name
+            };
+          } else {
+            console.error(`Image generation failed for ${meal.name}: ${imageResponse.status}`);
           }
         } catch (error) {
           console.error(`Error generating image for ${meal.name}:`, error);
         }
         
-        return { ...meal, id: index + 1, image: '/placeholder.svg' };
+        return { 
+          ...meal, 
+          id: index + 1, 
+          image: '/placeholder.svg',
+          recipe_name: meal.name
+        };
       })
     );
+
+    console.log(`Generated ${mealsWithImages.length} meals with images`);
 
     return new Response(
       JSON.stringify({

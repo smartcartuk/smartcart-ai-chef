@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, Sparkles, ShoppingCart, ChefHat } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { saveMealPlan } from '@/utils/mealPlanService';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -82,9 +83,12 @@ export const AIChatInterface = ({ userProfile, onMealPlanGenerated, onShoppingSt
         if (error) throw error;
 
         if (data.success) {
+          // Save meal plan to database
+          const saveResult = await saveMealPlan(data.meals);
+          
           const assistantMessage: Message = {
             role: 'assistant',
-            content: data.message || "I've created a personalized meal plan for you!",
+            content: data.message || "I've created a personalized meal plan for you with real recipes and beautiful images!",
             type: 'meal-plan',
             data: data.meals
           };
@@ -95,8 +99,8 @@ export const AIChatInterface = ({ userProfile, onMealPlanGenerated, onShoppingSt
           }
 
           toast({
-            title: "Meal Plan Generated!",
-            description: `Created ${data.meals?.length || 0} meals for you. Total cost: £${data.totalCost?.toFixed(2) || 0}`,
+            title: "Meal Plan Generated & Saved!",
+            description: `Created ${data.meals?.length || 0} authentic recipes. Total cost: £${data.totalCost?.toFixed(2) || 0}. ${saveResult.success ? 'Saved to your profile.' : ''}`,
           });
         }
       } else if (isShopping) {

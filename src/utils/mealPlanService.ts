@@ -21,7 +21,7 @@ export const saveMealPlan = async (meals: any[], weekStart?: Date): Promise<{ su
       .select('id')
       .eq('user_id', user.id)
       .eq('week_start', weekStartDate)
-      .single();
+      .maybeSingle();
 
     const mealPlanData = {
       user_id: user.id,
@@ -75,7 +75,7 @@ export const getMealPlan = async (weekStart?: Date): Promise<{ success: boolean;
       .select('*')
       .eq('user_id', user.id)
       .eq('week_start', weekStartDate)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
       console.error('Error fetching meal plan:', error);
@@ -135,7 +135,7 @@ export const saveShoppingList = async (items: any[], weekStart?: Date): Promise<
       .select('id')
       .eq('user_id', user.id)
       .eq('week_start', weekStartDate)
-      .single();
+      .maybeSingle();
 
     const shoppingListData = {
       user_id: user.id,
