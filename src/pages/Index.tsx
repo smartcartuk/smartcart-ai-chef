@@ -3,6 +3,7 @@ import { Header } from '@/components/Header';
 import { Hero } from '@/components/Hero';
 import { OnboardingWizard } from '@/components/OnboardingWizard';
 import { MealPlanDashboard } from '@/components/MealPlanDashboard';
+import { AIChatInterface } from '@/components/AIChatInterface';
 import { Toaster } from '@/components/ui/toaster';
 import { WebhookResponse } from '@/utils/webhookService';
 import { useNavigate } from 'react-router-dom';
@@ -77,10 +78,33 @@ const Index = () => {
       />
       
       {currentView === 'dashboard' && (
-        <MealPlanDashboard 
-          userProfile={userProfile} 
-          generatedData={generatedData}
-        />
+        <div className="container mx-auto p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <MealPlanDashboard 
+                userProfile={userProfile} 
+                generatedData={generatedData}
+              />
+            </div>
+            <div className="lg:col-span-1">
+              <AIChatInterface 
+                userProfile={userProfile}
+                onMealPlanGenerated={(meals) => {
+                  console.log('AI generated meal plan:', meals);
+                  setGeneratedData(prev => ({
+                    ...prev,
+                    meals: meals,
+                    priceComparisons: prev?.priceComparisons || [],
+                    shoppingList: prev?.shoppingList || []
+                  }));
+                }}
+                onShoppingStrategy={(strategy) => {
+                  console.log('AI shopping strategy:', strategy);
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
       
       <Toaster />
