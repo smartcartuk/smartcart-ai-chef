@@ -8,6 +8,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { WebhookResponse } from '@/utils/webhookService';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { getUserProfile } from '@/utils/profileService';
+import { useAutoMealPlanner } from '@/hooks/useAutoMealPlanner';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
@@ -16,12 +18,35 @@ const Index = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { generatedMeals, isGenerating } = useAutoMealPlanner(userProfile);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setIsAuthenticated(!!session);
+      
+      // When user logs in, automatically load their profile and trigger meal generation
+      if (session) {
+        const profileResult = await getUserProfile();
+        if (profileResult.success && profileResult.data) {
+          setUserProfile(profileResult.data);
+          setCurrentView('dashboard');
+        }
+      }
     });
-    supabase.auth.getSession().then(({ data }) => setIsAuthenticated(!!data.session));
+    
+    supabase.auth.getSession().then(async ({ data }) => {
+      setIsAuthenticated(!!data.session);
+      
+      // Load profile on initial mount if authenticated
+      if (data.session) {
+        const profileResult = await getUserProfile();
+        if (profileResult.success && profileResult.data) {
+          setUserProfile(profileResult.data);
+          setCurrentView('dashboard');
+        }
+      }
+    });
+    
     return () => subscription.unsubscribe();
   }, []);
 
@@ -38,11 +63,11 @@ const Index = () => {
     navigate('/auth');
   };
 
-  const handleOnboardingComplete = (profile: any, webhookData?: WebhookResponse) => {
+  const handleOnboardingComplete = async (profile: any, webhookData?: WebhookResponse) => {
     setUserProfile(profile);
-    setGeneratedData(webhookData || null);
     setShowOnboarding(false);
     setCurrentView('dashboard');
+    // The MealPlanDashboard will automatically trigger meal generation via useWeeklyPlan
   };
 
   const handleBackToLanding = () => {
@@ -79,11 +104,17 @@ const Index = () => {
       
       {currentView === 'dashboard' && (
         <div className="container mx-auto p-4">
+          {isGenerating && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+              <div className="text-lg font-semibold text-blue-700">🤖 AI is generating your personalized meal plan...</div>
+              <div className="text-sm text-blue-600 mt-1">Creating recipes, images, and finding the best prices</div>
+            </div>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <MealPlanDashboard 
                 userProfile={userProfile} 
-                generatedData={generatedData}
+                generatedData={generatedMeals || generatedData}
               />
             </div>
             <div className="lg:col-span-1">

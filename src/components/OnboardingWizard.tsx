@@ -85,9 +85,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
 
         toast({
           title: "Profile Saved!",
-          description: "Your preferences have been saved successfully.",
+          description: "Generating your personalized meal plan with AI...",
         });
 
+        // Pass profile to parent to trigger automatic meal generation
         onComplete(profile);
       } catch (error: any) {
         console.error('Error saving onboarding data:', error);
