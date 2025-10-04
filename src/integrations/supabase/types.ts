@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -531,18 +531,18 @@ export type Database = {
       get_latest_prices_by_store: {
         Args: { ingredient_name_param: string }
         Returns: {
-          store_name: string
-          price: number
-          product_url: string
-          product_title: string
           last_updated: string
+          price: number
+          product_title: string
+          product_url: string
+          store_name: string
         }[]
       }
       get_price_trends: {
         Args: {
+          days_back?: number
           ingredient_name_param: string
           store_name_param: string
-          days_back?: number
         }
         Returns: {
           price: number

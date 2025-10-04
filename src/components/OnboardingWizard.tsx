@@ -8,6 +8,8 @@ import { PersonalDetailsStep } from '@/components/onboarding/PersonalDetailsStep
 import { DietaryPreferencesStep } from '@/components/onboarding/DietaryPreferencesStep';
 import { ConnectStoresStep } from '@/components/onboarding/ConnectStoresStep';
 import { useAddressSearch } from '@/hooks/useAddressSearch';
+import { saveUserProfile, saveConnectedStores } from '@/utils/profileService';
+import { useToast } from '@/hooks/use-toast';
 
 interface OnboardingWizardProps {
   isOpen: boolean;
@@ -18,6 +20,8 @@ interface OnboardingWizardProps {
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onClose, onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
   const [profile, setProfile] = useState({
     name: '',
     email: '',
@@ -49,10 +53,52 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
 
   const progress = ((currentStep + 1) / steps.length) * 100;
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep === steps.length - 1) {
-      console.log('Completing onboarding with profile:', profile);
-      onComplete(profile);
+      setIsSaving(true);
+      console.log('Saving profile to database:', profile);
+      
+      try {
+        // Save profile data
+        const profileResult = await saveUserProfile({
+          full_name: profile.name,
+          email: profile.email,
+          address: profile.address,
+          household_size: profile.householdSize,
+          weekly_budget: profile.weeklyBudget,
+          dietary_preferences: profile.dietaryPreferences,
+          allergies: profile.allergies
+        });
+
+        if (!profileResult.success) {
+          throw new Error(profileResult.error || 'Failed to save profile');
+        }
+
+        // Save connected stores
+        if (profile.connectedStores.length > 0) {
+          const storesResult = await saveConnectedStores(profile.connectedStores);
+          
+          if (!storesResult.success) {
+            console.warn('Failed to save stores:', storesResult.error);
+          }
+        }
+
+        toast({
+          title: "Profile Saved!",
+          description: "Your preferences have been saved successfully.",
+        });
+
+        onComplete(profile);
+      } catch (error: any) {
+        console.error('Error saving onboarding data:', error);
+        toast({
+          title: "Error Saving Profile",
+          description: error.message || "Failed to save your profile. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsSaving(false);
+      }
     } else {
       setCurrentStep(prev => prev + 1);
     }
@@ -184,9 +230,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
               <ChevronLeft className="h-4 w-4" />
               Previous
             </Button>
-            <Button onClick={handleNext}>
-              {currentStep === steps.length - 1 ? 'Complete Setup' : 'Next'}
-              {currentStep < steps.length - 1 && <ChevronRight className="h-4 w-4" />}
+            <Button onClick={handleNext} disabled={isSaving}>
+              {isSaving ? 'Saving...' : currentStep === steps.length - 1 ? 'Complete Setup' : 'Next'}
+              {currentStep < steps.length - 1 && !isSaving && <ChevronRight className="h-4 w-4" />}
             </Button>
           </div>
         </div>
