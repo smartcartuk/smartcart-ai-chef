@@ -1,10 +1,10 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { WeeklyPlanHeader } from '@/components/WeeklyPlanHeader';
 import { PriceComparisonSection } from '@/components/PriceComparisonSection';
 import { WeeklyPlanLoading } from '@/components/WeeklyPlanLoading';
 import { RecipeGrid } from '@/components/RecipeGrid';
+import { RecipeSearchModal } from '@/components/RecipeSearchModal';
 import { useWeeklyPlan } from '@/hooks/useWeeklyPlan';
 import { WebhookResponse } from '@/utils/webhookService';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +25,9 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
   onWeeklyCostsChange
 }) => {
   const { toast } = useToast();
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchDayIndex, setSearchDayIndex] = useState<number | undefined>();
+  
   const {
     recipes,
     isLoading,
@@ -37,6 +40,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
     totalWeeklyCosts,
     fetchWeeklyRecipes,
     regenerateSingleRecipe,
+    replaceRecipe,
     toggleRecipeDetails,
     addToPlan,
     compareSelectedPrices,

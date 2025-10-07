@@ -63,17 +63,25 @@ export const useAutoMealPlanner = (userProfile: any) => {
   const loadOrGenerateMealPlan = async () => {
     if (!userProfile) return;
 
-    // First, try to load existing meal plan
-    const result = await getMealPlan();
+    // Check if meal plan exists for current week
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset);
+    const weekStart = monday.toISOString().split('T')[0];
+
+    // Try to load existing meal plan for this week
+    const result = await getMealPlan(new Date(weekStart));
     
-    if (result.success && result.data?.data?.meals) {
-      console.log('📥 Loading existing meal plan from database');
+    if (result.success && result.data?.data?.meals && result.data?.data?.meals.length > 0) {
+      console.log('📥 Loading existing meal plan for week starting:', weekStart);
       setGeneratedMeals({ meals: result.data.data.meals });
       return result.data.data;
     }
 
-    // If no meal plan exists, generate a new one
-    console.log('🆕 No existing meal plan found, generating new one...');
+    // If no meal plan exists for this week, generate a new one
+    console.log('🆕 No meal plan found for current week, generating new one...');
     toast({
       title: "Generating Your Meal Plan...",
       description: "Creating personalized recipes with AI",

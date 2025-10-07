@@ -421,6 +421,30 @@ export const useWeeklyPlan = (userProfile: any) => {
     totalWeeklyCosts,
     fetchWeeklyRecipes,
     regenerateSingleRecipe,
+    replaceRecipe: async (index: number, newRecipe: Recipe) => {
+      console.log(`Replacing recipe at index ${index} with:`, newRecipe);
+      setRecipes(prev => {
+        const updated = [...prev];
+        updated[index] = {
+          ...newRecipe,
+          day: DAYS_OF_WEEK[index]
+        };
+        return updated;
+      });
+      
+      // Save to database if needed
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const weekStart = new Date().toISOString().split('T')[0];
+        await supabase
+          .from('meal_plans')
+          .upsert([{
+            user_id: user.id,
+            week_start: weekStart,
+            data: { meals: recipes } as any
+          }]);
+      }
+    },
     toggleRecipeDetails,
     addToPlan,
     compareSelectedPrices,

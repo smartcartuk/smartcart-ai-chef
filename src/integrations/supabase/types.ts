@@ -110,6 +110,7 @@ export type Database = {
       connected_stores: {
         Row: {
           created_at: string
+          credentials: Json | null
           has_loyalty_card: boolean | null
           id: string
           name: string
@@ -118,6 +119,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          credentials?: Json | null
           has_loyalty_card?: boolean | null
           id?: string
           name: string
@@ -126,6 +128,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          credentials?: Json | null
           has_loyalty_card?: boolean | null
           id?: string
           name?: string
@@ -296,6 +299,36 @@ export type Database = {
         }
         Relationships: []
       }
+      order_history: {
+        Row: {
+          basket_urls: Json | null
+          id: string
+          meal_plan_data: Json
+          ordered_at: string | null
+          total_cost: number | null
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          basket_urls?: Json | null
+          id?: string
+          meal_plan_data: Json
+          ordered_at?: string | null
+          total_cost?: number | null
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          basket_urls?: Json | null
+          id?: string
+          meal_plan_data?: Json
+          ordered_at?: string | null
+          total_cost?: number | null
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       price_history: {
         Row: {
           id: string
@@ -409,6 +442,27 @@ export type Database = {
         }
         Relationships: []
       }
+      recipe_favorites: {
+        Row: {
+          created_at: string | null
+          id: string
+          recipe_data: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          recipe_data: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          recipe_data?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       sainsbury_prices: {
         Row: {
           average_price: number | null
@@ -441,6 +495,7 @@ export type Database = {
       }
       shopping_lists: {
         Row: {
+          basket_urls: Json | null
           created_at: string
           id: string
           items: Json
@@ -449,6 +504,7 @@ export type Database = {
           week_start: string
         }
         Insert: {
+          basket_urls?: Json | null
           created_at?: string
           id?: string
           items: Json
@@ -457,6 +513,7 @@ export type Database = {
           week_start: string
         }
         Update: {
+          basket_urls?: Json | null
           created_at?: string
           id?: string
           items?: Json

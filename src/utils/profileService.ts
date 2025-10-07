@@ -73,11 +73,16 @@ export const saveConnectedStores = async (stores: ConnectedStore[]): Promise<{ s
       .delete()
       .eq('user_id', user.id);
 
-    // Insert new stores
+    // Insert new stores with encrypted credentials
     const storesData = stores.map(store => ({
       user_id: user.id,
       name: store.name,
-      has_loyalty_card: Boolean(store.credentials?.loyaltyCard)
+      has_loyalty_card: Boolean(store.credentials?.loyaltyCard),
+      credentials: store.credentials ? {
+        username: store.credentials.username,
+        password: store.credentials.password,
+        loyaltyCard: store.credentials.loyaltyCard
+      } : null
     }));
 
     const { error } = await supabase

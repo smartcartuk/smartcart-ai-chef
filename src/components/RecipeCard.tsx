@@ -3,6 +3,9 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Search, Heart, RefreshCw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface Ingredient {
   name: string;
@@ -39,7 +42,10 @@ interface RecipeCardProps {
   isExpanded: boolean;
   onToggleDetails: (index: number) => void;
   onAddToPlan: (recipe: Recipe) => void;
+  onSearchReplace?: (index: number) => void;
+  onRegenerate?: (index: number) => void;
   estimatedPrice?: number;
+  pricesBySupermarket?: { [key: string]: number };
 }
 
 export const RecipeCard: React.FC<RecipeCardProps> = ({
@@ -48,8 +54,74 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   isExpanded,
   onToggleDetails,
   onAddToPlan,
-  estimatedPrice
+  onSearchReplace,
+  onRegenerate,
+  estimatedPrice,
+  pricesBySupermarket
 }) => {
+  const { toast } = useToast();
+  const [isFavorite, setIsFavorite] = React.useState(false);
+
+  // Check if recipe is favorited
+  React.useEffect(() => {
+    checkIfFavorite();
+  }, [recipe]);
+
+  const checkIfFavorite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('recipe_favorites')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('recipe_data->>name', recipe.recipe_name)
+        .maybeSingle();
+
+      if (!error && data) {
+        setIsFavorite(true);
+      }
+    } catch (error) {
+      console.error('Error checking favorite:', error);
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (isFavorite) {
+        await supabase
+          .from('recipe_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('recipe_data->>recipe_name', recipe.recipe_name);
+        
+        setIsFavorite(false);
+        toast({ title: "Removed from favorites" });
+      } else {
+        await supabase
+          .from('recipe_favorites')
+          .insert([{
+            user_id: user.id,
+            recipe_data: recipe as any
+          }]);
+        
+        setIsFavorite(true);
+        toast({ title: "Added to favorites ❤️" });
+      }
+    } catch (error: any) {
+      console.error('Error toggling favorite:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update favorites",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Helper function to format ingredients
   const formatIngredient = (ingredient: string | Ingredient) => {
     if (typeof ingredient === 'string') {
@@ -68,6 +140,18 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
   // Get the actual price to display
   const displayPrice = recipe.estimated_cost || recipe.cost_per_meal || recipe.estimated_price || estimatedPrice || 0;
+
+  // Find cheapest supermarket
+  const getCheapestStore = () => {
+    if (!pricesBySupermarket) return null;
+    const entries = Object.entries(pricesBySupermarket);
+    if (entries.length === 0) return null;
+    return entries.reduce((min, [store, price]) => 
+      price < min[1] ? [store, price] : min
+    );
+  };
+
+  const cheapestStore = getCheapestStore();
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -90,32 +174,83 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             <Badge variant="outline">
               {recipe.day}
             </Badge>
-            <Badge variant="secondary" className="bg-green-100 text-green-700">
-              £{displayPrice.toFixed(2)}
-            </Badge>
+            <div className="flex gap-2 items-center">
+              <Badge variant="secondary" className="bg-green-100 text-green-700">
+                £{displayPrice.toFixed(2)}
+              </Badge>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleToggleFavorite}
+                className="h-8 w-8 p-0"
+              >
+                <Heart className={`h-4 w-4 ${isFavorite ? 'fill-primary text-primary' : ''}`} />
+              </Button>
+            </div>
           </div>
           <h3 className="font-bold text-lg">{recipe.recipe_name}</h3>
           {recipe.description && (
             <p className="text-sm text-gray-600 mt-1">{recipe.description}</p>
           )}
+          
+          {/* Show price comparison immediately */}
+          {pricesBySupermarket && Object.keys(pricesBySupermarket).length > 0 && (
+            <div className="mt-2 p-2 bg-accent/50 rounded text-xs space-y-1">
+              {Object.entries(pricesBySupermarket).map(([store, price]) => (
+                <div key={store} className="flex justify-between items-center">
+                  <span className={cheapestStore && cheapestStore[0] === store ? 'font-semibold text-primary' : ''}>
+                    {store}
+                  </span>
+                  <span className={cheapestStore && cheapestStore[0] === store ? 'font-semibold text-primary' : ''}>
+                    £{price.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="flex space-x-2">
+        <div className="flex gap-2">
           <Button 
             onClick={() => onToggleDetails(index)}
             variant="outline" 
             size="sm"
             className="flex-1"
           >
-            {isExpanded ? 'Hide Details' : 'View Recipe'}
+            {isExpanded ? 'Hide' : 'View'}
           </Button>
           <Button 
             onClick={() => onAddToPlan(recipe)}
             size="sm"
-            className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600"
+            className="flex-1"
           >
             Add to Plan
           </Button>
+        </div>
+
+        <div className="flex gap-2">
+          {onSearchReplace && (
+            <Button 
+              onClick={() => onSearchReplace(index)}
+              variant="outline"
+              size="sm"
+              className="flex-1"
+            >
+              <Search className="h-3 w-3 mr-1" />
+              Replace
+            </Button>
+          )}
+          {onRegenerate && (
+            <Button 
+              onClick={() => onRegenerate(index)}
+              variant="outline"
+              size="sm"
+              className="flex-1"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Regenerate
+            </Button>
+          )}
         </div>
 
         {isExpanded && (

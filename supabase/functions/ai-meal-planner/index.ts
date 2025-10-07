@@ -12,11 +12,131 @@ serve(async (req) => {
   }
 
   try {
-    const { userPreferences, conversationHistory = [] } = await req.json();
+    const { userPreferences, conversationHistory = [], action, query } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
+    }
+
+    // Handle search action for recipe search
+    if (action === 'search') {
+      console.log('AI Meal Planner search called with query:', query);
+      
+      const searchSystemPrompt = `You are a recipe search assistant. Generate 3-5 REAL recipe suggestions based on the search query.
+      
+User Search: "${query}"
+Dietary Preferences: ${userPreferences.dietaryPreferences?.join(', ') || 'None'}
+Allergies: ${userPreferences.allergies?.join(', ') || 'None'}
+Household Size: ${userPreferences.householdSize || 2} people
+Budget per meal: £${((userPreferences.weeklyBudget || 50) / 7).toFixed(2)}
+
+REQUIREMENTS:
+1. Generate authentic recipes matching the search query
+2. STRICTLY respect dietary preferences and allergies
+3. Scale ingredients for ${userPreferences.householdSize || 2} people
+4. Provide realistic UK supermarket prices
+5. Include detailed nutritional information`;
+
+      const searchResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: searchSystemPrompt },
+            { role: 'user', content: `Find me recipes for: ${query}` }
+          ],
+          tools: [{
+            type: 'function',
+            function: {
+              name: 'search_recipes',
+              description: 'Search for recipe suggestions',
+              parameters: {
+                type: 'object',
+                properties: {
+                  recipes: {
+                    type: 'array',
+                    minItems: 3,
+                    maxItems: 5,
+                    items: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        description: { type: 'string' },
+                        ingredients: { type: 'array', items: { type: 'object' } },
+                        instructions: { type: 'array', items: { type: 'string' } },
+                        prepTime: { type: 'string' },
+                        cookTime: { type: 'string' },
+                        servings: { type: 'number' },
+                        estimatedCost: { type: 'number' },
+                        calories: { type: 'number' }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }],
+          tool_choice: { type: 'function', function: { name: 'search_recipes' } }
+        }),
+      });
+
+      if (!searchResponse.ok) {
+        throw new Error(`Search AI error: ${searchResponse.status}`);
+      }
+
+      const searchData = await searchResponse.json();
+      const searchToolCall = searchData.choices?.[0]?.message?.tool_calls?.[0];
+      
+      if (!searchToolCall) {
+        throw new Error('No search results generated');
+      }
+
+      const searchResults = JSON.parse(searchToolCall.function.arguments);
+      
+      // Generate images for search results
+      const recipesWithImages = await Promise.all(
+        searchResults.recipes.map(async (recipe: any) => {
+          try {
+            const imagePrompt = `Professional food photography: ${recipe.name}, plated beautifully, natural lighting, appetizing, restaurant quality, 16:9 aspect ratio, ultra high resolution`;
+            
+            const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'google/gemini-2.5-flash-image-preview',
+                messages: [{ role: 'user', content: imagePrompt }],
+                modalities: ['image', 'text']
+              }),
+            });
+
+            if (imageResponse.ok) {
+              const imageData = await imageResponse.json();
+              const imageUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+              return { ...recipe, image: imageUrl || '/placeholder.svg' };
+            }
+          } catch (error) {
+            console.error(`Error generating image for ${recipe.name}:`, error);
+          }
+          
+          return { ...recipe, image: '/placeholder.svg' };
+        })
+      );
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          recipes: recipesWithImages
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('AI Meal Planner called with preferences:', userPreferences);
