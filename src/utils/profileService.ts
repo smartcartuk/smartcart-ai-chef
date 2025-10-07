@@ -27,13 +27,23 @@ export interface ConnectedStore {
 
 export const saveUserProfile = async (profile: UserProfile): Promise<{ success: boolean; error?: string }> => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    console.log('🔍 Checking authentication...');
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      console.error('Auth error:', authError);
+      return { success: false, error: `Authentication error: ${authError.message}` };
+    }
     
     if (!user) {
+      console.error('No user found');
       return { success: false, error: 'User not authenticated' };
     }
 
-    const { error } = await supabase
+    console.log('✅ User authenticated:', user.id);
+    console.log('💾 Saving profile data...');
+
+    const { data, error } = await supabase
       .from('profiles')
       .upsert({
         id: user.id,
@@ -45,22 +55,25 @@ export const saveUserProfile = async (profile: UserProfile): Promise<{ success: 
         dietary_preferences: profile.dietary_preferences,
         allergies: profile.allergies,
         updated_at: new Date().toISOString()
-      });
+      })
+      .select();
 
     if (error) {
-      console.error('Error saving profile:', error);
+      console.error('❌ Error saving profile:', error);
       return { success: false, error: error.message };
     }
 
+    console.log('✅ Profile saved successfully:', data);
     return { success: true };
   } catch (error: any) {
-    console.error('Error in saveUserProfile:', error);
-    return { success: false, error: error.message };
+    console.error('❌ Exception in saveUserProfile:', error);
+    return { success: false, error: error.message || 'Unknown error occurred' };
   }
 };
 
 export const saveConnectedStores = async (stores: ConnectedStore[]): Promise<{ success: boolean; error?: string }> => {
   try {
+    console.log('💾 Saving connected stores...');
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -90,14 +103,15 @@ export const saveConnectedStores = async (stores: ConnectedStore[]): Promise<{ s
       .insert(storesData);
 
     if (error) {
-      console.error('Error saving stores:', error);
+      console.error('❌ Error saving stores:', error);
       return { success: false, error: error.message };
     }
 
+    console.log('✅ Stores saved successfully');
     return { success: true };
   } catch (error: any) {
-    console.error('Error in saveConnectedStores:', error);
-    return { success: false, error: error.message };
+    console.error('❌ Exception in saveConnectedStores:', error);
+    return { success: false, error: error.message || 'Unknown error occurred' };
   }
 };
 
