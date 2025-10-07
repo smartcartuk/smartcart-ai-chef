@@ -28,25 +28,28 @@ export interface ConnectedStore {
 export const saveUserProfile = async (profile: UserProfile): Promise<{ success: boolean; error?: string }> => {
   try {
     console.log('🔍 Checking authentication...');
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (authError) {
-      console.error('Auth error:', authError);
-      return { success: false, error: `Authentication error: ${authError.message}` };
+    // First check if we have a session
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      return { success: false, error: 'Please sign in to continue' };
     }
     
-    if (!user) {
-      console.error('No user found');
-      return { success: false, error: 'User not authenticated' };
+    if (!sessionData?.session) {
+      console.error('No active session');
+      return { success: false, error: 'Please sign in to continue' };
     }
 
-    console.log('✅ User authenticated:', user.id);
+    const userId = sessionData.session.user.id;
+    console.log('✅ User authenticated:', userId);
     console.log('💾 Saving profile data...');
 
     const { data, error } = await supabase
       .from('profiles')
       .upsert({
-        id: user.id,
+        id: userId,
         full_name: profile.full_name,
         email: profile.email,
         address: profile.address,

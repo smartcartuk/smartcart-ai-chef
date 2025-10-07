@@ -10,6 +10,7 @@ import { ConnectStoresStep } from '@/components/onboarding/ConnectStoresStep';
 import { useAddressSearch } from '@/hooks/useAddressSearch';
 import { saveUserProfile, saveConnectedStores } from '@/utils/profileService';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OnboardingWizardProps {
   isOpen: boolean;
@@ -59,6 +60,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
       console.log('Saving profile to database:', profile);
       
       try {
+        // Check authentication before saving
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          throw new Error('You must be signed in to complete onboarding. Please sign in first.');
+        }
+
         // Save profile data
         const profileResult = await saveUserProfile({
           full_name: profile.name,
