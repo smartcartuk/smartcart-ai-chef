@@ -11,11 +11,109 @@ serve(async (req) => {
   }
 
   try {
-    const { userPreferences, action, query } = await req.json();
+    const { userPreferences, action, query, day } = await req.json();
     const SPOONACULAR_API_KEY = Deno.env.get('SPOONACULAR_API_KEY');
     
     if (!SPOONACULAR_API_KEY) {
       throw new Error('SPOONACULAR_API_KEY not configured');
+    }
+
+    // Handle single recipe regeneration
+    if (action === 'regenerate' && day) {
+      console.log('🔄 Regenerating single recipe from Spoonacular for:', day);
+
+      // Build diet and exclusion parameters
+      let diet = '';
+      if (userPreferences.dietaryPreferences) {
+        const prefs = userPreferences.dietaryPreferences.map(p => p.toLowerCase());
+        if (prefs.includes('vegetarian')) diet = 'vegetarian';
+        if (prefs.includes('vegan')) diet = 'vegan';
+      }
+      const exclude = userPreferences.allergies?.join(',') || '';
+
+      // Get a random recipe from Spoonacular
+      const randomUrl = `https://api.spoonacular.com/recipes/random?number=1${diet ? `&tags=${diet}` : ''}${exclude ? `&excludeIngredients=${exclude}` : ''}&apiKey=${SPOONACULAR_API_KEY}`;
+      
+      const randomResponse = await fetch(randomUrl);
+      if (!randomResponse.ok) {
+        throw new Error(`Spoonacular random recipe error: ${randomResponse.status}`);
+      }
+
+      const randomData = await randomResponse.json();
+      const recipe = randomData.recipes[0];
+
+      if (!recipe) {
+        throw new Error('No recipe found');
+      }
+
+      console.log(`📖 Fetched random recipe: ${recipe.title}`);
+
+      // Get analyzed instructions
+      const instructionsUrl = `https://api.spoonacular.com/recipes/${recipe.id}/analyzedInstructions?apiKey=${SPOONACULAR_API_KEY}`;
+      const instructionsResponse = await fetch(instructionsUrl);
+      const instructionsData = await instructionsResponse.json();
+      
+      const instructions = instructionsData[0]?.steps.map(step => step.step) || 
+                          ['Follow the cooking instructions on the original recipe'];
+
+      // Format ingredients with amounts
+      const ingredients = recipe.extendedIngredients.map(ing => ({
+        name: ing.name,
+        amount: `${ing.amount} ${ing.unit}`,
+        category: ing.aisle || 'Other'
+      }));
+
+      // Extract nutrition info
+      const nutrition = recipe.nutrition || {};
+      const nutrients = nutrition.nutrients || [];
+      const calories = nutrients.find(n => n.name === 'Calories')?.amount || 0;
+      const protein = nutrients.find(n => n.name === 'Protein')?.amount || 0;
+      const carbs = nutrients.find(n => n.name === 'Carbohydrates')?.amount || 0;
+      const fat = nutrients.find(n => n.name === 'Fat')?.amount || 0;
+
+      // Estimate cost based on ingredients
+      const estimatedCost = ingredients.length * 1.5 * (userPreferences.householdSize || 2);
+
+      const meal = {
+        day,
+        name: recipe.title,
+        recipe_name: recipe.title,
+        description: recipe.summary?.replace(/<[^>]*>/g, '').substring(0, 150) || 'Delicious meal from Spoonacular',
+        ingredients,
+        instructions,
+        prep_time: `${recipe.preparationMinutes || 15} mins`,
+        cook_time: `${recipe.cookingMinutes || 30} mins`,
+        difficulty: recipe.preparationMinutes < 20 ? 'Easy' : recipe.preparationMinutes < 40 ? 'Medium' : 'Hard',
+        calories: Math.round(calories),
+        protein: Math.round(protein),
+        carbs: Math.round(carbs),
+        fat: Math.round(fat),
+        estimated_cost: parseFloat(estimatedCost.toFixed(2)),
+        estimated_price: parseFloat(estimatedCost.toFixed(2)),
+        cost_per_meal: parseFloat(estimatedCost.toFixed(2)),
+        image: recipe.image,
+        picture_url: recipe.image,
+        tags: [...(recipe.dishTypes || []), ...(recipe.diets || [])],
+        cuisine: recipe.cuisines?.[0] || 'International',
+        servings: recipe.servings || userPreferences.householdSize || 2,
+        cost_by_supermarket: {
+          tesco: parseFloat(estimatedCost.toFixed(2)),
+          sainsburys: parseFloat((estimatedCost * 1.05).toFixed(2)),
+          asda: parseFloat((estimatedCost * 0.95).toFixed(2)),
+          aldi: parseFloat((estimatedCost * 0.90).toFixed(2))
+        }
+      };
+
+      console.log(`✅ Regenerated recipe from Spoonacular: ${meal.name}`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          meals: [meal],
+          source: 'Spoonacular Food API'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Handle search action for recipe search

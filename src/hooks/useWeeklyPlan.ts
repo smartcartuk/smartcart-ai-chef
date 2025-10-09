@@ -265,18 +265,15 @@ export const useWeeklyPlan = (userProfile: any) => {
   const fetchSingleRecipe = async (day: string, preferences: string) => {
     const timestamp = new Date().toISOString();
     
-    const { data, error } = await supabase.functions.invoke('proxy-generate-recipes', {
+    const { data, error } = await supabase.functions.invoke('spoonacular-meal-planner', {
       body: { 
-        preferences: `${preferences} - New recipe for ${day} (avoid repeating previous recipes)`,
-        dietaryPreferences: userProfile?.dietaryPreferences || [],
-        allergies: userProfile?.allergies || [],
-        householdSize: userProfile?.householdSize || 2,
-        weeklyBudget: userProfile?.weeklyBudget || 50,
-        userProfile: {
-          ...userProfile,
-          requestId: `single-${day}-${timestamp}`,
-          timestamp: timestamp,
-          regenerating: true
+        action: 'regenerate',
+        day,
+        userPreferences: {
+          dietaryPreferences: userProfile?.dietary_preferences || [],
+          allergies: userProfile?.allergies || [],
+          householdSize: userProfile?.household_size || 2,
+          weeklyBudget: userProfile?.weekly_budget || 50
         }
       }
     });
@@ -285,38 +282,41 @@ export const useWeeklyPlan = (userProfile: any) => {
       throw new Error(`Failed to fetch recipe for ${day}: ${error.message}`);
     }
 
-    const estimatedPrice = data.ingredients 
-      ? await calculateEstimatedPrice(data.ingredients)
-      : 5.00;
-    const recipeName = data.recipe_name || 'Generated Recipe';
-
-    // Enhanced image handling for regenerated recipes
-    let imageUrl = data.picture_url || data.image;
-    if (!imageUrl || 
-        imageUrl.includes('unsplash') || 
-        !imageUrl.includes('spoonacular')) {
-      imageUrl = generateMealImage(recipeName);
+    if (!data.success || !data.meals || data.meals.length === 0) {
+      throw new Error('No recipe returned from Spoonacular');
     }
+
+    const meal = data.meals[0];
 
     return {
       day,
-      recipe_name: recipeName,
-      ingredients: data.ingredients,
-      instructions: data.instructions,
-      estimated_price: estimatedPrice,
-      estimated_cost: estimatedPrice,
-      cost_per_meal: estimatedPrice,
-      image: imageUrl,
-      picture_url: imageUrl,
-      description: data.description || '',
-      nutritional_info: data.nutritional_info || null,
-      nutrition: data.nutrition || null,
-      cost_by_supermarket: data.cost_by_supermarket || {
-        tesco: estimatedPrice,
-        sainsburys: estimatedPrice * 1.05,
-        asda: estimatedPrice * 0.95,
-        aldi: estimatedPrice * 0.90
-      }
+      recipe_name: meal.recipe_name || meal.name,
+      ingredients: meal.ingredients,
+      instructions: meal.instructions,
+      estimated_price: meal.estimated_cost || meal.estimated_price,
+      estimated_cost: meal.estimated_cost || meal.estimated_price,
+      cost_per_meal: meal.cost_per_meal || meal.estimated_cost,
+      image: meal.image || meal.picture_url,
+      picture_url: meal.picture_url || meal.image,
+      description: meal.description || '',
+      nutritional_info: {
+        calories: meal.calories,
+        protein: meal.protein,
+        carbs: meal.carbs,
+        fat: meal.fat
+      },
+      nutrition: meal.nutrition,
+      cost_by_supermarket: meal.cost_by_supermarket || {
+        tesco: meal.estimated_cost || 5,
+        sainsburys: (meal.estimated_cost || 5) * 1.05,
+        asda: (meal.estimated_cost || 5) * 0.95,
+        aldi: (meal.estimated_cost || 5) * 0.90
+      },
+      tags: meal.tags,
+      cuisine: meal.cuisine,
+      prep_time: meal.prep_time,
+      cook_time: meal.cook_time,
+      difficulty: meal.difficulty
     };
   };
 
