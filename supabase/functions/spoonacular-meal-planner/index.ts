@@ -21,32 +21,43 @@ serve(async (req) => {
     // Handle single recipe regeneration
     if (action === 'regenerate' && day) {
       console.log('🔄 Regenerating single recipe from Spoonacular for:', day);
+      console.log('User preferences:', userPreferences);
 
-      // Build diet and exclusion parameters
+      // Build diet parameter based on user dietary preferences
       let diet = '';
       if (userPreferences.dietaryPreferences) {
         const prefs = userPreferences.dietaryPreferences.map(p => p.toLowerCase());
-        if (prefs.includes('vegetarian')) diet = 'vegetarian';
         if (prefs.includes('vegan')) diet = 'vegan';
+        else if (prefs.includes('vegetarian')) diet = 'vegetarian';
+        else if (prefs.includes('gluten free')) diet = 'gluten free';
+        else if (prefs.includes('ketogenic')) diet = 'ketogenic';
+        else if (prefs.includes('paleo')) diet = 'paleo';
       }
-      const exclude = userPreferences.allergies?.join(',') || '';
-
-      // Get a random recipe from Spoonacular
-      const randomUrl = `https://api.spoonacular.com/recipes/random?number=1${diet ? `&tags=${diet}` : ''}${exclude ? `&excludeIngredients=${exclude}` : ''}&apiKey=${SPOONACULAR_API_KEY}`;
       
-      const randomResponse = await fetch(randomUrl);
-      if (!randomResponse.ok) {
-        throw new Error(`Spoonacular random recipe error: ${randomResponse.status}`);
+      // Build exclusion list from allergies
+      const exclude = userPreferences.allergies?.join(',') || '';
+      
+      // Calculate target calories based on household size
+      const targetCalories = 2000 * (userPreferences.householdSize || 2);
+
+      // Search for recipes matching user preferences using complex search
+      const searchUrl = `https://api.spoonacular.com/recipes/complexSearch?number=10&addRecipeInformation=true&fillIngredients=true&addRecipeNutrition=true&sort=random${diet ? `&diet=${diet}` : ''}${exclude ? `&excludeIngredients=${exclude}` : ''}&maxCalories=${targetCalories}&apiKey=${SPOONACULAR_API_KEY}`;
+      
+      const searchResponse = await fetch(searchUrl);
+      if (!searchResponse.ok) {
+        throw new Error(`Spoonacular search error: ${searchResponse.status}`);
       }
 
-      const randomData = await randomResponse.json();
-      const recipe = randomData.recipes[0];
-
-      if (!recipe) {
-        throw new Error('No recipe found');
+      const searchData = await searchResponse.json();
+      
+      // Pick a random recipe from the results that match user preferences
+      const recipes = searchData.results;
+      if (!recipes || recipes.length === 0) {
+        throw new Error('No recipes found matching your preferences');
       }
-
-      console.log(`📖 Fetched random recipe: ${recipe.title}`);
+      
+      const recipe = recipes[Math.floor(Math.random() * recipes.length)];
+      console.log(`📖 Found recipe matching preferences: ${recipe.title}`);
 
       // Get analyzed instructions
       const instructionsUrl = `https://api.spoonacular.com/recipes/${recipe.id}/analyzedInstructions?apiKey=${SPOONACULAR_API_KEY}`;
