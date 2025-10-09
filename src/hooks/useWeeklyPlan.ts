@@ -144,6 +144,17 @@ export const useWeeklyPlan = (userProfile: any) => {
       
       console.log('🎯 Final weekly recipes with enhanced data:', weeklyRecipes);
       setRecipes(weeklyRecipes);
+      
+      // Save meal plan to database
+      if (weeklyRecipes.length > 0) {
+        const { saveMealPlan } = await import('@/utils/mealPlanService');
+        const saveResult = await saveMealPlan(weeklyRecipes);
+        if (saveResult.success) {
+          console.log('💾 Meal plan saved to database');
+        } else {
+          console.error('❌ Failed to save meal plan:', saveResult.error);
+        }
+      }
     } catch (err) {
       console.error('❌ Error fetching weekly recipes:', err);
       setError('Generation failed. Using default meal plan. You can regenerate later.');
@@ -325,11 +336,18 @@ export const useWeeklyPlan = (userProfile: any) => {
       
       console.log(`✅ Successfully regenerated recipe for ${day}:`, newRecipe);
       
-      setRecipes(prev => {
-        const updated = [...prev];
-        updated[index] = newRecipe;
-        return updated;
-      });
+      const updatedRecipes = [...recipes];
+      updatedRecipes[index] = newRecipe;
+      setRecipes(updatedRecipes);
+      
+      // Save updated meal plan to database
+      const { saveMealPlan } = await import('@/utils/mealPlanService');
+      const saveResult = await saveMealPlan(updatedRecipes);
+      if (saveResult.success) {
+        console.log('💾 Updated meal plan saved to database');
+      } else {
+        console.error('❌ Failed to save updated meal plan:', saveResult.error);
+      }
     } catch (err) {
       console.error(`❌ Error regenerating recipe for ${DAYS_OF_WEEK[index]}:`, err);
       setError(`Failed to regenerate recipe for ${DAYS_OF_WEEK[index]}. Please try again.`);
@@ -395,9 +413,43 @@ export const useWeeklyPlan = (userProfile: any) => {
   };
 
   useEffect(() => {
-    if (userProfile) {
-      fetchWeeklyRecipes();
-    }
+    const loadOrGeneratePlan = async () => {
+      if (!userProfile) return;
+
+      // Check if meal plan exists for current week
+      const today = new Date();
+      const dayOfWeek = today.getDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(today);
+      monday.setDate(today.getDate() + mondayOffset);
+
+      console.log('📅 Checking for existing meal plan for week starting:', monday.toISOString().split('T')[0]);
+
+      // Import mealPlanService dynamically to avoid circular deps
+      const { getMealPlan } = await import('@/utils/mealPlanService');
+      const result = await getMealPlan(monday);
+      
+      if (result.success && result.data?.data?.meals && result.data.data.meals.length > 0) {
+        console.log('✅ Loading existing meal plan from database');
+        setRecipes(result.data.data.meals);
+        
+        // Calculate weekly costs from existing recipes
+        const costs = { tesco: 0, sainsburys: 0, asda: 0, aldi: 0 };
+        result.data.data.meals.forEach((meal: any) => {
+          if (meal.cost_by_supermarket) {
+            Object.keys(costs).forEach(store => {
+              costs[store] += meal.cost_by_supermarket[store] || 0;
+            });
+          }
+        });
+        setTotalWeeklyCosts(costs);
+      } else {
+        console.log('🆕 No existing meal plan found, generating new one...');
+        await fetchWeeklyRecipes();
+      }
+    };
+
+    loadOrGeneratePlan();
   }, [userProfile]);
 
   return {
