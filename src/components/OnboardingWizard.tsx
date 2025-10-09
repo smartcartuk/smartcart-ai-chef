@@ -57,17 +57,47 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
   const handleNext = async () => {
     if (currentStep === steps.length - 1) {
       setIsSaving(true);
-      console.log('Saving profile to database:', profile);
+      console.log('🔵 [ONBOARDING] Starting onboarding completion...');
+      console.log('🔵 [ONBOARDING] Profile data:', { ...profile, password: '[REDACTED]' });
       
       try {
-        // Check authentication before saving
-        const { data: { session } } = await supabase.auth.getSession();
+        // Step 1: Create the user account
+        console.log('🔵 [ONBOARDING] Step 1: Creating user account...');
+        const redirectUrl = `${window.location.origin}/`;
         
-        if (!session) {
-          throw new Error('You must be signed in to complete onboarding. Please sign in first.');
+        const signUpResult = await supabase.auth.signUp({
+          email: profile.email,
+          password: profile.password,
+          options: { emailRedirectTo: redirectUrl }
+        });
+        
+        console.log('🔵 [ONBOARDING] SignUp result:', JSON.stringify(signUpResult, null, 2));
+        
+        if (signUpResult.error) {
+          console.error('🔴 [ONBOARDING ERROR] Signup failed:', signUpResult.error);
+          throw new Error(`Account creation failed: ${signUpResult.error.message}`);
         }
-
-        // Save profile data
+        
+        console.log('✅ [ONBOARDING] User account created:', signUpResult.data.user?.id);
+        
+        // Step 2: Sign in the user (since email confirmation is disabled)
+        console.log('🔵 [ONBOARDING] Step 2: Signing in user...');
+        const signInResult = await supabase.auth.signInWithPassword({
+          email: profile.email,
+          password: profile.password
+        });
+        
+        console.log('🔵 [ONBOARDING] SignIn result:', JSON.stringify(signInResult, null, 2));
+        
+        if (signInResult.error) {
+          console.error('🔴 [ONBOARDING ERROR] Sign in failed:', signInResult.error);
+          throw new Error(`Sign in failed: ${signInResult.error.message}`);
+        }
+        
+        console.log('✅ [ONBOARDING] User signed in, session created');
+        
+        // Step 3: Save profile data
+        console.log('🔵 [ONBOARDING] Step 3: Saving profile data...');
         const profileResult = await saveUserProfile({
           full_name: profile.name,
           email: profile.email,
@@ -79,18 +109,26 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
         });
 
         if (!profileResult.success) {
+          console.error('🔴 [ONBOARDING ERROR] Profile save failed:', profileResult.error);
           throw new Error(profileResult.error || 'Failed to save profile');
         }
 
-        // Save connected stores
+        console.log('✅ [ONBOARDING] Profile saved successfully');
+
+        // Step 4: Save connected stores
         if (profile.connectedStores.length > 0) {
+          console.log('🔵 [ONBOARDING] Step 4: Saving connected stores...');
           const storesResult = await saveConnectedStores(profile.connectedStores);
           
           if (!storesResult.success) {
-            console.warn('Failed to save stores:', storesResult.error);
+            console.warn('⚠️ [ONBOARDING WARNING] Failed to save stores:', storesResult.error);
+          } else {
+            console.log('✅ [ONBOARDING] Connected stores saved');
           }
         }
 
+        console.log('✅ [ONBOARDING] Onboarding completed successfully!');
+        
         toast({
           title: "Profile Saved!",
           description: "Generating your personalized meal plan with AI...",
@@ -99,10 +137,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
         // Pass profile to parent to trigger automatic meal generation
         onComplete(profile);
       } catch (error: any) {
-        console.error('Error saving onboarding data:', error);
+        console.error('🔴 [ONBOARDING EXCEPTION]', error);
+        console.error('🔴 [ONBOARDING EXCEPTION] Stack:', error.stack);
         toast({
-          title: "Error Saving Profile",
-          description: error.message || "Failed to save your profile. Please try again.",
+          title: "Error Completing Setup",
+          description: error.message || "Failed to complete setup. Please try again.",
           variant: "destructive"
         });
       } finally {
