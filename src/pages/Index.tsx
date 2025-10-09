@@ -63,10 +63,7 @@ const Index = () => {
   }, []);
 
   const handleGetStarted = () => {
-    if (!isAuthenticated) {
-      navigate('/auth');
-      return;
-    }
+    // Always open onboarding wizard - it handles signup internally
     setShowOnboarding(true);
     setCurrentView('onboarding');
   };
