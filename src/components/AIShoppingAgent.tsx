@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Bot, ShoppingCart, Zap, CheckCircle, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Bot, ShoppingCart, AlertCircle, CheckCircle2, Loader2, ExternalLink, Brain, TrendingDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { AutonomousShoppingService } from '@/utils/autonomousShoppingService';
 
 interface AIShoppingAgentProps {
   ingredients: Array<{
@@ -20,167 +22,222 @@ interface AIShoppingAgentProps {
   }>;
   connectedStores: Array<{
     name: string;
-    credentials: {
+    credentials?: {
       username: string;
       password: string;
     };
   }>;
-  onShoppingComplete: (results: any) => void;
-  smartRecommendations?: boolean;
+  onShoppingComplete?: (results?: any) => void;
 }
 
 interface ShoppingTask {
-  id: string;
   store: string;
-  items: Array<{ name: string; amount: string; price: number }>;
   status: 'pending' | 'processing' | 'completed' | 'failed';
+  itemCount: number;
+  estimatedSavings: number;
   basketUrl?: string;
-  totalSaved?: number;
+  substitutionsMade?: Array<{
+    original: string;
+    substitute: string;
+    reason: string;
+  }>;
+  autonomousActions?: string[];
 }
 
 export const AIShoppingAgent: React.FC<AIShoppingAgentProps> = ({
   ingredients,
   connectedStores,
-  onShoppingComplete,
-  smartRecommendations = true
+  onShoppingComplete
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTask, setCurrentTask] = useState<string>('');
   const [shoppingTasks, setShoppingTasks] = useState<ShoppingTask[]>([]);
   const [agentStatus, setAgentStatus] = useState<'idle' | 'analyzing' | 'shopping' | 'completed'>('idle');
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [userPreferences, setUserPreferences] = useState<any>(null);
+  const [historyInsights, setHistoryInsights] = useState<any>(null);
   const { toast } = useToast();
 
-  const startAIShopping = async () => {
-    if (connectedStores.length === 0) {
-      toast({
-        title: "No Connected Stores",
-        description: "Please connect at least one supermarket account to use the AI shopping agent.",
-        variant: "destructive"
-      });
-      return;
-    }
+  // Load user preferences and history on mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const prefs = await AutonomousShoppingService.getPreferences(user.id);
+        const insights = await AutonomousShoppingService.getHistoryInsights(user.id);
+        setUserPreferences(prefs);
+        setHistoryInsights(insights);
+      }
+    };
+    loadUserData();
+  }, []);
 
+  const startAIShopping = async () => {
     setIsProcessing(true);
     setProgress(0);
     setAgentStatus('analyzing');
-    setCurrentTask('AI agent analyzing shopping options...');
+    setCurrentTask('🤖 Autonomous AI analyzing your shopping list with learning...');
 
     try {
-      // Step 1: Enhanced AI Analysis with ML
-      setProgress(20);
-      const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-shopping-agent', {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Step 1: Autonomous AI Analysis with Learning
+      const { data: plan, error: analysisError } = await supabase.functions.invoke('ai-shopping-agent', {
         body: {
-          action: 'analyze',
+          action: 'autonomous-analyze',
           ingredients,
-          connectedStores: connectedStores.map(store => ({ name: store.name })),
-          smartRecommendations,
-          preferences: {
-            prioritizeSavings: true,
-            preferredStores: connectedStores.slice(0, 2).map(s => s.name),
-            budgetOptimization: true
-          }
+          connectedStores: connectedStores.map(s => ({ name: s.name })),
+          userId: user.id
         }
       });
 
       if (analysisError) throw analysisError;
 
-      const recommendations = analysisData.recommendations;
-      setCurrentTask('Creating optimized shopping plan...');
-      setProgress(40);
+      console.log('Autonomous AI Plan:', plan);
 
-      // Step 2: Create shopping tasks
-      const tasks: ShoppingTask[] = recommendations.map((rec: any, index: number) => ({
-        id: `task-${index}`,
-        store: rec.store,
-        items: rec.items,
+      // Store session ID for tracking
+      setSessionId(plan.sessionId);
+
+      // Create shopping tasks from autonomous plan
+      const tasks: ShoppingTask[] = plan.primaryPlan.stores.map((storePlan: any) => ({
+        store: storePlan.store,
         status: 'pending' as const,
-        totalSaved: rec.estimatedSavings
+        itemCount: storePlan.items.length,
+        estimatedSavings: storePlan.estimatedSavings || 0,
+        substitutionsMade: [],
+        autonomousActions: []
       }));
 
       setShoppingTasks(tasks);
+      setProgress(30);
+
+      // Step 2: Autonomous Execution (Parallel across all stores)
       setAgentStatus('shopping');
-      setCurrentTask('Executing shopping tasks...');
-      setProgress(60);
+      setCurrentTask('🚀 Autonomously executing shopping across all stores...');
+      setProgress(50);
 
-      // Step 3: Execute shopping for each store
-      const results = [];
-      for (let i = 0; i < tasks.length; i++) {
-        const task = tasks[i];
-        const storeCredentials = connectedStores.find(store => 
-          store.name.toLowerCase() === task.store.toLowerCase()
-        )?.credentials;
+      // Execute all stores in parallel (truly autonomous)
+      const executePromises = plan.primaryPlan.stores.map(async (storePlan: any) => {
+        const storeInfo = connectedStores.find(s => s.name === storePlan.store);
 
-        if (!storeCredentials) continue;
+        if (!storeInfo?.credentials) {
+          console.warn(`No credentials for ${storePlan.store}, skipping...`);
+          return null;
+        }
 
-        // Update task status
-        setShoppingTasks(prev => prev.map(t => 
-          t.id === task.id ? { ...t, status: 'processing' } : t
+        // Update task status to processing
+        setShoppingTasks(prev => prev.map(task => 
+          task.store === storePlan.store ? { ...task, status: 'processing' } : task
         ));
 
-        setCurrentTask(`Adding items to ${task.store} basket...`);
-
         try {
-          const { data: shoppingData, error: shoppingError } = await supabase.functions.invoke('ai-shopping-agent', {
+          const { data: result, error: execError } = await supabase.functions.invoke('ai-shopping-agent', {
             body: {
-              action: 'execute',
-              store: task.store,
-              items: task.items,
-              credentials: storeCredentials
+              action: 'autonomous-execute',
+              store: storePlan.store,
+              items: storePlan.items,
+              credentials: storeInfo.credentials,
+              sessionId: plan.sessionId
             }
           });
 
-          if (shoppingError) throw shoppingError;
+          if (execError) throw execError;
 
-          // Update task as completed
-          setShoppingTasks(prev => prev.map(t => 
-            t.id === task.id ? { 
-              ...t, 
-              status: 'completed',
-              basketUrl: shoppingData.basketUrl 
-            } : t
+          // Update task with results including substitutions and autonomous actions
+          setShoppingTasks(prev => prev.map(task => 
+            task.store === storePlan.store 
+              ? { 
+                  ...task, 
+                  status: 'completed',
+                  basketUrl: result.basketUrl,
+                  substitutionsMade: result.substitutionsMade || [],
+                  autonomousActions: result.autonomousActions || []
+                } 
+              : task
           ));
 
-          results.push({
-            store: task.store,
-            success: true,
-            basketUrl: shoppingData.basketUrl,
-            itemsAdded: task.items.length
+          toast({
+            title: `✓ Autonomous shopping completed at ${storePlan.store}`,
+            description: `${result.itemsAdded} items added. ${result.substitutionsMade?.length || 0} substitutions made.`,
           });
+
+          return { store: storePlan.store, ...result };
 
         } catch (error) {
-          console.error(`Failed to shop at ${task.store}:`, error);
-          setShoppingTasks(prev => prev.map(t => 
-            t.id === task.id ? { ...t, status: 'failed' } : t
-          ));
+          console.error(`Autonomous execution error at ${storePlan.store}:`, error);
           
-          results.push({
-            store: task.store,
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error'
+          setShoppingTasks(prev => prev.map(task => 
+            task.store === storePlan.store ? { ...task, status: 'failed' } : task
+          ));
+
+          toast({
+            title: `✗ Autonomous execution failed at ${storePlan.store}`,
+            description: error instanceof Error ? error.message : 'Failed to complete shopping',
+            variant: 'destructive'
           });
+
+          return null;
         }
-
-        setProgress(60 + ((i + 1) / tasks.length) * 30);
-      }
-
-      setProgress(100);
-      setAgentStatus('completed');
-      setCurrentTask('Shopping completed!');
-      
-      toast({
-        title: "AI Shopping Completed",
-        description: `Successfully processed ${results.filter(r => r.success).length} of ${results.length} stores.`
       });
 
-      onShoppingComplete(results);
+      // Wait for all stores to complete
+      const results = await Promise.allSettled(executePromises);
+      const successfulResults = results
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value !== null)
+        .map(r => r.value);
+
+      setProgress(90);
+
+      // Step 3: Learn from this session
+      setCurrentTask('🧠 Learning from this shopping session...');
+      
+      const totalCost = successfulResults.reduce((sum, r) => sum + (r.totalCost || 0), 0);
+      const totalSavings = shoppingTasks.reduce((sum, task) => sum + task.estimatedSavings, 0);
+
+      await supabase.functions.invoke('ai-shopping-agent', {
+        body: {
+          action: 'learn',
+          sessionResults: {
+            storesUsed: successfulResults.map(r => r.store),
+            totalCost,
+            totalSavings
+          },
+          userId: user.id,
+          sessionId: plan.sessionId
+        }
+      });
+
+      // Step 4: Complete
+      setProgress(100);
+      setAgentStatus('completed');
+      setCurrentTask('✅ Autonomous shopping completed successfully!');
+
+      const completedCount = shoppingTasks.filter(t => t.status === 'completed').length;
+
+      // Refresh user data
+      const updatedPrefs = await AutonomousShoppingService.getPreferences(user.id);
+      const updatedInsights = await AutonomousShoppingService.getHistoryInsights(user.id);
+      setUserPreferences(updatedPrefs);
+      setHistoryInsights(updatedInsights);
+
+      toast({
+        title: '🎉 Autonomous AI Shopping Complete!',
+        description: `Shopped at ${completedCount} stores. Estimated savings: £${totalSavings.toFixed(2)}. Agent has learned from this session.`,
+      });
+
+      onShoppingComplete?.();
 
     } catch (error) {
-      console.error('AI Shopping Agent error:', error);
+      console.error('Autonomous AI Shopping Agent error:', error);
+      setAgentStatus('idle');
       toast({
-        title: "AI Shopping Failed",
-        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
-        variant: "destructive"
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to complete autonomous shopping',
+        variant: 'destructive'
       });
     } finally {
       setIsProcessing(false);
@@ -189,84 +246,167 @@ export const AIShoppingAgent: React.FC<AIShoppingAgentProps> = ({
 
   const getStatusIcon = (status: ShoppingTask['status']) => {
     switch (status) {
-      case 'completed': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'failed': return <AlertCircle className="h-4 w-4 text-red-500" />;
-      case 'processing': return <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />;
-      default: return <div className="h-4 w-4 rounded-full bg-muted" />;
+      case 'completed':
+        return <CheckCircle2 className="h-5 w-5 text-green-600" />;
+      case 'failed':
+        return <AlertCircle className="h-5 w-5 text-red-600" />;
+      case 'processing':
+        return <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />;
+      default:
+        return <ShoppingCart className="h-5 w-5 text-gray-400" />;
     }
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="h-5 w-5 text-primary" />
-          AI Shopping Agent
-        </CardTitle>
-        <CardDescription>
-          Let AI automatically find the best deals and add items to your baskets
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Badge variant={agentStatus === 'idle' ? 'secondary' : 'default'}>
-              {agentStatus}
-            </Badge>
-            <span className="text-sm text-muted-foreground">
-              {connectedStores.length} store{connectedStores.length !== 1 ? 's' : ''} connected
-            </span>
-          </div>
-          
-          <Button 
-            onClick={startAIShopping}
-            disabled={isProcessing || connectedStores.length === 0}
-            className="flex items-center gap-2"
-          >
-            <Zap className="h-4 w-4" />
-            {isProcessing ? 'Processing...' : 'Start AI Shopping'}
-          </Button>
-        </div>
-
-        {isProcessing && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span>{currentTask}</span>
-              <span>{progress}%</span>
+    <div className="space-y-4">
+      {/* Learning Dashboard */}
+      {historyInsights && historyInsights.totalSessions > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center space-x-2">
+              <Brain className="h-5 w-5 text-purple-600" />
+              <CardTitle className="text-base">Learning from Your Shopping Habits</CardTitle>
             </div>
-            <Progress value={progress} className="h-2" />
-          </div>
-        )}
-
-        {shoppingTasks.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="font-medium">Shopping Tasks</h4>
-            {shoppingTasks.map((task) => (
-              <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border">
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(task.status)}
-                  <div>
-                    <div className="font-medium">{task.store}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {task.items.length} items
-                      {task.totalSaved && ` • Save £${task.totalSaved.toFixed(2)}`}
-                    </div>
-                  </div>
-                </div>
-                
-                {task.basketUrl && (
-                  <Button size="sm" variant="outline" asChild>
-                    <a href={task.basketUrl} target="_blank" rel="noopener noreferrer">
-                      <ShoppingCart className="h-4 w-4 mr-1" />
-                      View Basket
-                    </a>
-                  </Button>
-                )}
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <div className="text-muted-foreground mb-1">Total Sessions</div>
+                <div className="font-semibold text-lg">{historyInsights.totalSessions}</div>
               </div>
-            ))}
+              <div>
+                <div className="text-muted-foreground mb-1">Avg Cost</div>
+                <div className="font-semibold text-lg">£{historyInsights.averageCost.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground mb-1">Total Saved</div>
+                <div className="font-semibold text-lg text-green-600">
+                  <TrendingDown className="inline h-4 w-4 mr-1" />
+                  £{historyInsights.totalSavings.toFixed(2)}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground mb-1">Preferred Store</div>
+                <div className="font-semibold text-lg">
+                  {historyInsights.mostUsedStores[0]?.store || 'N/A'}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Main Agent Card */}
+      <Card className="w-full">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Bot className="h-6 w-6 text-blue-600" />
+              <CardTitle>Autonomous AI Shopping Agent</CardTitle>
+            </div>
+            <Badge variant={agentStatus === 'idle' ? 'secondary' : agentStatus === 'completed' ? 'default' : 'outline'}>
+              {agentStatus === 'idle' && 'Ready'}
+              {agentStatus === 'analyzing' && 'Analyzing...'}
+              {agentStatus === 'shopping' && 'Shopping...'}
+              {agentStatus === 'completed' && 'Completed'}
+            </Badge>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <CardDescription>
+            Click "Start AI Shopping" to let the autonomous AI agent shop across multiple stores, make smart substitutions, and learn from your preferences
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              {connectedStores.length} stores connected
+            </span>
+            <Button
+              onClick={startAIShopping}
+              disabled={isProcessing || ingredients.length === 0 || connectedStores.length === 0}
+              className="flex items-center space-x-2"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <Bot className="h-4 w-4" />
+                  <span>Start AI Shopping</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          {isProcessing && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{currentTask}</span>
+                <span className="font-medium">{progress}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
+          )}
+
+          {shoppingTasks.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="font-medium">Shopping Tasks</h4>
+              {shoppingTasks.map((task) => (
+                <div key={task.store} className="space-y-3">
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center space-x-3 flex-1">
+                      {getStatusIcon(task.status)}
+                      <div className="flex-1">
+                        <p className="font-medium">{task.store}</p>
+                        <p className="text-sm text-gray-500">
+                          {task.itemCount} items • Save £{task.estimatedSavings.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    {task.status === 'completed' && task.basketUrl && (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={task.basketUrl} target="_blank" rel="noopener noreferrer">
+                          View Basket <ExternalLink className="ml-2 h-4 w-4" />
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Show autonomous actions taken */}
+                  {task.autonomousActions && task.autonomousActions.length > 0 && (
+                    <Alert className="ml-8">
+                      <Bot className="h-4 w-4" />
+                      <AlertTitle>Autonomous Actions</AlertTitle>
+                      <AlertDescription>
+                        {task.autonomousActions.map((action, idx) => (
+                          <div key={idx} className="text-xs">• {action}</div>
+                        ))}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Show substitutions made */}
+                  {task.substitutionsMade && task.substitutionsMade.length > 0 && (
+                    <Alert className="ml-8 border-yellow-200 bg-yellow-50">
+                      <AlertCircle className="h-4 w-4 text-yellow-600" />
+                      <AlertTitle className="text-yellow-800">Smart Substitutions</AlertTitle>
+                      <AlertDescription className="text-yellow-700">
+                        {task.substitutionsMade.map((sub, idx) => (
+                          <div key={idx} className="text-sm">
+                            {sub.original} → {sub.substitute}
+                            <span className="text-xs ml-2 text-yellow-600">({sub.reason})</span>
+                          </div>
+                        ))}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
