@@ -24,12 +24,18 @@ const Index = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setIsAuthenticated(!!session);
       
-      // When user logs in, automatically load their profile and trigger meal generation
+      // When user logs in, automatically load their profile
       if (session) {
         const profileResult = await getUserProfile();
         if (profileResult.success && profileResult.data) {
+          // User has a profile - go to dashboard
           setUserProfile(profileResult.data);
           setCurrentView('dashboard');
+        } else if (profileResult.success && !profileResult.data) {
+          // User is authenticated but has no profile - show onboarding
+          console.log('New user detected - opening onboarding wizard');
+          setShowOnboarding(true);
+          setCurrentView('onboarding');
         }
       }
     });
@@ -41,8 +47,14 @@ const Index = () => {
       if (data.session) {
         const profileResult = await getUserProfile();
         if (profileResult.success && profileResult.data) {
+          // User has a profile - go to dashboard
           setUserProfile(profileResult.data);
           setCurrentView('dashboard');
+        } else if (profileResult.success && !profileResult.data) {
+          // User is authenticated but has no profile - show onboarding
+          console.log('New user detected - opening onboarding wizard');
+          setShowOnboarding(true);
+          setCurrentView('onboarding');
         }
       }
     });

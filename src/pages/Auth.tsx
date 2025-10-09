@@ -40,16 +40,40 @@ const Auth: React.FC = () => {
   const handleSignUp = async () => {
     setLoading(true);
     const redirectUrl = `${window.location.origin}/`;
-    const { error } = await supabase.auth.signUp({
+    
+    // Step 1: Sign up the user
+    const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: redirectUrl }
     });
+    
+    if (signUpError) {
+      setLoading(false);
+      toast({ title: 'Sign up failed', description: signUpError.message, variant: 'destructive' });
+      return;
+    }
+    
+    // Step 2: Immediately sign in the user (since email confirmation is disabled)
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+    
     setLoading(false);
-    if (error) {
-      toast({ title: 'Sign up failed', description: error.message, variant: 'destructive' });
+    
+    if (signInError) {
+      toast({ 
+        title: 'Account created', 
+        description: 'Please sign in to continue.', 
+        variant: 'default' 
+      });
     } else {
-      toast({ title: 'Check your email', description: 'Confirm your email to complete sign up.' });
+      toast({ 
+        title: 'Welcome!', 
+        description: 'Your account has been created successfully.' 
+      });
+      // Navigation will be handled by onAuthStateChange in useEffect
     }
   };
 
