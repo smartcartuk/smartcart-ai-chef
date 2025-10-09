@@ -33,7 +33,7 @@ export const RecipeSearchModal = ({ isOpen, onClose, onSelectRecipe, userProfile
 
     setIsSearching(true);
     try {
-      const { data, error } = await supabase.functions.invoke('ai-meal-planner', {
+      const { data, error } = await supabase.functions.invoke('spoonacular-meal-planner', {
         body: {
           action: 'search',
           query: searchQuery,

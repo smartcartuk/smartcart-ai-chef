@@ -68,7 +68,7 @@ export const WeeklyPlanHeader: React.FC<WeeklyPlanHeaderProps> = ({
             {getPreferencesText()}
           </p>
           <p className="text-sm text-gray-500 mt-1">
-            ✨ Automatically generated based on your onboarding preferences • Live pricing from Spoonacular & SerpApi
+            ✨ Real recipes and images powered by Spoonacular Food API • Tailored to your preferences
           </p>
           {recipes.length > 0 && displayCost > 0 && (
             <div className="mt-2">

@@ -15,8 +15,8 @@ export const useAutoMealPlanner = (userProfile: any) => {
     console.log('🤖 Auto-generating AI meal plan for user profile:', userProfile);
 
     try {
-      // Call AI meal planner
-      const { data, error } = await supabase.functions.invoke('ai-meal-planner', {
+      // Call Spoonacular meal planner for real recipe data
+      const { data, error } = await supabase.functions.invoke('spoonacular-meal-planner', {
         body: {
           userPreferences: {
             dietaryPreferences: userProfile.dietary_preferences || [],
@@ -24,8 +24,7 @@ export const useAutoMealPlanner = (userProfile: any) => {
             householdSize: userProfile.household_size || 2,
             weeklyBudget: userProfile.weekly_budget || 80,
             address: userProfile.address
-          },
-          conversationHistory: []
+          }
         }
       });
 
