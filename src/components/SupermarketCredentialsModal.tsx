@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Shield, Store, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { saveConnectedStores } from '@/utils/profileService';
 
 interface SupermarketCredentialsModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export const SupermarketCredentialsModal: React.FC<SupermarketCredentialsModalPr
 }) => {
   const [credentials, setCredentials] = useState(initialCredentials);
   const [showPasswords, setShowPasswords] = useState<{[key: string]: boolean}>({});
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const STORES = [
@@ -32,10 +34,51 @@ export const SupermarketCredentialsModal: React.FC<SupermarketCredentialsModalPr
     { id: 'aldi', name: 'Aldi', status: 'beta' }
   ];
 
-  const handleSave = () => {
-    onSave(credentials);
-    toast({ title: "Credentials saved successfully" });
-    onClose();
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Transform credentials object into array format for database
+      const storesToSave = Object.entries(credentials)
+        .filter(([_, creds]: [string, any]) => creds?.username && creds?.password)
+        .map(([storeId, creds]: [string, any]) => {
+          const store = STORES.find(s => s.id === storeId);
+          return {
+            name: store?.name || storeId,
+            credentials: {
+              username: creds.username,
+              password: creds.password,
+              loyaltyCard: creds.loyaltyCard
+            },
+            has_loyalty_card: Boolean(creds.loyaltyCard)
+          };
+        });
+
+      // Save to database
+      const result = await saveConnectedStores(storesToSave);
+      
+      if (result.success) {
+        onSave(credentials);
+        toast({ 
+          title: "Success", 
+          description: `${storesToSave.length} store(s) connected successfully` 
+        });
+        onClose();
+      } else {
+        toast({ 
+          title: "Error", 
+          description: result.error || "Failed to save credentials",
+          variant: "destructive" 
+        });
+      }
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to save credentials",
+        variant: "destructive" 
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -107,8 +150,12 @@ export const SupermarketCredentialsModal: React.FC<SupermarketCredentialsModalPr
         </div>
 
         <div className="flex justify-end gap-2 pt-4">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}>Save Credentials</Button>
+          <Button variant="outline" onClick={onClose} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save Credentials'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
