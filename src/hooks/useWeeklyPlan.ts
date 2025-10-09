@@ -53,27 +53,18 @@ export const useWeeklyPlan = (userProfile: any) => {
     setError(null);
     
     try {
-      const preferences = buildPreferencesString(userProfile);
-      const timestamp = new Date().toISOString();
-      
-      console.log('🔄 Generating weekly recipes with enhanced user preferences:', {
-        preferences,
-        userProfile,
-        timestamp
+      console.log('🔄 Generating weekly recipes from Spoonacular with user preferences:', {
+        userProfile
       });
       
-      const { data, error } = await supabase.functions.invoke('proxy-generate-recipes', {
+      const { data, error } = await supabase.functions.invoke('spoonacular-meal-planner', {
         body: { 
-          preferences: preferences,
-          dietaryPreferences: userProfile?.dietaryPreferences || [],
-          allergies: userProfile?.allergies || [],
-          householdSize: userProfile?.householdSize || 2,
-          weeklyBudget: userProfile?.weeklyBudget || 50,
-          userProfile: {
-            ...userProfile,
-            // Add timestamp to ensure unique requests
-            requestId: `weekly-${timestamp}`,
-            timestamp: timestamp
+          userPreferences: {
+            dietaryPreferences: userProfile?.dietaryPreferences || [],
+            allergies: userProfile?.allergies || [],
+            householdSize: userProfile?.householdSize || 2,
+            weeklyBudget: userProfile?.weeklyBudget || 50,
+            address: userProfile?.address
           }
         }
       });
