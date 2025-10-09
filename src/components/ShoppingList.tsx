@@ -178,7 +178,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   const handleAddToBasket = async () => {
-    if (!userProfile?.connectedStores?.length) {
+    if (!connectedStores?.length) {
       toast({
         title: "No connected stores",
         description: "Please connect your supermarket accounts first.",
@@ -187,7 +187,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       return;
     }
 
-    const connectedStore = userProfile.connectedStores.find(
+    const connectedStore = connectedStores.find(
       (store: any) => store.name.toLowerCase() === activeStore
     );
 
