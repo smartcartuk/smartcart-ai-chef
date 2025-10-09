@@ -92,43 +92,33 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
       console.log('🔵 [ONBOARDING] Profile data:', { ...profile, password: '[REDACTED]' });
       
       try {
-        // Step 1: Create the user account
-        console.log('🔵 [ONBOARDING] Step 1: Creating user account...');
-        const redirectUrl = `${window.location.origin}/`;
+        // Step 1: Create user account (auto-signs in when email confirmation is disabled)
+        console.log('🔵 [ONBOARDING] Creating user account...');
         
-        const signUpResult = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: profile.email,
           password: profile.password,
-          options: { emailRedirectTo: redirectUrl }
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              full_name: profile.name
+            }
+          }
         });
         
-        console.log('🔵 [ONBOARDING] SignUp result:', JSON.stringify(signUpResult, null, 2));
-        
-        if (signUpResult.error) {
-          console.error('🔴 [ONBOARDING ERROR] Signup failed:', signUpResult.error);
-          throw new Error(`Account creation failed: ${signUpResult.error.message}`);
+        if (error) {
+          console.error('🔴 [ONBOARDING ERROR] Signup failed:', error);
+          throw error;
         }
         
-        console.log('✅ [ONBOARDING] User account created:', signUpResult.data.user?.id);
-        
-        // Step 2: Sign in the user (since email confirmation is disabled)
-        console.log('🔵 [ONBOARDING] Step 2: Signing in user...');
-        const signInResult = await supabase.auth.signInWithPassword({
-          email: profile.email,
-          password: profile.password
-        });
-        
-        console.log('🔵 [ONBOARDING] SignIn result:', JSON.stringify(signInResult, null, 2));
-        
-        if (signInResult.error) {
-          console.error('🔴 [ONBOARDING ERROR] Sign in failed:', signInResult.error);
-          throw new Error(`Sign in failed: ${signInResult.error.message}`);
+        if (!data.user) {
+          throw new Error('No user returned from signup');
         }
         
-        console.log('✅ [ONBOARDING] User signed in, session created');
+        console.log('✅ [ONBOARDING] User created and signed in:', data.user.id);
         
-        // Step 3: Save profile data
-        console.log('🔵 [ONBOARDING] Step 3: Saving profile data...');
+        // Step 2: Save profile data
+        console.log('🔵 [ONBOARDING] Saving profile data...');
         const profileResult = await saveUserProfile({
           full_name: profile.name,
           email: profile.email,
@@ -146,9 +136,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
 
         console.log('✅ [ONBOARDING] Profile saved successfully');
 
-        // Step 4: Save connected stores
+        // Step 3: Save connected stores
         if (profile.connectedStores.length > 0) {
-          console.log('🔵 [ONBOARDING] Step 4: Saving connected stores...');
+          console.log('🔵 [ONBOARDING] Saving connected stores...');
           const storesResult = await saveConnectedStores(profile.connectedStores);
           
           if (!storesResult.success) {
