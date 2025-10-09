@@ -56,6 +56,36 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
   const progress = ((currentStep + 1) / steps.length) * 100;
 
   const handleNext = async () => {
+    // Validate step 1 before allowing to proceed
+    if (currentStep === 0) {
+      if (!profile.email || !profile.password) {
+        toast({
+          title: "Missing Information",
+          description: "Please provide email and password",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!profile.name) {
+        toast({
+          title: "Missing Information",
+          description: "Please provide your name",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (profile.password.length < 6) {
+        toast({
+          title: "Invalid Password",
+          description: "Password must be at least 6 characters",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     if (currentStep === steps.length - 1) {
       setIsSaving(true);
       console.log('🔵 [ONBOARDING] Starting onboarding completion...');
@@ -130,6 +160,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
 
         console.log('✅ [ONBOARDING] Onboarding completed successfully!');
         
+        // Stop saving state FIRST
+        setIsSaving(false);
+        
         // Show success state
         setIsSuccess(true);
         
@@ -138,16 +171,26 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
           description: "Redirecting to your dashboard...",
         });
 
-        // Wait 1.5 seconds to show success message, then complete
+        // Wait 2 seconds to show success message, then complete
         setTimeout(() => {
           onComplete(profile);
-        }, 1500);
+        }, 2000);
       } catch (error: any) {
         console.error('🔴 [ONBOARDING EXCEPTION]', error);
         console.error('🔴 [ONBOARDING EXCEPTION] Stack:', error.stack);
+        
+        let errorMessage = error.message || 'An unexpected error occurred';
+        
+        // Provide specific guidance based on error
+        if (errorMessage.includes('already registered')) {
+          errorMessage = 'This email is already registered. Please sign in instead.';
+        } else if (errorMessage.includes('Invalid email')) {
+          errorMessage = 'Please provide a valid email address.';
+        }
+        
         toast({
-          title: "Error Completing Setup",
-          description: error.message || "Failed to complete setup. Please try again.",
+          title: "Setup Failed",
+          description: errorMessage,
           variant: "destructive"
         });
       } finally {
@@ -295,7 +338,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
                 <ChevronLeft className="h-4 w-4" />
                 Previous
               </Button>
-              <Button onClick={handleNext} disabled={isSaving}>
+              <Button 
+                onClick={handleNext} 
+                disabled={
+                  isSaving || 
+                  (currentStep === 0 && (!profile.name || !profile.email || !profile.password || profile.password.length < 6))
+                }
+              >
                 {isSaving ? 'Saving...' : currentStep === steps.length - 1 ? 'Complete Setup' : 'Next'}
                 {currentStep < steps.length - 1 && !isSaving && <ChevronRight className="h-4 w-4" />}
               </Button>
