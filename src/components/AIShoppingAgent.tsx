@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Bot, ShoppingCart, AlertCircle, CheckCircle2, Loader2, ExternalLink, Brain, TrendingDown } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { AutonomousShoppingService } from '@/utils/autonomousShoppingService';
@@ -318,25 +319,42 @@ export const AIShoppingAgent: React.FC<AIShoppingAgentProps> = ({
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
-              {connectedStores.length} stores connected
+              {connectedStores.length} stores connected • {ingredients.length} ingredients
             </span>
-            <Button
-              onClick={startAIShopping}
-              disabled={isProcessing || ingredients.length === 0 || connectedStores.length === 0}
-              className="flex items-center space-x-2"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Processing...</span>
-                </>
-              ) : (
-                <>
-                  <Bot className="h-4 w-4" />
-                  <span>Start AI Shopping</span>
-                </>
-              )}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      onClick={startAIShopping}
+                      disabled={isProcessing || ingredients.length === 0 || connectedStores.length === 0}
+                      className="flex items-center space-x-2"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bot className="h-4 w-4" />
+                          <span>Start AI Shopping</span>
+                        </>
+                      )}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {(ingredients.length === 0 || connectedStores.length === 0) && (
+                  <TooltipContent>
+                    <p>
+                      {ingredients.length === 0 && 'Generate a meal plan first to get ingredients'}
+                      {ingredients.length === 0 && connectedStores.length === 0 && ' and '}
+                      {connectedStores.length === 0 && 'Connect stores in settings'}
+                    </p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
           {isProcessing && (
