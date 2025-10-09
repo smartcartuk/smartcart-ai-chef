@@ -18,11 +18,14 @@ export const useAutoMealPlanner = (userProfile: any) => {
       // Call AI meal planner
       const { data, error } = await supabase.functions.invoke('ai-meal-planner', {
         body: {
-          preferences: userProfile.dietaryPreferences || [],
-          allergies: userProfile.allergies || [],
-          householdSize: userProfile.householdSize || 2,
-          weeklyBudget: userProfile.weeklyBudget || 80,
-          address: userProfile.address
+          userPreferences: {
+            dietaryPreferences: userProfile.dietary_preferences || [],
+            allergies: userProfile.allergies || [],
+            householdSize: userProfile.household_size || 2,
+            weeklyBudget: userProfile.weekly_budget || 80,
+            address: userProfile.address
+          },
+          conversationHistory: []
         }
       });
 

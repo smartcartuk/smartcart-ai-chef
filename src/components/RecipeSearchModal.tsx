@@ -37,10 +37,12 @@ export const RecipeSearchModal = ({ isOpen, onClose, onSelectRecipe, userProfile
         body: {
           action: 'search',
           query: searchQuery,
-          preferences: userProfile.dietaryPreferences || [],
-          allergies: userProfile.allergies || [],
-          householdSize: userProfile.householdSize || 2,
-          weeklyBudget: userProfile.weeklyBudget || 80
+          userPreferences: {
+            dietaryPreferences: userProfile.dietary_preferences || [],
+            allergies: userProfile.allergies || [],
+            householdSize: userProfile.household_size || 2,
+            weeklyBudget: userProfile.weekly_budget || 80
+          }
         }
       });
 
