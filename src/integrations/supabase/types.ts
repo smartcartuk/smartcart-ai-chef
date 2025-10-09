@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_decisions: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          decision_type: string
+          final_decision: Json
+          id: string
+          original_plan: Json | null
+          reasoning: string
+          shopping_session_id: string | null
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          decision_type: string
+          final_decision: Json
+          id?: string
+          original_plan?: Json | null
+          reasoning: string
+          shopping_session_id?: string | null
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          decision_type?: string
+          final_decision?: Json
+          id?: string
+          original_plan?: Json | null
+          reasoning?: string
+          shopping_session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_decisions_shopping_session_id_fkey"
+            columns: ["shopping_session_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       aldi_prices: {
         Row: {
           average_price: number | null
@@ -493,6 +534,42 @@ export type Database = {
         }
         Relationships: []
       }
+      shopping_history: {
+        Row: {
+          completion_status: string
+          created_at: string
+          id: string
+          session_date: string
+          stores_used: string[]
+          total_cost: number
+          total_items: number
+          total_savings: number
+          user_id: string
+        }
+        Insert: {
+          completion_status?: string
+          created_at?: string
+          id?: string
+          session_date?: string
+          stores_used?: string[]
+          total_cost?: number
+          total_items?: number
+          total_savings?: number
+          user_id: string
+        }
+        Update: {
+          completion_status?: string
+          created_at?: string
+          id?: string
+          session_date?: string
+          stores_used?: string[]
+          total_cost?: number
+          total_items?: number
+          total_savings?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       shopping_lists: {
         Row: {
           basket_urls: Json | null
@@ -523,6 +600,33 @@ export type Database = {
         }
         Relationships: []
       }
+      substitution_rules: {
+        Row: {
+          acceptable_substitutes: Json[] | null
+          created_at: string
+          id: string
+          never_substitute: string[] | null
+          original_item: string
+          user_id: string
+        }
+        Insert: {
+          acceptable_substitutes?: Json[] | null
+          created_at?: string
+          id?: string
+          never_substitute?: string[] | null
+          original_item: string
+          user_id: string
+        }
+        Update: {
+          acceptable_substitutes?: Json[] | null
+          created_at?: string
+          id?: string
+          never_substitute?: string[] | null
+          original_item?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tesco_prices: {
         Row: {
           average_price: number
@@ -550,6 +654,39 @@ export type Database = {
           ingredient_name?: string
           last_updated?: string
           product_url?: string | null
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          budget_priority: boolean | null
+          id: string
+          max_price_variance: number | null
+          preferred_brands: Json | null
+          preferred_stores: Json | null
+          substitution_tolerance: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_priority?: boolean | null
+          id?: string
+          max_price_variance?: number | null
+          preferred_brands?: Json | null
+          preferred_stores?: Json | null
+          substitution_tolerance?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget_priority?: boolean | null
+          id?: string
+          max_price_variance?: number | null
+          preferred_brands?: Json | null
+          preferred_stores?: Json | null
+          substitution_tolerance?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
