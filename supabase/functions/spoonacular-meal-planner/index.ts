@@ -177,74 +177,57 @@ serve(async (req) => {
       );
     }
 
-    console.log('🍽️ Fetching meal plan from Spoonacular API');
+    console.log('🍽️ Generating weekly meal plan from Spoonacular API');
     console.log('User preferences:', userPreferences);
 
-    // Build diet query parameter
+    // Build diet parameter based on user dietary preferences
     let diet = '';
     if (userPreferences.dietaryPreferences) {
       const prefs = userPreferences.dietaryPreferences.map(p => p.toLowerCase());
-      if (prefs.includes('vegetarian')) diet = 'vegetarian';
       if (prefs.includes('vegan')) diet = 'vegan';
-      if (prefs.includes('gluten free')) diet = 'gluten free';
-      if (prefs.includes('ketogenic')) diet = 'ketogenic';
+      else if (prefs.includes('vegetarian')) diet = 'vegetarian';
+      else if (prefs.includes('gluten free')) diet = 'gluten free';
+      else if (prefs.includes('ketogenic')) diet = 'ketogenic';
+      else if (prefs.includes('paleo')) diet = 'paleo';
     }
-
-    // Build exclude parameter for allergies
+    
+    // Build exclusion list from allergies
     const exclude = userPreferences.allergies?.join(',') || '';
+    
+    // Calculate target calories based on household size
+    const targetCalories = Math.floor(2000 * (userPreferences.householdSize || 2));
 
-    // Calculate target calories (rough estimate: 2000 per day for household)
-    const targetCalories = 2000 * (userPreferences.householdSize || 2);
+    // Use complexSearch to get 7 recipes matching user preferences
+    const searchUrl = `https://api.spoonacular.com/recipes/complexSearch?number=7&addRecipeInformation=true&fillIngredients=true&addRecipeNutrition=true&sort=random${diet ? `&diet=${diet}` : ''}${exclude ? `&excludeIngredients=${exclude}` : ''}&maxCalories=${targetCalories}&apiKey=${SPOONACULAR_API_KEY}`;
     
-    // Generate weekly meal plan using Spoonacular
-    const mealPlanUrl = `https://api.spoonacular.com/mealplanner/generate?timeFrame=week&targetCalories=${targetCalories}${diet ? `&diet=${diet}` : ''}${exclude ? `&exclude=${exclude}` : ''}&apiKey=${SPOONACULAR_API_KEY}`;
+    console.log('🔍 Searching for recipes with preferences...');
+    const searchResponse = await fetch(searchUrl);
     
-    const mealPlanResponse = await fetch(mealPlanUrl);
-    
-    if (!mealPlanResponse.ok) {
-      throw new Error(`Spoonacular API error: ${mealPlanResponse.status}`);
+    if (!searchResponse.ok) {
+      throw new Error(`Spoonacular API error: ${searchResponse.status}`);
     }
 
-    const mealPlanData = await mealPlanResponse.json();
-    console.log('✅ Received meal plan from Spoonacular');
-    console.log('Meal plan data structure:', JSON.stringify(mealPlanData, null, 2));
+    const searchData = await searchResponse.json();
+    const recipes = searchData.results || [];
+    
+    console.log(`✅ Found ${recipes.length} recipes from Spoonacular`);
 
-    // Extract recipe IDs and fetch detailed information
+    // Process each recipe into meal format
     const meals = [];
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const weekKeys = Object.keys(mealPlanData.week || {});
     
-    console.log(`📅 Processing ${weekKeys.length} days from meal plan`);
-    
-    for (let i = 0; i < weekKeys.length && i < 7; i++) {
-      const dayKey = weekKeys[i];
-      const dayPlan = mealPlanData.week[dayKey];
+    for (let i = 0; i < recipes.length && i < 7; i++) {
+      const recipe = recipes[i];
       
-      if (!dayPlan || !dayPlan.meals || dayPlan.meals.length === 0) {
-        console.log(`⚠️ No meals found for ${dayKey}`);
+      if (!recipe || !recipe.id) {
+        console.log(`⚠️ Invalid recipe at index ${i}`);
         continue;
       }
       
-      const dinner = dayPlan.meals.find(m => m.id) || dayPlan.meals[0];
-      
-      if (!dinner || !dinner.id) {
-        console.log(`⚠️ No valid recipe ID for ${dayKey}`);
-        continue;
-      }
-      
-      console.log(`🍽️ Processing recipe ${dinner.id} for ${days[i]}`);
-
-      // Fetch detailed recipe information
-      const recipeUrl = `https://api.spoonacular.com/recipes/${dinner.id}/information?includeNutrition=true&apiKey=${SPOONACULAR_API_KEY}`;
-      const recipeResponse = await fetch(recipeUrl);
-      
-      if (!recipeResponse.ok) continue;
-      
-      const recipe = await recipeResponse.json();
-      console.log(`📖 Fetched recipe: ${recipe.title}`);
+      console.log(`🍽️ Processing recipe: ${recipe.title} for ${days[i]}`);
 
       // Get analyzed instructions
-      const instructionsUrl = `https://api.spoonacular.com/recipes/${dinner.id}/analyzedInstructions?apiKey=${SPOONACULAR_API_KEY}`;
+      const instructionsUrl = `https://api.spoonacular.com/recipes/${recipe.id}/analyzedInstructions?apiKey=${SPOONACULAR_API_KEY}`;
       const instructionsResponse = await fetch(instructionsUrl);
       const instructionsData = await instructionsResponse.json();
       
@@ -252,11 +235,11 @@ serve(async (req) => {
                           ['Follow the cooking instructions on the original recipe'];
 
       // Format ingredients with amounts
-      const ingredients = recipe.extendedIngredients.map(ing => ({
+      const ingredients = recipe.extendedIngredients?.map(ing => ({
         name: ing.name,
         amount: `${ing.amount} ${ing.unit}`,
         category: ing.aisle || 'Other'
-      }));
+      })) || [];
 
       // Extract nutrition info
       const nutrition = recipe.nutrition || {};
