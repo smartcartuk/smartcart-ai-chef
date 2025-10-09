@@ -38,42 +38,75 @@ const Auth: React.FC = () => {
   };
 
   const handleSignUp = async () => {
+    console.log('🔵 [SIGNUP] Starting signup process...');
+    console.log('🔵 [SIGNUP] Email:', email);
+    console.log('🔵 [SIGNUP] Supabase URL:', 'https://sqdjteugxarustivcpqs.supabase.co');
+    console.log('🔵 [SIGNUP] Current origin:', window.location.origin);
+    
     setLoading(true);
     const redirectUrl = `${window.location.origin}/`;
+    console.log('🔵 [SIGNUP] Redirect URL:', redirectUrl);
     
-    // Step 1: Sign up the user
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: redirectUrl }
-    });
-    
-    if (signUpError) {
+    try {
+      // Step 1: Sign up the user
+      console.log('🔵 [SIGNUP] Calling supabase.auth.signUp...');
+      const signUpResult = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: redirectUrl }
+      });
+      
+      console.log('🔵 [SIGNUP] SignUp result:', JSON.stringify(signUpResult, null, 2));
+      
+      if (signUpResult.error) {
+        console.error('🔴 [SIGNUP ERROR]', signUpResult.error);
+        console.error('🔴 [SIGNUP ERROR] Full error object:', JSON.stringify(signUpResult.error, null, 2));
+        setLoading(false);
+        toast({ 
+          title: 'Sign up failed', 
+          description: `${signUpResult.error.message} (${signUpResult.error.status || 'no status'})`,
+          variant: 'destructive' 
+        });
+        return;
+      }
+      
+      console.log('✅ [SIGNUP] User created:', signUpResult.data.user?.id);
+      
+      // Step 2: Immediately sign in the user (since email confirmation is disabled)
+      console.log('🔵 [SIGNUP] Attempting immediate sign in...');
+      const signInResult = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      console.log('🔵 [SIGNUP] SignIn result:', JSON.stringify(signInResult, null, 2));
+      
       setLoading(false);
-      toast({ title: 'Sign up failed', description: signUpError.message, variant: 'destructive' });
-      return;
-    }
-    
-    // Step 2: Immediately sign in the user (since email confirmation is disabled)
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    
-    setLoading(false);
-    
-    if (signInError) {
+      
+      if (signInResult.error) {
+        console.error('🔴 [SIGNIN ERROR]', signInResult.error);
+        toast({ 
+          title: 'Account created', 
+          description: 'Please sign in to continue.', 
+          variant: 'default' 
+        });
+      } else {
+        console.log('✅ [SIGNUP] Sign in successful, session created');
+        toast({ 
+          title: 'Welcome!', 
+          description: 'Your account has been created successfully.' 
+        });
+        // Navigation will be handled by onAuthStateChange in useEffect
+      }
+    } catch (err) {
+      console.error('🔴 [SIGNUP EXCEPTION]', err);
+      console.error('🔴 [SIGNUP EXCEPTION] Stack:', (err as Error).stack);
+      setLoading(false);
       toast({ 
-        title: 'Account created', 
-        description: 'Please sign in to continue.', 
-        variant: 'default' 
+        title: 'Signup error', 
+        description: `Unexpected error: ${(err as Error).message}`,
+        variant: 'destructive' 
       });
-    } else {
-      toast({ 
-        title: 'Welcome!', 
-        description: 'Your account has been created successfully.' 
-      });
-      // Navigation will be handled by onAuthStateChange in useEffect
     }
   };
 
