@@ -260,16 +260,16 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {/* Store Selection Tabs */}
       <Tabs value={activeStore} onValueChange={setActiveStore}>
-        <TabsList className="grid w-full grid-cols-4 bg-white border shadow-sm">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-2 bg-white border shadow-sm p-2 h-auto">
           {stores.map(store => {
             const { logo, emoji } = getSupermarketLogo(store.id);
             return (
               <TabsTrigger 
                 key={store.id}
                 value={store.id}
-                className="flex flex-col items-center space-y-1 p-3 data-[state=active]:bg-blue-50 data-[state=active]:border-blue-200"
+                className="flex flex-col items-center justify-center gap-1.5 p-2 min-h-[100px] data-[state=active]:bg-blue-50 data-[state=active]:border-blue-200 data-[state=active]:border-2 rounded-lg"
               >
-                <div className="flex items-center justify-center w-16 h-10 mb-1">
+                <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-12">
                   <img 
                     src={logo} 
                     alt={store.name}
@@ -290,11 +290,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     {emoji}
                   </span>
                 </div>
-                <div className="text-center min-w-0 space-y-0.5">
-                  <div className="font-medium text-xs truncate">{store.name}</div>
-                  <div className="text-xs text-gray-600">£{store.total.toFixed(2)}</div>
+                <div className="flex flex-col items-center gap-0.5 w-full">
+                  <div className="font-medium text-xs truncate w-full text-center">{store.name}</div>
+                  <div className="text-sm font-semibold text-gray-900">£{store.total.toFixed(2)}</div>
                   {store.savings > 0 && (
-                    <Badge variant="secondary" className="text-[10px] px-1 py-0 bg-green-100 text-green-700">
+                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-green-100 text-green-700 whitespace-nowrap">
                       Save £{store.savings.toFixed(2)}
                     </Badge>
                   )}
@@ -310,9 +310,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             <TabsContent key={store.id} value={store.id} className="space-y-6">
               {/* Store Info Card */}
               <Card className="p-4 bg-gradient-to-r from-blue-50 to-purple-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-20 h-12 flex items-center justify-center flex-shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="w-16 h-12 sm:w-20 sm:h-12 flex items-center justify-center flex-shrink-0">
                       <img 
                         src={logo} 
                         alt={store.name}
@@ -334,13 +334,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-lg">{store.name}</h3>
-                      <div className="flex flex-col space-y-1 text-sm text-gray-600">
-                        <div className="flex items-center space-x-1">
-                          <MapPin className="w-4 h-4 flex-shrink-0" />
-                          <span className="truncate">{store.address}</span>
+                      <h3 className="font-semibold text-base sm:text-lg mb-2">{store.name}</h3>
+                      <div className="flex flex-col gap-1.5 text-xs sm:text-sm text-gray-600">
+                        <div className="flex items-start gap-1.5">
+                          <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                          <span className="break-words line-clamp-2">{store.address}</span>
                         </div>
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center gap-1.5">
                           <Clock className="w-4 h-4 flex-shrink-0" />
                           <span>{store.deliveryTime}</span>
                         </div>
@@ -348,7 +348,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     </div>
                   </div>
                   
-                  <div className="text-right flex-shrink-0 ml-4">
+                  <div className="text-left sm:text-right flex-shrink-0">
                     <div className="text-2xl font-bold text-blue-600">£{store.total.toFixed(2)}</div>
                     <div className="text-sm text-gray-600">{store.items} items</div>
                   </div>
