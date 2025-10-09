@@ -21,22 +21,24 @@ const Index = () => {
   const { generatedMeals, isGenerating } = useAutoMealPlanner(userProfile);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(!!session);
       
-      // When user logs in, automatically load their profile
+      // Defer Supabase calls to prevent deadlock
       if (session) {
-        const profileResult = await getUserProfile();
-        if (profileResult.success && profileResult.data) {
-          // User has a profile - go to dashboard
-          setUserProfile(profileResult.data);
-          setCurrentView('dashboard');
-        } else if (profileResult.success && !profileResult.data) {
-          // User is authenticated but has no profile - show onboarding
-          console.log('New user detected - opening onboarding wizard');
-          setShowOnboarding(true);
-          setCurrentView('onboarding');
-        }
+        setTimeout(async () => {
+          const profileResult = await getUserProfile();
+          if (profileResult.success && profileResult.data) {
+            // User has a profile - go to dashboard
+            setUserProfile(profileResult.data);
+            setCurrentView('dashboard');
+          } else if (profileResult.success && !profileResult.data) {
+            // User is authenticated but has no profile - show onboarding
+            console.log('New user detected - opening onboarding wizard');
+            setShowOnboarding(true);
+            setCurrentView('onboarding');
+          }
+        }, 0);
       }
     });
     
