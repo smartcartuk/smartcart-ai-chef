@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronRight, ChevronLeft, Users, Target, ShoppingCart } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Users, Target, ShoppingCart, Check } from 'lucide-react';
 import { PersonalDetailsStep } from '@/components/onboarding/PersonalDetailsStep';
 import { DietaryPreferencesStep } from '@/components/onboarding/DietaryPreferencesStep';
 import { ConnectStoresStep } from '@/components/onboarding/ConnectStoresStep';
@@ -22,6 +22,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
   const [currentStep, setCurrentStep] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const { toast } = useToast();
   const [profile, setProfile] = useState({
     name: '',
@@ -129,13 +130,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
 
         console.log('✅ [ONBOARDING] Onboarding completed successfully!');
         
+        // Show success state
+        setIsSuccess(true);
+        
         toast({
-          title: "Profile Saved!",
-          description: "Generating your personalized meal plan with AI...",
+          title: "Setup Complete!",
+          description: "Redirecting to your dashboard...",
         });
 
-        // Pass profile to parent to trigger automatic meal generation
-        onComplete(profile);
+        // Wait 1.5 seconds to show success message, then complete
+        setTimeout(() => {
+          onComplete(profile);
+        }, 1500);
       } catch (error: any) {
         console.error('🔴 [ONBOARDING EXCEPTION]', error);
         console.error('🔴 [ONBOARDING EXCEPTION] Stack:', error.stack);
@@ -243,7 +249,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
               <CardDescription>Step {currentStep + 1} of {steps.length}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {currentStep === 0 && (
+              {isSuccess ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center">
+                    <Check className="w-10 h-10 text-green-500" />
+                  </div>
+                  <div className="text-center space-y-2">
+                    <h3 className="text-2xl font-semibold">Setup Complete!</h3>
+                    <p className="text-muted-foreground">Redirecting to your dashboard...</p>
+                  </div>
+                </div>
+              ) : currentStep === 0 && (
                 <PersonalDetailsStep
                   profile={profile}
                   setProfile={setProfile}
@@ -273,16 +289,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
             </CardContent>
           </Card>
 
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={handlePrevious} disabled={currentStep === 0}>
-              <ChevronLeft className="h-4 w-4" />
-              Previous
-            </Button>
-            <Button onClick={handleNext} disabled={isSaving}>
-              {isSaving ? 'Saving...' : currentStep === steps.length - 1 ? 'Complete Setup' : 'Next'}
-              {currentStep < steps.length - 1 && !isSaving && <ChevronRight className="h-4 w-4" />}
-            </Button>
-          </div>
+          {!isSuccess && (
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={handlePrevious} disabled={currentStep === 0 || isSaving}>
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <Button onClick={handleNext} disabled={isSaving}>
+                {isSaving ? 'Saving...' : currentStep === steps.length - 1 ? 'Complete Setup' : 'Next'}
+                {currentStep < steps.length - 1 && !isSaving && <ChevronRight className="h-4 w-4" />}
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
