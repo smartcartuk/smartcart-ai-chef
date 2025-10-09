@@ -157,9 +157,15 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
             </div>
           </Card>
           
-          <Card className="p-6 bg-gradient-to-br from-purple-50 to-purple-100">
+          <Card 
+            className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 cursor-pointer hover:from-purple-100 hover:to-purple-200 transition-all duration-200 hover:shadow-md"
+            onClick={() => setShowCredentialsModal(true)}
+          >
             <div className="space-y-2">
-              <div className="text-2xl">📱</div>
+              <div className="flex items-center justify-between">
+                <div className="text-2xl">📱</div>
+                <div className="text-xs text-purple-500 font-medium">Click to manage</div>
+              </div>
               <div className="text-2xl font-bold text-purple-700">{connectedStores.length}</div>
               <div className="text-sm text-purple-600">Stores Connected</div>
             </div>
