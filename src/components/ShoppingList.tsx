@@ -11,6 +11,7 @@ import { getIngredientImage } from '@/utils/recipeImageGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { AIShoppingAgent } from './AIShoppingAgent';
 import { useToast } from '@/hooks/use-toast';
+import { getConnectedStores } from '@/utils/profileService';
 
 interface ShoppingListProps {
   userProfile: any;
@@ -36,7 +37,20 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [optimizedRoute, setOptimizedRoute] = useState<any[]>([]);
   const [addingToBasket, setAddingToBasket] = useState(false);
+  const [connectedStores, setConnectedStores] = useState<any[]>([]);
   const { toast } = useToast();
+
+  // Load connected stores on mount
+  useEffect(() => {
+    const loadStores = async () => {
+      const result = await getConnectedStores();
+      if (result.success && result.data) {
+        setConnectedStores(result.data);
+        console.log('Connected stores loaded:', result.data);
+      }
+    };
+    loadStores();
+  }, []);
 
   // Extract and consolidate ingredients from recipes
   const ingredients = React.useMemo(() => {
@@ -516,7 +530,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           }
           return acc;
         }, [] as Array<{name: string; amount: string; prices: Array<{store: string; price: number; url?: string; title?: string}>}>)}
-        connectedStores={userProfile?.connectedStores || []}
+        connectedStores={connectedStores}
         onShoppingComplete={(results) => {
           console.log('AI Shopping completed:', results);
           toast({
