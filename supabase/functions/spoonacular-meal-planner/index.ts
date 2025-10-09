@@ -207,16 +207,32 @@ serve(async (req) => {
 
     const mealPlanData = await mealPlanResponse.json();
     console.log('✅ Received meal plan from Spoonacular');
+    console.log('Meal plan data structure:', JSON.stringify(mealPlanData, null, 2));
 
     // Extract recipe IDs and fetch detailed information
     const meals = [];
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const weekKeys = Object.keys(mealPlanData.week || {});
     
-    for (let i = 0; i < mealPlanData.week.length && i < 7; i++) {
-      const dayPlan = mealPlanData.week[Object.keys(mealPlanData.week)[i]];
+    console.log(`📅 Processing ${weekKeys.length} days from meal plan`);
+    
+    for (let i = 0; i < weekKeys.length && i < 7; i++) {
+      const dayKey = weekKeys[i];
+      const dayPlan = mealPlanData.week[dayKey];
+      
+      if (!dayPlan || !dayPlan.meals || dayPlan.meals.length === 0) {
+        console.log(`⚠️ No meals found for ${dayKey}`);
+        continue;
+      }
+      
       const dinner = dayPlan.meals.find(m => m.id) || dayPlan.meals[0];
       
-      if (!dinner || !dinner.id) continue;
+      if (!dinner || !dinner.id) {
+        console.log(`⚠️ No valid recipe ID for ${dayKey}`);
+        continue;
+      }
+      
+      console.log(`🍽️ Processing recipe ${dinner.id} for ${days[i]}`);
 
       // Fetch detailed recipe information
       const recipeUrl = `https://api.spoonacular.com/recipes/${dinner.id}/information?includeNutrition=true&apiKey=${SPOONACULAR_API_KEY}`;
