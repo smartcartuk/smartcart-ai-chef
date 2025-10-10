@@ -53,15 +53,51 @@ export const PriceComparisonSection: React.FC<PriceComparisonSectionProps> = ({
 
       {/* Price Comparison Results */}
       {priceComparisonResult && (
-        <Card className="p-6 bg-green-50 border-green-200">
-          <h3 className="font-semibold text-lg mb-4">Price Comparison Results</h3>
-          <div className="bg-white p-4 rounded-lg">
-            <pre className="text-sm overflow-auto">
-              {JSON.stringify(priceComparisonResult, null, 2)}
-            </pre>
+        <Card className="p-6 bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20">
+          <h3 className="font-semibold text-lg mb-4">Live Price Comparison Results</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Object.entries(priceComparisonResult).map(([store, data]: [string, any]) => (
+              <Card key={store} className="p-4 hover:shadow-lg transition-shadow">
+                <div className="flex flex-col h-full">
+                  <h4 className="font-semibold text-base capitalize mb-2 flex items-center justify-between">
+                    {store}
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                      {data.itemCount} items
+                    </span>
+                  </h4>
+                  
+                  <div className="flex-1 mb-3">
+                    <div className="text-3xl font-bold text-primary">
+                      £{data.total.toFixed(2)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Total basket cost
+                    </p>
+                  </div>
+
+                  {data.items.length > 0 && (
+                    <div className="text-xs text-muted-foreground border-t pt-2">
+                      <p className="font-medium mb-1">Sample items:</p>
+                      <ul className="space-y-1">
+                        {data.items.slice(0, 2).map((item: any, idx: number) => (
+                          <li key={idx} className="truncate">
+                            {item.ingredient}: £{item.price.toFixed(2)}
+                          </li>
+                        ))}
+                        {data.items.length > 2 && (
+                          <li className="text-primary">+{data.items.length - 2} more</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            ))}
           </div>
-          <p className="text-sm text-gray-600 mt-2">
-            Detailed price comparison results displayed above. Integration with store data coming soon!
+          
+          <p className="text-sm text-muted-foreground mt-4 text-center">
+            ✨ Live prices from RapidAPI • Select your preferred supermarket to continue
           </p>
         </Card>
       )}

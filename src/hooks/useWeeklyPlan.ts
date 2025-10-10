@@ -45,6 +45,8 @@ export const useWeeklyPlan = (userProfile: any) => {
   const [isComparingPrices, setIsComparingPrices] = useState(false);
   const [priceComparisonResult, setPriceComparisonResult] = useState<any>(null);
   const [totalWeeklyCosts, setTotalWeeklyCosts] = useState<any>(null);
+  const [showSupermarketSelection, setShowSupermarketSelection] = useState(false);
+  const [selectedSupermarket, setSelectedSupermarket] = useState<string | null>(null);
 
   const { calculateEstimatedPrice } = useUnifiedPriceCalculation();
 
@@ -366,14 +368,29 @@ export const useWeeklyPlan = (userProfile: any) => {
     setExpandedRecipes(newExpanded);
   };
 
-  const addToPlan = (recipe: Recipe) => {
+  const addToPlan = async (recipe: Recipe) => {
     // Extract ingredient names properly
     const ingredientNames = recipe.ingredients.map((ingredient: any) => {
       return typeof ingredient === 'string' ? ingredient : ingredient?.name || ingredient;
     }).filter(Boolean);
     
-    setSelectedIngredients(prev => [...prev, ...ingredientNames]);
-    console.log(`${recipe.recipe_name} added to plan with ingredients:`, ingredientNames);
+    const updatedIngredients = [...selectedIngredients, ...ingredientNames];
+    setSelectedIngredients(updatedIngredients);
+    
+    // Auto-save shopping list when meals are added
+    try {
+      const { saveShoppingList } = await import('@/utils/mealPlanService');
+      const shoppingItems = updatedIngredients.map(name => ({
+        name,
+        quantity: '1',
+        checked: false
+      }));
+      
+      await saveShoppingList(shoppingItems);
+      console.log(`✅ ${recipe.recipe_name} added to plan and shopping list saved with ${ingredientNames.length} ingredients`);
+    } catch (error) {
+      console.error('❌ Failed to save shopping list:', error);
+    }
   };
 
   const compareSelectedPrices = async () => {
@@ -386,25 +403,71 @@ export const useWeeklyPlan = (userProfile: any) => {
     setError(null);
 
     try {
-      const response = await fetch('https://proj3cts.app.n8n.cloud/webhook-test/compare-prices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ingredients: selectedIngredients })
+      console.log('🔍 Comparing prices for ingredients:', selectedIngredients);
+      
+      // Call unified-price-lookup for each ingredient
+      const stores = ['tesco', 'sainsburys', 'asda', 'aldi'];
+      const priceResults: any = {};
+      
+      // Initialize store totals
+      stores.forEach(store => {
+        priceResults[store] = { items: [], total: 0, itemCount: 0 };
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to compare prices');
+      // Fetch prices for each ingredient
+      for (const ingredient of selectedIngredients) {
+        try {
+          const { data, error } = await supabase.functions.invoke('unified-price-lookup', {
+            body: {
+              ingredientName: ingredient,
+              quantity: 1,
+              stores
+            }
+          });
+
+          if (error) {
+            console.error(`❌ Error fetching price for ${ingredient}:`, error);
+            continue;
+          }
+
+          if (data?.results) {
+            data.results.forEach((result: any) => {
+              const storeName = result.store.toLowerCase();
+              if (priceResults[storeName]) {
+                priceResults[storeName].items.push({
+                  ingredient,
+                  price: result.price,
+                  title: result.title,
+                  url: result.url,
+                  image: result.image
+                });
+                priceResults[storeName].total += result.price;
+                priceResults[storeName].itemCount += 1;
+              }
+            });
+          }
+        } catch (err) {
+          console.error(`❌ Error processing ingredient ${ingredient}:`, err);
+        }
       }
 
-      const priceData = await response.json();
-      setPriceComparisonResult(priceData);
-      console.log('Price comparison result:', priceData);
+      console.log('✅ Price comparison complete:', priceResults);
+      setPriceComparisonResult(priceResults);
+      
+      // Show supermarket selection modal
+      setShowSupermarketSelection(true);
     } catch (err) {
-      console.error('Error comparing prices:', err);
+      console.error('❌ Error comparing prices:', err);
       setError('Failed to compare prices. Please try again.');
     } finally {
       setIsComparingPrices(false);
     }
+  };
+
+  const handleSupermarketSelection = (supermarket: string) => {
+    setSelectedSupermarket(supermarket);
+    setShowSupermarketSelection(false);
+    console.log(`✅ User selected ${supermarket} for shopping`);
   };
 
   const clearSelection = () => {
@@ -462,6 +525,8 @@ export const useWeeklyPlan = (userProfile: any) => {
     isComparingPrices,
     priceComparisonResult,
     totalWeeklyCosts,
+    showSupermarketSelection,
+    selectedSupermarket,
     fetchWeeklyRecipes,
     regenerateSingleRecipe,
     replaceRecipe: async (index: number, newRecipe: Recipe) => {
@@ -491,6 +556,7 @@ export const useWeeklyPlan = (userProfile: any) => {
     toggleRecipeDetails,
     addToPlan,
     compareSelectedPrices,
-    clearSelection
+    clearSelection,
+    handleSupermarketSelection
   };
 };
