@@ -20,15 +20,13 @@ import { RecipeFavorites } from '@/components/RecipeFavorites';
 import { WebhookResponse } from '@/utils/webhookService';
 import { useToast } from '@/hooks/use-toast';
 import { getConnectedStores } from '@/utils/profileService';
-
 interface MealPlanDashboardProps {
   userProfile: any;
   generatedData?: WebhookResponse | null;
 }
-
-export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({ 
-  userProfile, 
-  generatedData 
+export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
+  userProfile,
+  generatedData
 }) => {
   const [activeTab, setActiveTab] = useState('plan');
   const [recipes, setRecipes] = useState<any[]>([]);
@@ -38,31 +36,30 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [basketUrls, setBasketUrls] = useState<{ [store: string]: string }>({});
+  const [basketUrls, setBasketUrls] = useState<{
+    [store: string]: string;
+  }>({});
   const [userCredentials, setUserCredentials] = useState({});
   const [connectedStores, setConnectedStores] = useState<any[]>([]);
-  const { toast } = useToast();
-
+  const {
+    toast
+  } = useToast();
   React.useEffect(() => {
     loadConnectedStores();
   }, []);
-
   const loadConnectedStores = async () => {
     const result = await getConnectedStores();
     if (result.success && result.data) {
       setConnectedStores(result.data);
     }
   };
-
   const handleRecipesChange = (newRecipes: any[]) => {
     setRecipes(newRecipes);
   };
-
   const handleWeeklyCostsChange = (costs: any) => {
     setTotalWeeklyCosts(costs);
     console.log('📊 Weekly costs updated in dashboard:', costs);
   };
-
   const handleFinalizeAndShop = () => {
     if (recipes.length === 0) {
       toast({
@@ -74,12 +71,11 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
     }
     setShowConfirmationModal(true);
   };
-
   const handleConfirmMealPlan = async () => {
     setShowConfirmationModal(false);
     toast({
       title: "Adding items to carts...",
-      description: "Please wait while we populate your shopping carts",
+      description: "Please wait while we populate your shopping carts"
     });
 
     // Simulate adding items to baskets
@@ -88,38 +84,34 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
       "Sainsburys": "https://sainsburys.co.uk/basket",
       Asda: "https://asda.com/trolley"
     };
-
     setBasketUrls(mockBasketUrls);
     setShowCheckout(true);
     setActiveTab('checkout');
-
     toast({
       title: "Carts Ready! 🎉",
-      description: "Your shopping carts have been populated",
+      description: "Your shopping carts have been populated"
     });
   };
 
   // Mock function to simulate saving user credentials
   const handleSaveCredentials = (storeName: string, credentials: any) => {
-    setUserCredentials(prev => ({ ...prev, [storeName]: credentials }));
+    setUserCredentials(prev => ({
+      ...prev,
+      [storeName]: credentials
+    }));
     toast({
       title: "Credentials Saved",
-      description: `Credentials for ${storeName} saved successfully`,
+      description: `Credentials for ${storeName} saved successfully`
     });
     setShowCredentialsModal(false);
   };
-
   const handleOpenCredentialsModal = () => {
     setShowCredentialsModal(true);
   };
-
   const totalCost = totalWeeklyCosts?.tesco || generatedData?.meals?.reduce((sum, meal) => sum + meal.cost, 0) || 46.95;
   const totalMeals = recipes.length || 7;
-  const avgSavings = totalWeeklyCosts ? 
-    Math.max(0, (totalWeeklyCosts.sainsburys - totalWeeklyCosts.aldi)) : 12.50;
-
-  return (
-    <div className="container mx-auto px-4 py-8">
+  const avgSavings = totalWeeklyCosts ? Math.max(0, totalWeeklyCosts.sainsburys - totalWeeklyCosts.aldi) : 12.50;
+  return <div className="container mx-auto px-4 py-8">
       <div className="space-y-8">
         {/* Dashboard Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
@@ -133,9 +125,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
           </div>
           
           <div className="flex items-center space-x-4">
-            <Button onClick={handleFinalizeAndShop} size="lg" className="bg-gradient-to-r from-emerald-500 to-blue-600">
-              Finalize & Shop
-            </Button>
+            
           </div>
         </div>
 
@@ -157,10 +147,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
             </div>
           </Card>
           
-          <Card 
-            className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 cursor-pointer hover:from-purple-100 hover:to-purple-200 transition-all duration-200 hover:shadow-md"
-            onClick={() => setShowCredentialsModal(true)}
-          >
+          <Card className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 cursor-pointer hover:from-purple-100 hover:to-purple-200 transition-all duration-200 hover:shadow-md" onClick={() => setShowCredentialsModal(true)}>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-2xl">📱</div>
@@ -171,13 +158,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
             </div>
           </Card>
           
-          <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100">
-            <div className="space-y-2">
-              <div className="text-2xl">⏱️</div>
-              <div className="text-2xl font-bold text-orange-700">2hrs</div>
-              <div className="text-sm text-orange-600">Time Saved</div>
-            </div>
-          </Card>
+          
         </div>
 
         {/* Main Tabs */}
@@ -191,26 +172,11 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
           </TabsList>
 
           <TabsContent value="plan">
-            <WeeklyPlan
-              userProfile={userProfile}
-              generatedData={generatedData}
-              onRecipesChange={handleRecipesChange}
-              onWeeklyCostsChange={handleWeeklyCostsChange}
-            />
+            <WeeklyPlan userProfile={userProfile} generatedData={generatedData} onRecipesChange={handleRecipesChange} onWeeklyCostsChange={handleWeeklyCostsChange} />
           </TabsContent>
 
           <TabsContent value="shopping">
-            <ShoppingList 
-              userProfile={userProfile} 
-              recipes={recipes}
-              totalWeeklyCosts={totalWeeklyCosts}
-              onComparePrice={async () => {
-                // Price comparison logic can be added here if needed
-                // For now, this serves as a placeholder
-              }}
-              priceComparisonResult={null}
-              isComparingPrices={false}
-            />
+            <ShoppingList userProfile={userProfile} recipes={recipes} totalWeeklyCosts={totalWeeklyCosts} />
           </TabsContent>
 
           <TabsContent value="favorites">
@@ -222,41 +188,24 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
           </TabsContent>
 
           <TabsContent value="checkout">
-            {showCheckout ? (
-              <CheckoutSummary
-                basketUrls={basketUrls}
-                totalCosts={totalWeeklyCosts || {}}
-                onMarkAsOrdered={() => {
-                  toast({ title: "Order marked complete! 🎉" });
-                  setShowCheckout(false);
-                }}
-              />
-            ) : (
-              <Card className="p-8 text-center">
+            {showCheckout ? <CheckoutSummary basketUrls={basketUrls} totalCosts={totalWeeklyCosts || {}} onMarkAsOrdered={() => {
+            toast({
+              title: "Order marked complete! 🎉"
+            });
+            setShowCheckout(false);
+          }} /> : <Card className="p-8 text-center">
                 <p className="text-muted-foreground">Complete meal plan confirmation to see checkout</p>
-              </Card>
-            )}
+              </Card>}
           </TabsContent>
         </Tabs>
 
         {/* Modals */}
-        <MealPlanConfirmationModal
-          isOpen={showConfirmationModal}
-          onClose={() => setShowConfirmationModal(false)}
-          onConfirm={handleConfirmMealPlan}
-          recipes={recipes}
-          connectedStores={connectedStores}
-        />
+        <MealPlanConfirmationModal isOpen={showConfirmationModal} onClose={() => setShowConfirmationModal(false)} onConfirm={handleConfirmMealPlan} recipes={recipes} connectedStores={connectedStores} />
 
-        <SupermarketCredentialsModal
-          isOpen={showCredentialsModal}
-          onClose={() => setShowCredentialsModal(false)}
-          onSave={(credentials) => {
-            setUserCredentials(credentials);
-            loadConnectedStores();
-          }}
-        />
+        <SupermarketCredentialsModal isOpen={showCredentialsModal} onClose={() => setShowCredentialsModal(false)} onSave={credentials => {
+        setUserCredentials(credentials);
+        loadConnectedStores();
+      }} />
       </div>
-    </div>
-  );
+    </div>;
 };
