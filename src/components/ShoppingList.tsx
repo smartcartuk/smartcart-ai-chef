@@ -3,89 +3,76 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, Circle, ShoppingCart, MapPin, Clock, Trash2, Loader2, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { CheckCircle, Circle, ShoppingCart, MapPin, Clock, Trash2, Loader2 } from 'lucide-react';
 import { WebhookResponse } from '@/utils/webhookService';
 import { getSupermarketLogo } from '@/utils/supermarketLogos';
 import { getIngredientImage } from '@/utils/recipeImageGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { AIShoppingAgent } from './AIShoppingAgent';
-import { AIChatInterface } from './AIChatInterface';
-import { SupermarketSelectionModal } from './SupermarketSelectionModal';
-import { SupermarketCredentialsModal } from './SupermarketCredentialsModal';
 import { useToast } from '@/hooks/use-toast';
 import { getConnectedStores } from '@/utils/profileService';
-
 interface ShoppingListProps {
   userProfile: any;
   generatedData?: WebhookResponse | null;
   recipes?: any[];
   totalWeeklyCosts?: any;
-  onComparePrice?: () => Promise<void>;
-  priceComparisonResult?: any;
-  isComparingPrices?: boolean;
 }
 
 // Helper function to capitalize first letter of each word
 const capitalizeWords = (str: string): string => {
-  return str.split(' ').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-  ).join(' ');
+  return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
 };
-
-export const ShoppingList: React.FC<ShoppingListProps> = ({ 
-  userProfile, 
-  generatedData, 
+export const ShoppingList: React.FC<ShoppingListProps> = ({
+  userProfile,
+  generatedData,
   recipes = [],
-  totalWeeklyCosts,
-  onComparePrice,
-  priceComparisonResult,
-  isComparingPrices = false
+  totalWeeklyCosts
 }) => {
   const [activeStore, setActiveStore] = useState('tesco');
-  const [itemQuantities, setItemQuantities] = useState<Map<string, number>>(new Map());
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [optimizedRoute, setOptimizedRoute] = useState<any[]>([]);
   const [addingToBasket, setAddingToBasket] = useState(false);
   const [connectedStores, setConnectedStores] = useState<any[]>([]);
   const [ingredientPrices, setIngredientPrices] = useState<Map<string, any>>(new Map());
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [removedIngredients, setRemovedIngredients] = useState<Set<string>>(new Set());
-  const [showSupermarketSelection, setShowSupermarketSelection] = useState(false);
-  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
-  const [selectedSupermarket, setSelectedSupermarket] = useState<string>('');
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
 
   // Load connected stores on mount
-  const loadStores = async () => {
-    const result = await getConnectedStores();
-    if (result.success && result.data) {
-      setConnectedStores(result.data);
-      console.log('Connected stores loaded:', result.data);
-    }
-  };
-
   useEffect(() => {
+    const loadStores = async () => {
+      const result = await getConnectedStores();
+      if (result.success && result.data) {
+        setConnectedStores(result.data);
+        console.log('Connected stores loaded:', result.data);
+      }
+    };
     loadStores();
   }, []);
 
   // Extract and consolidate ingredients from recipes (excluding removed ones)
   const ingredients = React.useMemo(() => {
-    const ingredientMap = new Map<string, { name: string; totalAmount: number; unit: string; image: string; count: number }>();
-    
+    const ingredientMap = new Map<string, {
+      name: string;
+      totalAmount: number;
+      unit: string;
+      image: string;
+      count: number;
+    }>();
     recipes.forEach(recipe => {
       if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
         recipe.ingredients.forEach(ingredient => {
           const ingredientName = typeof ingredient === 'string' ? ingredient : ingredient.name;
-          const ingredientAmount = typeof ingredient === 'string' ? '150g' : (ingredient.amount || '150g');
-          
+          const ingredientAmount = typeof ingredient === 'string' ? '150g' : ingredient.amount || '150g';
           if (ingredientName && !removedIngredients.has(ingredientName.toLowerCase())) {
             const key = ingredientName.toLowerCase();
-            
+
             // Extract numeric amount and unit
             const amountMatch = ingredientAmount.match(/(\d+)\s*(\w+)/);
             const numericAmount = amountMatch ? parseInt(amountMatch[1]) : 150;
             const unit = amountMatch ? amountMatch[2] : 'g';
-            
             if (ingredientMap.has(key)) {
               const existing = ingredientMap.get(key)!;
               existing.totalAmount += numericAmount;
@@ -103,7 +90,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         });
       }
     });
-    
     return Array.from(ingredientMap.values()).map(item => ({
       name: item.name,
       amount: item.count > 1 ? `${item.totalAmount}${item.unit} (${item.count} recipes)` : `${item.totalAmount}${item.unit}`,
@@ -111,34 +97,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }));
   }, [recipes, removedIngredients]);
 
-  const handleComparePrices = async () => {
-    if (onComparePrice) {
-      await onComparePrice();
-      setShowSupermarketSelection(true);
-    }
-  };
-
-  const handleSupermarketSelection = (supermarket: string) => {
-    setSelectedSupermarket(supermarket);
-    setShowSupermarketSelection(false);
-    toast({
-      title: "Supermarket selected",
-      description: `Selected ${supermarket} as your preferred store`,
-    });
-  };
-
-  // Check which stores have credentials
-  const storesWithCredentials = connectedStores.filter(store => 
-    store.credentials?.username && store.credentials?.password
-  );
-  const storesWithoutCredentials = connectedStores.filter(store => 
-    !store.credentials?.username || !store.credentials?.password
-  );
-
   // Show empty state if no recipes or ingredients
   if (recipes.length === 0 || ingredients.length === 0) {
-    return (
-      <Card className="p-8 text-center">
+    return <Card className="p-8 text-center">
         <ShoppingCart className="w-16 h-16 mx-auto text-gray-300 mb-4" />
         <h3 className="text-xl font-semibold text-gray-700 mb-2">
           No Shopping List Yet
@@ -146,29 +107,29 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         <p className="text-gray-600 mb-4">
           Add recipes to your meal plan to generate a shopping list
         </p>
-      </Card>
-    );
+      </Card>;
   }
 
   // Fetch prices for all ingredients from unified-price-lookup
   useEffect(() => {
     const fetchPrices = async () => {
       if (ingredients.length === 0) return;
-      
       setLoadingPrices(true);
       try {
         const pricesMap = new Map();
-        
+
         // Fetch prices for each ingredient
         for (const ingredient of ingredients) {
-          const { data, error } = await supabase.functions.invoke('unified-price-lookup', {
-            body: { 
+          const {
+            data,
+            error
+          } = await supabase.functions.invoke('unified-price-lookup', {
+            body: {
               ingredientName: ingredient.name,
               quantity: 1,
               stores: ['tesco', 'sainsburys', 'asda', 'aldi']
             }
           });
-
           if (!error && data?.results) {
             // Transform array results into store-keyed object
             const storeData: any = {};
@@ -182,7 +143,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             pricesMap.set(ingredient.name.toLowerCase(), storeData);
           }
         }
-        
         setIngredientPrices(pricesMap);
       } catch (error) {
         console.error('Error fetching prices:', error);
@@ -190,19 +150,19 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         setLoadingPrices(false);
       }
     };
-
     fetchPrices();
   }, [ingredients]);
 
   // Calculate total costs per store from actual prices
   const storeTotals = React.useMemo(() => {
-    const totals: { [key: string]: number } = {
+    const totals: {
+      [key: string]: number;
+    } = {
       tesco: 0,
       sainsburys: 0,
       asda: 0,
       aldi: 0
     };
-
     ingredients.forEach(ingredient => {
       const priceData = ingredientPrices.get(ingredient.name.toLowerCase());
       if (priceData) {
@@ -212,52 +172,45 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         });
       }
     });
-
     return totals;
   }, [ingredients, ingredientPrices]);
 
   // Store information with enhanced data using actual price totals
-  const stores = [
-    { 
-      id: 'tesco', 
-      name: 'Tesco', 
-      total: storeTotals.tesco || 0,
-      items: ingredients.length,
-      savings: 0,
-      deliveryTime: '2-3 hours',
-      address: '123 High Street, Your Area'
-    },
-    { 
-      id: 'sainsburys', 
-      name: 'Sainsbury\'s', 
-      total: storeTotals.sainsburys || 0,
-      items: ingredients.length,
-      savings: Math.max(0, storeTotals.sainsburys - storeTotals.tesco),
-      deliveryTime: '3-4 hours',
-      address: '456 Main Road, Your Area'
-    },
-    { 
-      id: 'asda', 
-      name: 'ASDA', 
-      total: storeTotals.asda || 0,
-      items: ingredients.length,
-      savings: Math.max(0, storeTotals.tesco - storeTotals.asda),
-      deliveryTime: '2-4 hours',
-      address: '789 Shopping Centre, Your Area'
-    },
-    { 
-      id: 'aldi', 
-      name: 'Aldi', 
-      total: storeTotals.aldi || 0,
-      items: ingredients.length,
-      savings: Math.max(0, storeTotals.tesco - storeTotals.aldi),
-      deliveryTime: '4-6 hours',
-      address: '321 Budget Lane, Your Area'
-    }
-  ];
-
+  const stores = [{
+    id: 'tesco',
+    name: 'Tesco',
+    total: storeTotals.tesco || 0,
+    items: ingredients.length,
+    savings: 0,
+    deliveryTime: '2-3 hours',
+    address: '123 High Street, Your Area'
+  }, {
+    id: 'sainsburys',
+    name: 'Sainsbury\'s',
+    total: storeTotals.sainsburys || 0,
+    items: ingredients.length,
+    savings: Math.max(0, storeTotals.sainsburys - storeTotals.tesco),
+    deliveryTime: '3-4 hours',
+    address: '456 Main Road, Your Area'
+  }, {
+    id: 'asda',
+    name: 'ASDA',
+    total: storeTotals.asda || 0,
+    items: ingredients.length,
+    savings: Math.max(0, storeTotals.tesco - storeTotals.asda),
+    deliveryTime: '2-4 hours',
+    address: '789 Shopping Centre, Your Area'
+  }, {
+    id: 'aldi',
+    name: 'Aldi',
+    total: storeTotals.aldi || 0,
+    items: ingredients.length,
+    savings: Math.max(0, storeTotals.tesco - storeTotals.aldi),
+    deliveryTime: '4-6 hours',
+    address: '321 Budget Lane, Your Area'
+  }];
   const currentStore = stores.find(store => store.id === activeStore) || stores[0];
-  
+
   // Get ingredients with prices for the current store
   const currentIngredientsWithPrices = ingredients.map(ing => {
     const priceData = ingredientPrices.get(ing.name.toLowerCase());
@@ -267,7 +220,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       price: storePrice
     };
   });
-
   const removeIngredient = (ingredientName: string) => {
     setRemovedIngredients(prev => new Set([...prev, ingredientName.toLowerCase()]));
     toast({
@@ -275,27 +227,15 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       description: `${ingredientName} has been removed from your shopping list.`
     });
   };
-
-  const addItemToBasket = (itemName: string) => {
-    const newQuantities = new Map(itemQuantities);
-    newQuantities.set(itemName.toLowerCase(), 1);
-    setItemQuantities(newQuantities);
-  };
-
-  const updateItemQuantity = (itemName: string, delta: number) => {
-    const newQuantities = new Map(itemQuantities);
-    const currentQty = newQuantities.get(itemName.toLowerCase()) || 0;
-    const newQty = Math.max(0, currentQty + delta);
-    
-    if (newQty === 0) {
-      newQuantities.delete(itemName.toLowerCase());
+  const toggleItem = (itemName: string) => {
+    const newChecked = new Set(checkedItems);
+    if (newChecked.has(itemName)) {
+      newChecked.delete(itemName);
     } else {
-      newQuantities.set(itemName.toLowerCase(), newQty);
+      newChecked.add(itemName);
     }
-    
-    setItemQuantities(newQuantities);
+    setCheckedItems(newChecked);
   };
-
   const generateOptimizedRoute = () => {
     // Simple route optimization - group by aisle/category
     const categories = {
@@ -304,17 +244,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       'Dairy': ['milk', 'cheese', 'yogurt', 'butter'],
       'Pantry': ['rice', 'pasta', 'oil', 'spices', 'flour', 'bread']
     };
-
     const route = Object.entries(categories).map(([category, items]) => ({
       category,
-      items: currentIngredientsWithPrices.filter(ingredient => 
-        items.some(item => ingredient.name.toLowerCase().includes(item))
-      )
+      items: currentIngredientsWithPrices.filter(ingredient => items.some(item => ingredient.name.toLowerCase().includes(item)))
     })).filter(section => section.items.length > 0);
-
     setOptimizedRoute(route);
   };
-
   const handleAddToBasket = async () => {
     if (!connectedStores?.length) {
       toast({
@@ -324,11 +259,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       });
       return;
     }
-
-    const connectedStore = connectedStores.find(
-      (store: any) => store.name.toLowerCase() === activeStore
-    );
-
+    const connectedStore = connectedStores.find((store: any) => store.name.toLowerCase() === activeStore);
     if (!connectedStore || !connectedStore.credentials) {
       toast({
         title: "Store not connected",
@@ -337,16 +268,16 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       });
       return;
     }
-
     setAddingToBasket(true);
-
     try {
       const shoppingItems = currentIngredientsWithPrices.map(item => ({
         name: item.name,
         quantity: item.amount || '1'
       }));
-
-      const { data, error } = await supabase.functions.invoke('ai-shopping-agent', {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('ai-shopping-agent', {
         body: {
           action: 'execute',
           store: activeStore,
@@ -354,14 +285,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           credentials: connectedStore.credentials
         }
       });
-
       if (error) throw error;
-
       toast({
         title: 'Items added to basket!',
-        description: `Successfully added ${shoppingItems.length} items to your ${currentStore.name} basket.`,
+        description: `Successfully added ${shoppingItems.length} items to your ${currentStore.name} basket.`
       });
-
       if (data?.basketUrl) {
         window.open(data.basketUrl, '_blank');
       }
@@ -376,67 +304,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       setAddingToBasket(false);
     }
   };
-
   useEffect(() => {
     generateOptimizedRoute();
   }, [activeStore, currentIngredientsWithPrices.length]);
-
-  return (
-    <div className="space-y-6">
-      {/* Header with Compare Prices Button */}
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">Shopping List</h2>
-            <p className="text-muted-foreground">
-              {ingredients.length} ingredients from {recipes.length} recipes
-            </p>
-          </div>
-          {onComparePrice && (
-            <Button 
-              onClick={handleComparePrices}
-              disabled={isComparingPrices || ingredients.length === 0}
-              size="lg"
-              className="w-full sm:w-auto"
-            >
-              {isComparingPrices ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Comparing Prices...
-                </>
-              ) : (
-                <>
-                  <ShoppingCart className="mr-2 h-4 w-4" />
-                  Compare Prices
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {/* Store Connection Status Alert */}
-      {storesWithoutCredentials.length > 0 && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Connect Your Stores</AlertTitle>
-          <AlertDescription className="flex flex-col gap-2">
-            <p>
-              Connect your supermarket accounts to enable AI shopping. 
-              Missing credentials for: {storesWithoutCredentials.map(s => s.name).join(', ')}
-            </p>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowCredentialsModal(true)}
-              className="w-fit"
-            >
-              Connect Stores
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
+  return <div className="space-y-6">
       {/* Shopping List Header */}
       <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
@@ -455,13 +326,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               <div className="text-sm text-gray-600">Items</div>
             </div>
             <div className="text-center">
-              {loadingPrices ? (
-                <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" />
-              ) : (
-                <div className="text-2xl font-bold text-blue-600">
+              {loadingPrices ? <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" /> : <div className="text-2xl font-bold text-blue-600">
                   £{currentStore.total.toFixed(2)}
-                </div>
-              )}
+                </div>}
               <div className="text-sm text-gray-600">Total Cost</div>
             </div>
           </div>
@@ -472,50 +339,57 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       <Tabs value={activeStore} onValueChange={setActiveStore}>
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-2 bg-white border shadow-sm p-2 h-auto">
           {stores.map(store => {
-            const { logo, emoji } = getSupermarketLogo(store.id);
-            return (
-              <TabsTrigger 
-                key={store.id}
-                value={store.id}
-                className="flex flex-col items-center justify-center gap-1.5 p-2 min-h-[100px] data-[state=active]:bg-blue-50 data-[state=active]:border-blue-200 data-[state=active]:border-2 rounded-lg"
-              >
-                <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-12 bg-white rounded">
-                  <img 
-                    src={logo} 
-                    alt={`${store.name} logo`}
-                    loading="eager"
-                    className="max-w-full max-h-full object-contain p-1"
-                  />
+          const {
+            logo,
+            emoji
+          } = getSupermarketLogo(store.id);
+          return <TabsTrigger key={store.id} value={store.id} className="flex flex-col items-center justify-center gap-1.5 p-2 min-h-[100px] data-[state=active]:bg-blue-50 data-[state=active]:border-blue-200 data-[state=active]:border-2 rounded-lg">
+                <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-12">
+                  <img src={logo} alt={store.name} loading="lazy" className="max-w-full max-h-full object-contain" onError={e => {
+                const target = e.currentTarget;
+                target.style.display = 'none';
+                const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) {
+                  fallback.style.display = 'block';
+                }
+              }} />
+                  <span className="text-2xl hidden">
+                    {emoji}
+                  </span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5 w-full">
                   <div className="font-medium text-xs truncate w-full text-center">{store.name}</div>
                   <div className="text-sm font-semibold text-gray-900">£{store.total.toFixed(2)}</div>
-                  {store.savings > 0 && (
-                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-green-100 text-green-700 whitespace-nowrap">
+                  {store.savings > 0 && <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-green-100 text-green-700 whitespace-nowrap">
                       Save £{store.savings.toFixed(2)}
-                    </Badge>
-                  )}
+                    </Badge>}
                 </div>
-              </TabsTrigger>
-            );
-          })}
+              </TabsTrigger>;
+        })}
         </TabsList>
 
         {stores.map(store => {
-          const { logo, emoji } = getSupermarketLogo(store.id);
-          return (
-            <TabsContent key={store.id} value={store.id} className="space-y-6">
+        const {
+          logo,
+          emoji
+        } = getSupermarketLogo(store.id);
+        return <TabsContent key={store.id} value={store.id} className="space-y-6">
               {/* Store Info Card */}
               <Card className="p-4 bg-gradient-to-r from-blue-50 to-purple-50">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="w-16 h-12 sm:w-20 sm:h-12 flex items-center justify-center flex-shrink-0 bg-white rounded p-1">
-                      <img 
-                        src={logo} 
-                        alt={`${store.name} logo`}
-                        loading="eager"
-                        className="max-w-full max-h-full object-contain"
-                      />
+                    <div className="w-16 h-12 sm:w-20 sm:h-12 flex items-center justify-center flex-shrink-0">
+                      <img src={logo} alt={store.name} loading="lazy" className="max-w-full max-h-full object-contain" onError={e => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    const fallback = target.nextElementSibling as HTMLElement;
+                    if (fallback) {
+                      fallback.style.display = 'block';
+                    }
+                  }} />
+                      <span className="text-4xl hidden">
+                        {emoji}
+                      </span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-base sm:text-lg mb-2">{store.name}</h3>
@@ -545,7 +419,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   <h3 className="font-semibold text-lg">Shopping List Items</h3>
                   <div className="flex items-center space-x-2">
                     <Badge variant="outline">
-                      {itemQuantities.size} of {currentIngredientsWithPrices.length} items added
+                      {checkedItems.size} of {currentIngredientsWithPrices.length} collected
                     </Badge>
                     <Button size="sm" variant="outline" onClick={generateOptimizedRoute}>
                       <MapPin className="w-4 h-4 mr-2" />
@@ -554,10 +428,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   </div>
                 </div>
 
-                {optimizedRoute.length > 0 ? (
-                  <div className="space-y-6">
-                    {optimizedRoute.map((section, index) => (
-                      <div key={index} className="space-y-3">
+                {optimizedRoute.length > 0 ? <div className="space-y-6">
+                    {optimizedRoute.map((section, index) => <div key={index} className="space-y-3">
                         <div className="flex items-center space-x-2">
                           <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">
                             {index + 1}
@@ -568,260 +440,133 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           </Badge>
                         </div>
                         
-                        <div className="ml-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                          {section.items.map((item, itemIndex) => {
-                            const itemKey = item.name.toLowerCase();
-                            const quantity = itemQuantities.get(itemKey) || 0;
-                            const isAdded = quantity > 0;
-                            
-                            return (
-                              <Card key={itemIndex} className="flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
-                                <div className="relative aspect-square bg-gray-50">
-                                  <img 
-                                    src={item.image} 
-                                    alt={item.name}
-                                    loading="lazy"
-                                    className="w-full h-full object-cover"
-                                  />
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => removeIngredient(item.name)}
-                                    className="absolute top-2 right-2 h-8 w-8 bg-white/80 hover:bg-white text-red-500 hover:text-red-700"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                        <div className="ml-8 space-y-2">
+                          {section.items.map((item, itemIndex) => <div key={itemIndex} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${checkedItems.has(item.name) ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                              <div className="flex items-center space-x-3 flex-1 min-w-0 cursor-pointer" onClick={() => toggleItem(item.name)}>
+                                {checkedItems.has(item.name) ? <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" /> : <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />}
+                                <div className="w-12 h-12 flex-shrink-0">
+                                  <img src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover rounded-md" />
                                 </div>
-                                
-                                <div className="p-3 flex flex-col flex-1">
-                                  <div className="text-sm font-medium text-gray-900 mb-1 line-clamp-2 min-h-[2.5rem]">
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-gray-900">
                                     {item.name}
                                   </div>
-                                  <div className="text-xs text-muted-foreground mb-2">
-                                    {item.amount}
-                                  </div>
-                                  
-                                  <div className="mt-auto">
-                                    {loadingPrices ? (
-                                      <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                                    ) : (
-                                      <div className="text-lg font-bold text-gray-900 mb-2">
-                                        £{item.price.toFixed(2)}
-                                      </div>
-                                    )}
-                                    
-                                    {!isAdded ? (
-                                      <Button 
-                                        onClick={() => addItemToBasket(item.name)}
-                                        className="w-full bg-[#f5a623] hover:bg-[#e09612] text-white font-semibold"
-                                        size="lg"
-                                      >
-                                        Add
-                                      </Button>
-                                    ) : (
-                                      <div className="flex items-center justify-between bg-[#f5a623] rounded-md overflow-hidden">
-                                        <Button
-                                          onClick={() => updateItemQuantity(item.name, -1)}
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-10 w-10 text-white hover:bg-[#e09612] hover:text-white rounded-none"
-                                        >
-                                          <span className="text-2xl font-bold">−</span>
-                                        </Button>
-                                        <span className="text-white font-semibold text-lg px-2">
-                                          {quantity}
-                                        </span>
-                                        <Button
-                                          onClick={() => updateItemQuantity(item.name, 1)}
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-10 w-10 text-white hover:bg-[#e09612] hover:text-white rounded-none"
-                                        >
-                                          <span className="text-2xl font-bold">+</span>
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </div>
+                                  <div className="text-sm text-gray-600">{item.amount}</div>
                                 </div>
-                              </Card>
-                            );
-                          })}
+                              </div>
+                              
+                              <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+                                
+                                <Button size="sm" variant="ghost" onClick={e => {
+                        e.stopPropagation();
+                        removeIngredient(item.name);
+                      }} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>)}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {currentIngredientsWithPrices.map((item, index) => {
-                      const itemKey = item.name.toLowerCase();
-                      const quantity = itemQuantities.get(itemKey) || 0;
-                      const isAdded = quantity > 0;
-                      
-                      return (
-                        <Card key={index} className="flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
-                          <div className="relative aspect-square bg-gray-50">
-                            <img 
-                              src={item.image} 
-                              alt={item.name}
-                              loading="lazy"
-                              className="w-full h-full object-cover"
-                            />
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => removeIngredient(item.name)}
-                              className="absolute top-2 right-2 h-8 w-8 bg-white/80 hover:bg-white text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                      </div>)}
+                  </div> : <div className="space-y-2">
+                    {currentIngredientsWithPrices.map((item, index) => <div key={index} className={`flex items-center justify-between p-4 rounded-lg border transition-all ${checkedItems.has(item.name) ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                        <div className="flex items-center space-x-3 flex-1 min-w-0 cursor-pointer" onClick={() => toggleItem(item.name)}>
+                          {checkedItems.has(item.name) ? <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" /> : <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />}
+                          <div className="w-12 h-12 flex-shrink-0">
+                             <img src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover rounded-md" />
                           </div>
-                          
-                          <div className="p-4 flex flex-col flex-1">
-                            <div className="font-medium text-gray-900 mb-1 line-clamp-2 min-h-[3rem]">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-gray-900">
                               {item.name}
                             </div>
-                            <div className="text-sm text-muted-foreground mb-3">
-                              {item.amount}
-                            </div>
-                            
-                            <div className="mt-auto">
-                              {loadingPrices ? (
-                                <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                              ) : (
-                                <div className="text-2xl font-bold text-gray-900 mb-3">
-                                  £{item.price.toFixed(2)}
-                                </div>
-                              )}
-                              
-                              {!isAdded ? (
-                                <Button 
-                                  onClick={() => addItemToBasket(item.name)}
-                                  className="w-full bg-[#f5a623] hover:bg-[#e09612] text-white font-semibold"
-                                  size="lg"
-                                >
-                                  Add
-                                </Button>
-                              ) : (
-                                <div className="flex items-center justify-between bg-[#f5a623] rounded-md overflow-hidden">
-                                  <Button
-                                    onClick={() => updateItemQuantity(item.name, -1)}
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-11 w-11 text-white hover:bg-[#e09612] hover:text-white rounded-none"
-                                  >
-                                    <span className="text-2xl font-bold">−</span>
-                                  </Button>
-                                  <span className="text-white font-semibold text-xl px-3">
-                                    {quantity}
-                                  </span>
-                                  <Button
-                                    onClick={() => updateItemQuantity(item.name, 1)}
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-11 w-11 text-white hover:bg-[#e09612] hover:text-white rounded-none"
-                                  >
-                                    <span className="text-2xl font-bold">+</span>
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
+                            <div className="text-sm text-gray-600">{item.amount}</div>
                           </div>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                  <Button 
-                    onClick={handleComparePrices}
-                    disabled={isComparingPrices || ingredients.length === 0}
-                    className="flex-1"
-                    size="lg"
-                  >
-                    {isComparingPrices ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Comparing Prices...
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart className="w-4 h-4 mr-2" />
-                        Compare Supermarket Basket Costs
-                      </>
-                    )}
-                  </Button>
-                </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+                          <div className="text-right">
+                            {loadingPrices ? <Loader2 className="w-4 h-4 animate-spin" /> : <div className="font-medium text-gray-900">£{item.price.toFixed(2)}</div>}
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={e => {
+                    e.stopPropagation();
+                    removeIngredient(item.name);
+                  }} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>)}
+                  </div>}
               </Card>
-            </TabsContent>
-          );
-        })}
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                <Button className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-white" onClick={handleAddToBasket} disabled={addingToBasket || loadingPrices || !connectedStores.some(s => s.name.toLowerCase() === activeStore)}>
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  {addingToBasket ? 'Adding to basket...' : `Add to ${store.name} Basket`}
+                </Button>
+                <Button variant="outline" className="flex-1">
+                  Export Shopping List
+                </Button>
+              </div>
+            </TabsContent>;
+      })}
       </Tabs>
 
-      {/* AI Shopping Agent Section */}
-      {storesWithCredentials.length > 0 ? (
-        <AIShoppingAgent 
-          ingredients={ingredients.map(ing => ({
-            name: ing.name,
-            amount: ing.amount,
-            prices: Object.entries(ingredientPrices.get(ing.name.toLowerCase()) || {}).map(([store, priceInfo]: [string, any]) => ({
-              store,
-              price: priceInfo.price,
-              url: priceInfo.url,
-              title: priceInfo.title
-            }))
-          }))}
-          connectedStores={storesWithCredentials}
-        />
-      ) : (
-        <Card className="p-6">
-          <div className="text-center space-y-4">
-            <AlertCircle className="h-12 w-12 mx-auto text-yellow-600" />
-            <div>
-              <h3 className="text-lg font-semibold mb-2">AI Shopping Unavailable</h3>
-              <p className="text-muted-foreground mb-4">
-                Connect your supermarket accounts to enable autonomous AI shopping
-              </p>
-              <Button onClick={() => setShowCredentialsModal(true)}>
-                Connect Stores Now
-              </Button>
-            </div>
+      {/* AI Shopping Agent */}
+      <AIShoppingAgent ingredients={ingredients.map(ingredient => {
+      const priceData = ingredientPrices.get(ingredient.name.toLowerCase());
+      return {
+        name: ingredient.name,
+        amount: ingredient.amount,
+        prices: Object.keys(storeTotals).map(store => ({
+          store,
+          price: priceData?.[store]?.price || 0,
+          title: ingredient.name,
+          url: `https://${store}.com/search?q=${encodeURIComponent(ingredient.name)}`
+        }))
+      };
+    })} connectedStores={connectedStores} onShoppingComplete={results => {
+      console.log('AI Shopping completed:', results);
+      toast({
+        title: "AI Shopping Results",
+        description: `Completed shopping tasks for ${results.filter((r: any) => r.success).length} stores.`
+      });
+    }} />
+
+      {/* Live Weekly Cost Comparison */}
+      {totalWeeklyCosts && <Card className="p-6 bg-gradient-to-r from-purple-50 to-pink-50">
+          <h3 className="font-semibold text-lg mb-4">Live Weekly Cost Comparison</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {stores.map(store => {
+          const {
+            logo,
+            emoji
+          } = getSupermarketLogo(store.id);
+          return <div key={store.id} className="text-center p-4 bg-white rounded-lg shadow-sm">
+                  <div className="w-16 h-10 mx-auto mb-3 flex items-center justify-center">
+                    <img src={logo} alt={store.name} loading="lazy" className="max-w-full max-h-full object-contain" onError={e => {
+                const target = e.currentTarget;
+                target.style.display = 'none';
+                const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) {
+                  fallback.style.display = 'block';
+                }
+              }} />
+                    <span className="text-2xl hidden">
+                      {emoji}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="font-medium text-sm">{store.name}</div>
+                    <div className="text-lg font-bold text-blue-600">
+                      £{store.total.toFixed(2)}
+                    </div>
+                    {store.savings > 0 && <div className="text-xs text-green-600">
+                        Save £{store.savings.toFixed(2)}
+                      </div>}
+                  </div>
+                </div>;
+        })}
           </div>
-        </Card>
-      )}
-
-      {/* AI Chat Interface */}
-      <AIChatInterface 
-        userProfile={userProfile}
-      />
-
-      {/* Supermarket Selection Modal */}
-      {priceComparisonResult && (
-        <SupermarketSelectionModal
-          isOpen={showSupermarketSelection}
-          onClose={() => setShowSupermarketSelection(false)}
-          supermarkets={Object.entries(priceComparisonResult).map(([name, data]: [string, any]) => ({
-            name,
-            totalCost: data.total || 0,
-            itemCount: data.itemCount || 0,
-            savings: 0
-          }))}
-          onSelectSupermarket={handleSupermarketSelection}
-        />
-      )}
-
-      {/* Supermarket Credentials Modal */}
-      <SupermarketCredentialsModal
-        isOpen={showCredentialsModal}
-        onClose={() => setShowCredentialsModal(false)}
-        onSave={(creds) => {
-          loadStores();
-          toast({
-            title: "Credentials saved",
-            description: "Your supermarket credentials have been saved successfully.",
-          });
-        }}
-      />
-    </div>
-  );
+        </Card>}
+    </div>;
 };
