@@ -3,37 +3,38 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Lightbulb, Clock, ShoppingCart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
 interface AIAssistantProps {
   userProfile: any;
 }
-
-export const AIAssistant: React.FC<AIAssistantProps> = ({ userProfile }) => {
-  const { toast } = useToast();
-
-  const suggestions = [
-    {
-      title: "Recipe Substitutions",
-      description: "Find alternatives for ingredients you don't have",
-      icon: <Lightbulb className="h-5 w-5" />,
-      action: () => toast({ title: "Recipe suggestions coming soon!" })
-    },
-    {
-      title: "Meal Prep Tips",
-      description: "Get advice on batch cooking and meal prep",
-      icon: <Clock className="h-5 w-5" />,
-      action: () => toast({ title: "Meal prep tips coming soon!" })
-    },
-    {
-      title: "Budget Optimization",
-      description: "Ways to reduce your weekly grocery bill",
-      icon: <ShoppingCart className="h-5 w-5" />,
-      action: () => toast({ title: "Budget optimization coming soon!" })
-    }
-  ];
-
-  return (
-    <div className="space-y-6">
+export const AIAssistant: React.FC<AIAssistantProps> = ({
+  userProfile
+}) => {
+  const {
+    toast
+  } = useToast();
+  const suggestions = [{
+    title: "Recipe Substitutions",
+    description: "Find alternatives for ingredients you don't have",
+    icon: <Lightbulb className="h-5 w-5" />,
+    action: () => toast({
+      title: "Recipe suggestions coming soon!"
+    })
+  }, {
+    title: "Meal Prep Tips",
+    description: "Get advice on batch cooking and meal prep",
+    icon: <Clock className="h-5 w-5" />,
+    action: () => toast({
+      title: "Meal prep tips coming soon!"
+    })
+  }, {
+    title: "Budget Optimization",
+    description: "Ways to reduce your weekly grocery bill",
+    icon: <ShoppingCart className="h-5 w-5" />,
+    action: () => toast({
+      title: "Budget optimization coming soon!"
+    })
+  }];
+  return <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -52,8 +53,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ userProfile }) => {
           </div>
 
           <div className="grid gap-4">
-            {suggestions.map((suggestion, index) => (
-              <Card key={index} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={suggestion.action}>
+            {suggestions.map((suggestion, index) => <Card key={index} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={suggestion.action}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <div className="text-primary">
@@ -65,15 +65,11 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ userProfile }) => {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            ))}
+              </Card>)}
           </div>
 
-          <Badge variant="secondary" className="w-fit">
-            🚧 Coming Soon - Full AI Chat Interface
-          </Badge>
+          
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
