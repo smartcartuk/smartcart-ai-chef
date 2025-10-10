@@ -110,11 +110,24 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         // Fetch prices for each ingredient
         for (const ingredient of ingredients) {
           const { data, error } = await supabase.functions.invoke('unified-price-lookup', {
-            body: { ingredients: [ingredient.name] }
+            body: { 
+              ingredientName: ingredient.name,
+              quantity: 1,
+              stores: ['tesco', 'sainsburys', 'asda', 'aldi']
+            }
           });
 
-          if (!error && data) {
-            pricesMap.set(ingredient.name.toLowerCase(), data);
+          if (!error && data?.results) {
+            // Transform array results into store-keyed object
+            const storeData: any = {};
+            data.results.forEach((result: any) => {
+              storeData[result.store] = {
+                price: result.price,
+                url: result.url,
+                title: result.title
+              };
+            });
+            pricesMap.set(ingredient.name.toLowerCase(), storeData);
           }
         }
         
