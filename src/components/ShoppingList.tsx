@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, Circle, ShoppingCart, MapPin, Clock } from 'lucide-react';
+import { CheckCircle, Circle, ShoppingCart, MapPin, Clock, Trash2, Loader2 } from 'lucide-react';
 import { WebhookResponse } from '@/utils/webhookService';
 import { getSupermarketLogo } from '@/utils/supermarketLogos';
 import { getIngredientImage } from '@/utils/recipeImageGenerator';
@@ -38,6 +38,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [optimizedRoute, setOptimizedRoute] = useState<any[]>([]);
   const [addingToBasket, setAddingToBasket] = useState(false);
   const [connectedStores, setConnectedStores] = useState<any[]>([]);
+  const [ingredientPrices, setIngredientPrices] = useState<Map<string, any>>(new Map());
+  const [loadingPrices, setLoadingPrices] = useState(false);
+  const [removedIngredients, setRemovedIngredients] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   // Load connected stores on mount
@@ -52,9 +55,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     loadStores();
   }, []);
 
-  // Extract and consolidate ingredients from recipes
+  // Extract and consolidate ingredients from recipes (excluding removed ones)
   const ingredients = React.useMemo(() => {
-    const ingredientMap = new Map<string, { name: string; totalAmount: number; unit: string; store: string; price: number; image: string; count: number }>();
+    const ingredientMap = new Map<string, { name: string; totalAmount: number; unit: string; image: string; count: number }>();
     
     recipes.forEach(recipe => {
       if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
@@ -62,35 +65,27 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           const ingredientName = typeof ingredient === 'string' ? ingredient : ingredient.name;
           const ingredientAmount = typeof ingredient === 'string' ? '150g' : (ingredient.amount || '150g');
           
-          if (ingredientName) {
-            const stores = ['tesco', 'sainsburys', 'asda', 'aldi'];
-            stores.forEach(store => {
-              const key = `${ingredientName.toLowerCase()}-${store}`;
-              const basePrice = 1.5 + Math.sin(ingredientName.length + store.length) * 1.5; // Consistent pricing per ingredient
-              const storeMultiplier = store === 'aldi' ? 0.9 : store === 'asda' ? 0.95 : store === 'sainsburys' ? 1.05 : 1;
-              
-              // Extract numeric amount and unit
-              const amountMatch = ingredientAmount.match(/(\d+)\s*(\w+)/);
-              const numericAmount = amountMatch ? parseInt(amountMatch[1]) : 150;
-              const unit = amountMatch ? amountMatch[2] : 'g';
-              
-              if (ingredientMap.has(key)) {
-                const existing = ingredientMap.get(key)!;
-                existing.totalAmount += numericAmount;
-                existing.count += 1;
-                existing.price = basePrice * storeMultiplier * (existing.totalAmount / 150); // Scale price by total amount
-              } else {
-                ingredientMap.set(key, {
-                  name: capitalizeWords(ingredientName),
-                  totalAmount: numericAmount,
-                  unit: unit,
-                  store: store,
-                  price: basePrice * storeMultiplier,
-                  image: getIngredientImage(ingredientName),
-                  count: 1
-                });
-              }
-            });
+          if (ingredientName && !removedIngredients.has(ingredientName.toLowerCase())) {
+            const key = ingredientName.toLowerCase();
+            
+            // Extract numeric amount and unit
+            const amountMatch = ingredientAmount.match(/(\d+)\s*(\w+)/);
+            const numericAmount = amountMatch ? parseInt(amountMatch[1]) : 150;
+            const unit = amountMatch ? amountMatch[2] : 'g';
+            
+            if (ingredientMap.has(key)) {
+              const existing = ingredientMap.get(key)!;
+              existing.totalAmount += numericAmount;
+              existing.count += 1;
+            } else {
+              ingredientMap.set(key, {
+                name: capitalizeWords(ingredientName),
+                totalAmount: numericAmount,
+                unit: unit,
+                image: getIngredientImage(ingredientName),
+                count: 1
+              });
+            }
           }
         });
       }
@@ -99,19 +94,70 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     return Array.from(ingredientMap.values()).map(item => ({
       name: item.name,
       amount: item.count > 1 ? `${item.totalAmount}${item.unit} (${item.count} recipes)` : `${item.totalAmount}${item.unit}`,
-      store: item.store,
-      price: item.price,
       image: item.image
     }));
-  }, [recipes]);
+  }, [recipes, removedIngredients]);
 
-  // Store information with enhanced data
+  // Fetch prices for all ingredients from unified-price-lookup
+  useEffect(() => {
+    const fetchPrices = async () => {
+      if (ingredients.length === 0) return;
+      
+      setLoadingPrices(true);
+      try {
+        const pricesMap = new Map();
+        
+        // Fetch prices for each ingredient
+        for (const ingredient of ingredients) {
+          const { data, error } = await supabase.functions.invoke('unified-price-lookup', {
+            body: { ingredients: [ingredient.name] }
+          });
+
+          if (!error && data) {
+            pricesMap.set(ingredient.name.toLowerCase(), data);
+          }
+        }
+        
+        setIngredientPrices(pricesMap);
+      } catch (error) {
+        console.error('Error fetching prices:', error);
+      } finally {
+        setLoadingPrices(false);
+      }
+    };
+
+    fetchPrices();
+  }, [ingredients.length]);
+
+  // Calculate total costs per store from actual prices
+  const storeTotals = React.useMemo(() => {
+    const totals: { [key: string]: number } = {
+      tesco: 0,
+      sainsburys: 0,
+      asda: 0,
+      aldi: 0
+    };
+
+    ingredients.forEach(ingredient => {
+      const priceData = ingredientPrices.get(ingredient.name.toLowerCase());
+      if (priceData) {
+        Object.keys(totals).forEach(store => {
+          const storePrice = priceData[store]?.price || 0;
+          totals[store] += typeof storePrice === 'number' ? storePrice : 0;
+        });
+      }
+    });
+
+    return totals;
+  }, [ingredients, ingredientPrices]);
+
+  // Store information with enhanced data using actual price totals
   const stores = [
     { 
       id: 'tesco', 
       name: 'Tesco', 
-      total: totalWeeklyCosts?.tesco || 47.85,
-      items: ingredients.filter(item => item.store === 'tesco').length,
+      total: storeTotals.tesco || 0,
+      items: ingredients.length,
       savings: 0,
       deliveryTime: '2-3 hours',
       address: '123 High Street, Your Area'
@@ -119,34 +165,51 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     { 
       id: 'sainsburys', 
       name: 'Sainsbury\'s', 
-      total: totalWeeklyCosts?.sainsburys || 52.30,
-      items: ingredients.filter(item => item.store === 'sainsburys').length,
-      savings: totalWeeklyCosts ? Math.max(0, (totalWeeklyCosts.sainsburys - (totalWeeklyCosts.tesco || 47.85))) : 4.45,
+      total: storeTotals.sainsburys || 0,
+      items: ingredients.length,
+      savings: Math.max(0, storeTotals.sainsburys - storeTotals.tesco),
       deliveryTime: '3-4 hours',
       address: '456 Main Road, Your Area'
     },
     { 
       id: 'asda', 
       name: 'ASDA', 
-      total: totalWeeklyCosts?.asda || 44.20,
-      items: ingredients.filter(item => item.store === 'asda').length,
-      savings: totalWeeklyCosts ? Math.max(0, ((totalWeeklyCosts.tesco || 47.85) - totalWeeklyCosts.asda)) : 3.65,
+      total: storeTotals.asda || 0,
+      items: ingredients.length,
+      savings: Math.max(0, storeTotals.tesco - storeTotals.asda),
       deliveryTime: '2-4 hours',
       address: '789 Shopping Centre, Your Area'
     },
     { 
       id: 'aldi', 
       name: 'Aldi', 
-      total: totalWeeklyCosts?.aldi || 39.95,
-      items: ingredients.filter(item => item.store === 'aldi').length,
-      savings: totalWeeklyCosts ? Math.max(0, ((totalWeeklyCosts.tesco || 47.85) - totalWeeklyCosts.aldi)) : 7.90,
+      total: storeTotals.aldi || 0,
+      items: ingredients.length,
+      savings: Math.max(0, storeTotals.tesco - storeTotals.aldi),
       deliveryTime: '4-6 hours',
       address: '321 Budget Lane, Your Area'
     }
   ];
 
   const currentStore = stores.find(store => store.id === activeStore) || stores[0];
-  const currentIngredients = ingredients.filter(item => item.store === activeStore);
+  
+  // Get ingredients with prices for the current store
+  const currentIngredientsWithPrices = ingredients.map(ing => {
+    const priceData = ingredientPrices.get(ing.name.toLowerCase());
+    const storePrice = priceData?.[activeStore]?.price || 0;
+    return {
+      ...ing,
+      price: storePrice
+    };
+  });
+
+  const removeIngredient = (ingredientName: string) => {
+    setRemovedIngredients(prev => new Set([...prev, ingredientName.toLowerCase()]));
+    toast({
+      title: "Ingredient removed",
+      description: `${ingredientName} has been removed from your shopping list.`
+    });
+  };
 
   const toggleItem = (itemName: string) => {
     const newChecked = new Set(checkedItems);
@@ -169,7 +232,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
     const route = Object.entries(categories).map(([category, items]) => ({
       category,
-      items: currentIngredients.filter(ingredient => 
+      items: currentIngredientsWithPrices.filter(ingredient => 
         items.some(item => ingredient.name.toLowerCase().includes(item))
       )
     })).filter(section => section.items.length > 0);
@@ -203,9 +266,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     setAddingToBasket(true);
 
     try {
-      const shoppingItems = currentIngredients.map(item => ({
+      const shoppingItems = currentIngredientsWithPrices.map(item => ({
         name: item.name,
-        amount: item.amount || '1'
+        quantity: item.amount || '1'
       }));
 
       const { data, error } = await supabase.functions.invoke('ai-shopping-agent', {
@@ -241,7 +304,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   useEffect(() => {
     generateOptimizedRoute();
-  }, [activeStore, ingredients.length]); // Fixed: use ingredients.length instead of currentIngredients
+  }, [activeStore, currentIngredientsWithPrices.length]);
 
   return (
     <div className="space-y-6">
@@ -251,21 +314,25 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Smart Shopping List</h2>
             <p className="text-gray-600 mt-1">
-              Optimized for your weekly meal plan with live price comparisons
+              {loadingPrices ? 'Fetching live prices...' : 'Optimized for your weekly meal plan with live price comparisons'}
             </p>
           </div>
           
           <div className="flex items-center space-x-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-emerald-600">
-                {currentIngredients.length}
+                {ingredients.length}
               </div>
               <div className="text-sm text-gray-600">Items</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                £{currentStore.total.toFixed(2)}
-              </div>
+              {loadingPrices ? (
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" />
+              ) : (
+                <div className="text-2xl font-bold text-blue-600">
+                  £{currentStore.total.toFixed(2)}
+                </div>
+              )}
               <div className="text-sm text-gray-600">Total Cost</div>
             </div>
           </div>
@@ -375,7 +442,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   <h3 className="font-semibold text-lg">Shopping List Items</h3>
                   <div className="flex items-center space-x-2">
                     <Badge variant="outline">
-                      {checkedItems.size} of {currentIngredients.length} collected
+                      {checkedItems.size} of {currentIngredientsWithPrices.length} collected
                     </Badge>
                     <Button size="sm" variant="outline" onClick={generateOptimizedRoute}>
                       <MapPin className="w-4 h-4 mr-2" />
@@ -402,14 +469,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           {section.items.map((item, itemIndex) => (
                             <div 
                               key={itemIndex}
-                              className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${
+                              className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
                                 checkedItems.has(item.name) 
                                   ? 'bg-green-50 border-green-200' 
                                   : 'bg-white border-gray-200 hover:border-gray-300'
                               }`}
-                              onClick={() => toggleItem(item.name)}
                             >
-                              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                              <div className="flex items-center space-x-3 flex-1 min-w-0 cursor-pointer" onClick={() => toggleItem(item.name)}>
                                 {checkedItems.has(item.name) ? (
                                   <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                                 ) : (
@@ -431,8 +497,25 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                 </div>
                               </div>
                               
-                              <div className="text-right flex-shrink-0 ml-4">
-                                <div className="font-medium text-gray-900">£{item.price.toFixed(2)}</div>
+                              <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+                                <div className="text-right">
+                                  {loadingPrices ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <div className="font-medium text-gray-900">£{item.price.toFixed(2)}</div>
+                                  )}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeIngredient(item.name);
+                                  }}
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
                               </div>
                             </div>
                           ))}
@@ -442,17 +525,16 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {currentIngredients.map((item, index) => (
+                    {currentIngredientsWithPrices.map((item, index) => (
                       <div 
                         key={index}
-                        className={`flex items-center justify-between p-4 rounded-lg border transition-all cursor-pointer ${
+                        className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
                           checkedItems.has(item.name) 
                             ? 'bg-green-50 border-green-200' 
                             : 'bg-white border-gray-200 hover:border-gray-300'
                         }`}
-                        onClick={() => toggleItem(item.name)}
                       >
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div className="flex items-center space-x-3 flex-1 min-w-0 cursor-pointer" onClick={() => toggleItem(item.name)}>
                           {checkedItems.has(item.name) ? (
                             <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                           ) : (
@@ -474,8 +556,25 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           </div>
                         </div>
                         
-                        <div className="text-right flex-shrink-0 ml-4">
-                          <div className="font-medium text-gray-900">£{item.price.toFixed(2)}</div>
+                        <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+                          <div className="text-right">
+                            {loadingPrices ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <div className="font-medium text-gray-900">£{item.price.toFixed(2)}</div>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeIngredient(item.name);
+                            }}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -486,12 +585,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
                 <Button 
-                  className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
+                  className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-white"
                   onClick={handleAddToBasket}
-                  disabled={addingToBasket}
+                  disabled={addingToBasket || loadingPrices || !connectedStores.some(s => s.name.toLowerCase() === activeStore)}
                 >
                   <ShoppingCart className="w-4 h-4 mr-2" />
-                  {addingToBasket ? 'Adding...' : `Add to ${store.name} Basket`}
+                  {addingToBasket ? 'Adding to basket...' : `Add to ${store.name} Basket`}
                 </Button>
                 <Button variant="outline" className="flex-1">
                   Export Shopping List
@@ -504,32 +603,19 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {/* AI Shopping Agent */}
       <AIShoppingAgent 
-        ingredients={ingredients.reduce((acc, ingredient) => {
-          const existing = acc.find(item => item.name === ingredient.name);
-          if (existing) {
-            const existingPrice = existing.prices.find(p => p.store === ingredient.store);
-            if (!existingPrice) {
-              existing.prices.push({
-                store: ingredient.store,
-                price: ingredient.price,
-                title: ingredient.name,
-                url: `https://${ingredient.store}.com/search?q=${encodeURIComponent(ingredient.name)}`
-              });
-            }
-          } else {
-            acc.push({
-              name: ingredient.name,
-              amount: ingredient.amount,
-              prices: [{
-                store: ingredient.store,
-                price: ingredient.price,
-                title: ingredient.name,
-                url: `https://${ingredient.store}.com/search?q=${encodeURIComponent(ingredient.name)}`
-              }]
-            });
-          }
-          return acc;
-        }, [] as Array<{name: string; amount: string; prices: Array<{store: string; price: number; url?: string; title?: string}>}>)}
+        ingredients={ingredients.map(ingredient => {
+          const priceData = ingredientPrices.get(ingredient.name.toLowerCase());
+          return {
+            name: ingredient.name,
+            amount: ingredient.amount,
+            prices: Object.keys(storeTotals).map(store => ({
+              store,
+              price: priceData?.[store]?.price || 0,
+              title: ingredient.name,
+              url: `https://${store}.com/search?q=${encodeURIComponent(ingredient.name)}`
+            }))
+          };
+        })}
         connectedStores={connectedStores}
         onShoppingComplete={(results) => {
           console.log('AI Shopping completed:', results);
