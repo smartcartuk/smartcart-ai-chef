@@ -479,26 +479,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                 value={store.id}
                 className="flex flex-col items-center justify-center gap-1.5 p-2 min-h-[100px] data-[state=active]:bg-blue-50 data-[state=active]:border-blue-200 data-[state=active]:border-2 rounded-lg"
               >
-                <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-12">
+                <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-12 bg-white rounded">
                   <img 
                     src={logo} 
-                    alt={store.name}
-                    loading="lazy"
-                    className="max-w-full max-h-full object-contain"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      target.style.display = 'none';
-                      const fallback = target.nextElementSibling as HTMLElement;
-                      if (fallback) {
-                        fallback.style.display = 'block';
-                      }
-                    }}
+                    alt={`${store.name} logo`}
+                    loading="eager"
+                    className="max-w-full max-h-full object-contain p-1"
                   />
-                  <span 
-                    className="text-2xl hidden" 
-                  >
-                    {emoji}
-                  </span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5 w-full">
                   <div className="font-medium text-xs truncate w-full text-center">{store.name}</div>
@@ -522,26 +509,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               <Card className="p-4 bg-gradient-to-r from-blue-50 to-purple-50">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="w-16 h-12 sm:w-20 sm:h-12 flex items-center justify-center flex-shrink-0">
+                    <div className="w-16 h-12 sm:w-20 sm:h-12 flex items-center justify-center flex-shrink-0 bg-white rounded p-1">
                       <img 
                         src={logo} 
-                        alt={store.name}
-                        loading="lazy"
+                        alt={`${store.name} logo`}
+                        loading="eager"
                         className="max-w-full max-h-full object-contain"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          target.style.display = 'none';
-                          const fallback = target.nextElementSibling as HTMLElement;
-                          if (fallback) {
-                            fallback.style.display = 'block';
-                          }
-                        }}
                       />
-                      <span 
-                        className="text-4xl hidden"
-                      >
-                        {emoji}
-                      </span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-base sm:text-lg mb-2">{store.name}</h3>
