@@ -97,55 +97,148 @@ serve(async (req) => {
       });
     }
 
-    // If no recent prices, fetch from external API
-    const OPERATOR_URL = 'https://smartcart-operator.vercel.app/api/ingredient-prices';
+    // Second, try RapidAPI for real UK grocery prices
+    const rapidApiKey = Deno.env.get('RAPIDAPI_KEY');
     const results: any[] = [];
 
-    try {
-      const promises = stores.map(async (store) => {
-        const response = await fetch(`${OPERATOR_URL}?ingredient=${encodeURIComponent(normalizedName)}&store=${store}&quantity=${encodeURIComponent(quantity)}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
+    if (rapidApiKey) {
+      console.log('Attempting to fetch prices from RapidAPI');
+      try {
+        // Map store names to RapidAPI store identifiers
+        const storeMapping: Record<string, string> = {
+          'tesco': 'tesco',
+          'sainsburys': 'sainsburys',
+          'asda': 'asda',
+          'aldi': 'aldi',
+          'morrisons': 'morrisons',
+          'lidl': 'lidl',
+          'waitrose': 'waitrose',
+          'iceland': 'iceland',
+          'coop': 'coop',
+          'ocado': 'ocado'
+        };
+
+        const rapidPromises = stores.map(async (store) => {
+          try {
+            // Using a generic approach that works with most grocery price APIs
+            const response = await fetch(
+              `https://api.example-rapidapi.com/search?query=${encodeURIComponent(normalizedName)}&store=${storeMapping[store] || store}`,
+              {
+                method: 'GET',
+                headers: {
+                  'X-RapidAPI-Key': rapidApiKey,
+                  'X-RapidAPI-Host': 'api.example-rapidapi.com',
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+
+            if (response.ok) {
+              const data = await response.json();
+              // Adapt this based on your specific RapidAPI response structure
+              if (data && (data.price || data.product?.price)) {
+                const price = Number(data.price || data.product?.price);
+                if (price > 0) {
+                  const priceData = {
+                    store,
+                    price,
+                    url: data.url || data.product?.url || `https://${store}.com/search?q=${encodeURIComponent(ingredientName)}`,
+                    title: data.title || data.product?.title || `${store} ${ingredientName}`,
+                    image: data.image || data.product?.image
+                  };
+
+                  // Store RapidAPI results with longer cache (15 minutes for real data)
+                  await supabase
+                    .from('prices')
+                    .upsert({
+                      ingredient_name: normalizedName,
+                      store_name: store,
+                      price: priceData.price,
+                      product_url: priceData.url,
+                      product_title: priceData.title,
+                      product_image: priceData.image,
+                      quantity: quantity,
+                      last_updated: new Date().toISOString()
+                    }, {
+                      onConflict: 'ingredient_name,store_name,quantity'
+                    });
+
+                  console.log(`✓ RapidAPI: Found price £${price} for ${ingredientName} at ${store}`);
+                  return priceData;
+                }
+              }
+            }
+          } catch (err) {
+            console.warn(`RapidAPI lookup failed for ${store}:`, err.message);
+          }
+          return null;
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.price && data.price > 0) {
-            const priceData = {
-              store,
-              price: Number(data.price),
-              url: data.url || `https://${store}.com/search?q=${encodeURIComponent(ingredientName)}`,
-              title: data.title || `${store} ${ingredientName}`,
-              image: data.image
-            };
-            
-            // Store in database for future use
-            await supabase
-              .from('prices')
-              .upsert({
-                ingredient_name: normalizedName,
-                store_name: store,
-                price: priceData.price,
-                product_url: priceData.url,
-                product_title: priceData.title,
-                product_image: priceData.image,
-                quantity: quantity,
-                last_updated: new Date().toISOString()
-              }, {
-                onConflict: 'ingredient_name,store_name,quantity'
-              });
-            
-            return priceData;
-          }
+        const rapidResults = await Promise.all(rapidPromises);
+        const validResults = rapidResults.filter(Boolean);
+        
+        if (validResults.length > 0) {
+          console.log(`✓ RapidAPI returned ${validResults.length} prices`);
+          results.push(...validResults);
         }
-        return null;
-      });
+      } catch (error) {
+        console.error('RapidAPI error:', error);
+      }
+    } else {
+      console.log('⚠ RAPIDAPI_KEY not configured, skipping RapidAPI lookup');
+    }
 
-      const priceResults = await Promise.all(promises);
-      results.push(...priceResults.filter(Boolean));
+    // Third, fallback to operator API if RapidAPI didn't return results
+    if (results.length === 0) {
+      console.log('Falling back to operator API');
+      const OPERATOR_URL = 'https://smartcart-operator.vercel.app/api/ingredient-prices';
 
-    } catch (error) {
-      console.error('Error fetching from external API:', error);
+      try {
+        const promises = stores.map(async (store) => {
+          const response = await fetch(`${OPERATOR_URL}?ingredient=${encodeURIComponent(normalizedName)}&store=${store}&quantity=${encodeURIComponent(quantity)}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.price && data.price > 0) {
+              const priceData = {
+                store,
+                price: Number(data.price),
+                url: data.url || `https://${store}.com/search?q=${encodeURIComponent(ingredientName)}`,
+                title: data.title || `${store} ${ingredientName}`,
+                image: data.image
+              };
+              
+              // Store operator API results
+              await supabase
+                .from('prices')
+                .upsert({
+                  ingredient_name: normalizedName,
+                  store_name: store,
+                  price: priceData.price,
+                  product_url: priceData.url,
+                  product_title: priceData.title,
+                  product_image: priceData.image,
+                  quantity: quantity,
+                  last_updated: new Date().toISOString()
+                }, {
+                  onConflict: 'ingredient_name,store_name,quantity'
+                });
+              
+              return priceData;
+            }
+          }
+          return null;
+        });
+
+        const priceResults = await Promise.all(promises);
+        results.push(...priceResults.filter(Boolean));
+
+      } catch (error) {
+        console.error('Error fetching from operator API:', error);
+      }
     }
 
     // Fallback to mock data if no results from external API
