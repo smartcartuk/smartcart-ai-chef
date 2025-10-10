@@ -43,7 +43,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   isComparingPrices = false
 }) => {
   const [activeStore, setActiveStore] = useState('tesco');
-  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const [itemQuantities, setItemQuantities] = useState<Map<string, number>>(new Map());
   const [optimizedRoute, setOptimizedRoute] = useState<any[]>([]);
   const [addingToBasket, setAddingToBasket] = useState(false);
   const [connectedStores, setConnectedStores] = useState<any[]>([]);
@@ -276,14 +276,24 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     });
   };
 
-  const toggleItem = (itemName: string) => {
-    const newChecked = new Set(checkedItems);
-    if (newChecked.has(itemName)) {
-      newChecked.delete(itemName);
+  const addItemToBasket = (itemName: string) => {
+    const newQuantities = new Map(itemQuantities);
+    newQuantities.set(itemName.toLowerCase(), 1);
+    setItemQuantities(newQuantities);
+  };
+
+  const updateItemQuantity = (itemName: string, delta: number) => {
+    const newQuantities = new Map(itemQuantities);
+    const currentQty = newQuantities.get(itemName.toLowerCase()) || 0;
+    const newQty = Math.max(0, currentQty + delta);
+    
+    if (newQty === 0) {
+      newQuantities.delete(itemName.toLowerCase());
     } else {
-      newChecked.add(itemName);
+      newQuantities.set(itemName.toLowerCase(), newQty);
     }
-    setCheckedItems(newChecked);
+    
+    setItemQuantities(newQuantities);
   };
 
   const generateOptimizedRoute = () => {
@@ -561,7 +571,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   <h3 className="font-semibold text-lg">Shopping List Items</h3>
                   <div className="flex items-center space-x-2">
                     <Badge variant="outline">
-                      {checkedItems.size} of {currentIngredientsWithPrices.length} collected
+                      {itemQuantities.size} of {currentIngredientsWithPrices.length} items added
                     </Badge>
                     <Button size="sm" variant="outline" onClick={generateOptimizedRoute}>
                       <MapPin className="w-4 h-4 mr-2" />
@@ -584,117 +594,167 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                           </Badge>
                         </div>
                         
-                        <div className="ml-8 space-y-2">
-                          {section.items.map((item, itemIndex) => (
-                            <div 
-                              key={itemIndex}
-                              className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-                                checkedItems.has(item.name) 
-                                  ? 'bg-green-50 border-green-200' 
-                                  : 'bg-white border-gray-200 hover:border-gray-300'
-                              }`}
-                            >
-                              <div className="flex items-center space-x-3 flex-1 min-w-0 cursor-pointer" onClick={() => toggleItem(item.name)}>
-                                {checkedItems.has(item.name) ? (
-                                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                                ) : (
-                                  <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                                )}
-                                <div className="w-12 h-12 flex-shrink-0">
+                        <div className="ml-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                          {section.items.map((item, itemIndex) => {
+                            const itemKey = item.name.toLowerCase();
+                            const quantity = itemQuantities.get(itemKey) || 0;
+                            const isAdded = quantity > 0;
+                            
+                            return (
+                              <Card key={itemIndex} className="flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
+                                <div className="relative aspect-square bg-gray-50">
                                   <img 
                                     src={item.image} 
                                     alt={item.name}
                                     loading="lazy"
-                                    className="w-full h-full object-cover rounded-md"
+                                    className="w-full h-full object-cover"
                                   />
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => removeIngredient(item.name)}
+                                    className="absolute top-2 right-2 h-8 w-8 bg-white/80 hover:bg-white text-red-500 hover:text-red-700"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-medium text-gray-900">
+                                
+                                <div className="p-3 flex flex-col flex-1">
+                                  <div className="text-sm font-medium text-gray-900 mb-1 line-clamp-2 min-h-[2.5rem]">
                                     {item.name}
                                   </div>
-                                  <div className="text-sm text-gray-600">{item.amount}</div>
+                                  <div className="text-xs text-muted-foreground mb-2">
+                                    {item.amount}
+                                  </div>
+                                  
+                                  <div className="mt-auto">
+                                    {loadingPrices ? (
+                                      <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                                    ) : (
+                                      <div className="text-lg font-bold text-gray-900 mb-2">
+                                        £{item.price.toFixed(2)}
+                                      </div>
+                                    )}
+                                    
+                                    {!isAdded ? (
+                                      <Button 
+                                        onClick={() => addItemToBasket(item.name)}
+                                        className="w-full bg-[#f5a623] hover:bg-[#e09612] text-white font-semibold"
+                                        size="lg"
+                                      >
+                                        Add
+                                      </Button>
+                                    ) : (
+                                      <div className="flex items-center justify-between bg-[#f5a623] rounded-md overflow-hidden">
+                                        <Button
+                                          onClick={() => updateItemQuantity(item.name, -1)}
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-10 w-10 text-white hover:bg-[#e09612] hover:text-white rounded-none"
+                                        >
+                                          <span className="text-2xl font-bold">−</span>
+                                        </Button>
+                                        <span className="text-white font-semibold text-lg px-2">
+                                          {quantity}
+                                        </span>
+                                        <Button
+                                          onClick={() => updateItemQuantity(item.name, 1)}
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-10 w-10 text-white hover:bg-[#e09612] hover:text-white rounded-none"
+                                        >
+                                          <span className="text-2xl font-bold">+</span>
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                              
-                              <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
-                                <div className="text-right">
-                                  {loadingPrices ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <div className="font-medium text-gray-900">£{item.price.toFixed(2)}</div>
-                                  )}
-                                </div>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeIngredient(item.name);
-                                  }}
-                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
+                              </Card>
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {currentIngredientsWithPrices.map((item, index) => (
-                      <div 
-                        key={index}
-                        className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
-                          checkedItems.has(item.name) 
-                            ? 'bg-green-50 border-green-200' 
-                            : 'bg-white border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-4 flex-1 min-w-0 cursor-pointer" onClick={() => toggleItem(item.name)}>
-                          {checkedItems.has(item.name) ? (
-                            <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />
-                          ) : (
-                            <Circle className="w-6 h-6 text-gray-400 flex-shrink-0" />
-                          )}
-                          <div className="w-16 h-16 flex-shrink-0">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {currentIngredientsWithPrices.map((item, index) => {
+                      const itemKey = item.name.toLowerCase();
+                      const quantity = itemQuantities.get(itemKey) || 0;
+                      const isAdded = quantity > 0;
+                      
+                      return (
+                        <Card key={index} className="flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
+                          <div className="relative aspect-square bg-gray-50">
                             <img 
                               src={item.image} 
                               alt={item.name}
                               loading="lazy"
-                              className="w-full h-full object-cover rounded-lg"
+                              className="w-full h-full object-cover"
                             />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeIngredient(item.name)}
+                              className="absolute top-2 right-2 h-8 w-8 bg-white/80 hover:bg-white text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-lg text-gray-900">{item.name}</div>
-                            <div className="text-sm text-gray-600">{item.amount}</div>
+                          
+                          <div className="p-4 flex flex-col flex-1">
+                            <div className="font-medium text-gray-900 mb-1 line-clamp-2 min-h-[3rem]">
+                              {item.name}
+                            </div>
+                            <div className="text-sm text-muted-foreground mb-3">
+                              {item.amount}
+                            </div>
+                            
+                            <div className="mt-auto">
+                              {loadingPrices ? (
+                                <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                              ) : (
+                                <div className="text-2xl font-bold text-gray-900 mb-3">
+                                  £{item.price.toFixed(2)}
+                                </div>
+                              )}
+                              
+                              {!isAdded ? (
+                                <Button 
+                                  onClick={() => addItemToBasket(item.name)}
+                                  className="w-full bg-[#f5a623] hover:bg-[#e09612] text-white font-semibold"
+                                  size="lg"
+                                >
+                                  Add
+                                </Button>
+                              ) : (
+                                <div className="flex items-center justify-between bg-[#f5a623] rounded-md overflow-hidden">
+                                  <Button
+                                    onClick={() => updateItemQuantity(item.name, -1)}
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-11 w-11 text-white hover:bg-[#e09612] hover:text-white rounded-none"
+                                  >
+                                    <span className="text-2xl font-bold">−</span>
+                                  </Button>
+                                  <span className="text-white font-semibold text-xl px-3">
+                                    {quantity}
+                                  </span>
+                                  <Button
+                                    onClick={() => updateItemQuantity(item.name, 1)}
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-11 w-11 text-white hover:bg-[#e09612] hover:text-white rounded-none"
+                                  >
+                                    <span className="text-2xl font-bold">+</span>
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-4 flex-shrink-0 ml-4">
-                          <div className="text-right">
-                            {loadingPrices ? (
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                              <div className="font-bold text-xl text-gray-900">£{item.price.toFixed(2)}</div>
-                            )}
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeIngredient(item.name);
-                            }}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
 
