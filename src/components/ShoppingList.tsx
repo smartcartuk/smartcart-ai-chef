@@ -700,20 +700,20 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
                 <div className="mt-6 flex flex-col sm:flex-row gap-3">
                   <Button 
-                    onClick={handleAddToBasket}
-                    disabled={addingToBasket || ingredients.length === 0}
+                    onClick={handleComparePrices}
+                    disabled={isComparingPrices || ingredients.length === 0}
                     className="flex-1"
                     size="lg"
                   >
-                    {addingToBasket ? (
+                    {isComparingPrices ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Adding to Basket...
+                        Comparing Prices...
                       </>
                     ) : (
                       <>
                         <ShoppingCart className="w-4 h-4 mr-2" />
-                        Add to {store.name} Basket
+                        Compare Supermarket Basket Costs
                       </>
                     )}
                   </Button>

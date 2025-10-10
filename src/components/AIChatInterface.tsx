@@ -168,5 +168,78 @@ export const AIChatInterface = ({
       setIsLoading(false);
     }
   };
-  return;
+  return (
+    <Card className="p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Sparkles className="w-5 h-5 text-primary" />
+        <h3 className="font-semibold text-lg">AI Shopping Assistant</h3>
+      </div>
+
+      <ScrollArea className="h-[400px] mb-4 rounded-lg border p-4">
+        <div className="space-y-4">
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[80%] rounded-lg p-3 ${
+                  message.role === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted'
+                }`}
+              >
+                <p className="whitespace-pre-line">{message.content}</p>
+                {message.type === 'meal-plan' && message.data && (
+                  <div className="mt-2 text-sm opacity-90">
+                    📋 {message.data.length} meals planned
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-muted rounded-lg p-3">
+                <Loader2 className="w-4 h-4 animate-spin" />
+              </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      {messages.length === 1 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+          {quickActions.map((action) => (
+            <Button
+              key={action.action}
+              variant="outline"
+              className="justify-start"
+              onClick={() => handleQuickAction(action.action)}
+            >
+              <action.icon className="w-4 h-4 mr-2" />
+              {action.label}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+          placeholder="Ask me anything about your meal planning or shopping..."
+          disabled={isLoading}
+        />
+        <Button onClick={() => handleSend()} disabled={!input.trim() || isLoading}>
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Send className="w-4 h-4" />
+          )}
+        </Button>
+      </div>
+    </Card>
+  );
 };
