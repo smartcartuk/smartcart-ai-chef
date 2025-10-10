@@ -204,6 +204,12 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
               userProfile={userProfile} 
               recipes={recipes}
               totalWeeklyCosts={totalWeeklyCosts}
+              onComparePrice={async () => {
+                // Price comparison logic can be added here if needed
+                // For now, this serves as a placeholder
+              }}
+              priceComparisonResult={null}
+              isComparingPrices={false}
             />
           </TabsContent>
 

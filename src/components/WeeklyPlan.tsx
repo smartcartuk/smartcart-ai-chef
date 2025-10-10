@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { WeeklyPlanHeader } from '@/components/WeeklyPlanHeader';
-import { PriceComparisonSection } from '@/components/PriceComparisonSection';
 import { WeeklyPlanLoading } from '@/components/WeeklyPlanLoading';
 import { RecipeGrid } from '@/components/RecipeGrid';
 import { RecipeSearchModal } from '@/components/RecipeSearchModal';
-import { SupermarketSelectionModal } from '@/components/SupermarketSelectionModal';
 import { useWeeklyPlan } from '@/hooks/useWeeklyPlan';
 import { WebhookResponse } from '@/utils/webhookService';
 import { useToast } from '@/hooks/use-toast';
@@ -143,28 +141,6 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
         onAddToPlan={handleAddToPlan}
         onRegenerateSingleRecipe={handleRegenerateSingleRecipe}
       />
-
-      <PriceComparisonSection
-        selectedIngredientsCount={selectedIngredients.length}
-        isComparingPrices={isComparingPrices}
-        priceComparisonResult={priceComparisonResult}
-        onCompareSelectedPrices={handleCompareSelectedPrices}
-      />
-
-      {/* Supermarket Selection Modal */}
-      {priceComparisonResult && (
-        <SupermarketSelectionModal
-          isOpen={showSupermarketSelection}
-          onClose={() => handleSupermarketSelection(selectedSupermarket || '')}
-          supermarkets={Object.entries(priceComparisonResult).map(([name, data]: [string, any]) => ({
-            name,
-            totalCost: data.total || 0,
-            itemCount: data.itemCount || 0,
-            savings: 0
-          }))}
-          onSelectSupermarket={handleSupermarketSelection}
-        />
-      )}
     </div>
   );
 };

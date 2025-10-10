@@ -1,15 +1,18 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, Circle, ShoppingCart, MapPin, Clock, Trash2, Loader2 } from 'lucide-react';
+import { CheckCircle, Circle, ShoppingCart, MapPin, Clock, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { WebhookResponse } from '@/utils/webhookService';
 import { getSupermarketLogo } from '@/utils/supermarketLogos';
 import { getIngredientImage } from '@/utils/recipeImageGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { AIShoppingAgent } from './AIShoppingAgent';
+import { AIChatInterface } from './AIChatInterface';
+import { SupermarketSelectionModal } from './SupermarketSelectionModal';
+import { SupermarketCredentialsModal } from './SupermarketCredentialsModal';
 import { useToast } from '@/hooks/use-toast';
 import { getConnectedStores } from '@/utils/profileService';
 
@@ -18,6 +21,9 @@ interface ShoppingListProps {
   generatedData?: WebhookResponse | null;
   recipes?: any[];
   totalWeeklyCosts?: any;
+  onComparePrice?: () => Promise<void>;
+  priceComparisonResult?: any;
+  isComparingPrices?: boolean;
 }
 
 // Helper function to capitalize first letter of each word
@@ -31,7 +37,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   userProfile, 
   generatedData, 
   recipes = [],
-  totalWeeklyCosts 
+  totalWeeklyCosts,
+  onComparePrice,
+  priceComparisonResult,
+  isComparingPrices = false
 }) => {
   const [activeStore, setActiveStore] = useState('tesco');
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
@@ -41,17 +50,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [ingredientPrices, setIngredientPrices] = useState<Map<string, any>>(new Map());
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [removedIngredients, setRemovedIngredients] = useState<Set<string>>(new Set());
+  const [showSupermarketSelection, setShowSupermarketSelection] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [selectedSupermarket, setSelectedSupermarket] = useState<string>('');
   const { toast } = useToast();
 
   // Load connected stores on mount
+  const loadStores = async () => {
+    const result = await getConnectedStores();
+    if (result.success && result.data) {
+      setConnectedStores(result.data);
+      console.log('Connected stores loaded:', result.data);
+    }
+  };
+
   useEffect(() => {
-    const loadStores = async () => {
-      const result = await getConnectedStores();
-      if (result.success && result.data) {
-        setConnectedStores(result.data);
-        console.log('Connected stores loaded:', result.data);
-      }
-    };
     loadStores();
   }, []);
 
@@ -97,6 +110,30 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       image: item.image
     }));
   }, [recipes, removedIngredients]);
+
+  const handleComparePrices = async () => {
+    if (onComparePrice) {
+      await onComparePrice();
+      setShowSupermarketSelection(true);
+    }
+  };
+
+  const handleSupermarketSelection = (supermarket: string) => {
+    setSelectedSupermarket(supermarket);
+    setShowSupermarketSelection(false);
+    toast({
+      title: "Supermarket selected",
+      description: `Selected ${supermarket} as your preferred store`,
+    });
+  };
+
+  // Check which stores have credentials
+  const storesWithCredentials = connectedStores.filter(store => 
+    store.credentials?.username && store.credentials?.password
+  );
+  const storesWithoutCredentials = connectedStores.filter(store => 
+    !store.credentials?.username || !store.credentials?.password
+  );
 
   // Show empty state if no recipes or ingredients
   if (recipes.length === 0 || ingredients.length === 0) {
@@ -336,6 +373,60 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Header with Compare Prices Button */}
+      <Card className="p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold mb-2">Shopping List</h2>
+            <p className="text-muted-foreground">
+              {ingredients.length} ingredients from {recipes.length} recipes
+            </p>
+          </div>
+          {onComparePrice && (
+            <Button 
+              onClick={handleComparePrices}
+              disabled={isComparingPrices || ingredients.length === 0}
+              size="lg"
+              className="w-full sm:w-auto"
+            >
+              {isComparingPrices ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Comparing Prices...
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Compare Prices
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      {/* Store Connection Status Alert */}
+      {storesWithoutCredentials.length > 0 && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Connect Your Stores</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2">
+            <p>
+              Connect your supermarket accounts to enable AI shopping. 
+              Missing credentials for: {storesWithoutCredentials.map(s => s.name).join(', ')}
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowCredentialsModal(true)}
+              className="w-fit"
+            >
+              Connect Stores
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Shopping List Header */}
       <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
@@ -562,34 +653,32 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                             : 'bg-white border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <div className="flex items-center space-x-3 flex-1 min-w-0 cursor-pointer" onClick={() => toggleItem(item.name)}>
+                        <div className="flex items-center space-x-4 flex-1 min-w-0 cursor-pointer" onClick={() => toggleItem(item.name)}>
                           {checkedItems.has(item.name) ? (
-                            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                            <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />
                           ) : (
-                            <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                            <Circle className="w-6 h-6 text-gray-400 flex-shrink-0" />
                           )}
-                          <div className="w-12 h-12 flex-shrink-0">
-                             <img 
-                               src={item.image} 
-                               alt={item.name}
-                               loading="lazy"
-                               className="w-full h-full object-cover rounded-md"
-                             />
+                          <div className="w-16 h-16 flex-shrink-0">
+                            <img 
+                              src={item.image} 
+                              alt={item.name}
+                              loading="lazy"
+                              className="w-full h-full object-cover rounded-lg"
+                            />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="font-medium text-gray-900">
-                              {item.name}
-                            </div>
+                            <div className="font-medium text-lg text-gray-900">{item.name}</div>
                             <div className="text-sm text-gray-600">{item.amount}</div>
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+                        <div className="flex items-center space-x-4 flex-shrink-0 ml-4">
                           <div className="text-right">
                             {loadingPrices ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <Loader2 className="w-5 h-5 animate-spin" />
                             ) : (
-                              <div className="font-medium text-gray-900">£{item.price.toFixed(2)}</div>
+                              <div className="font-bold text-xl text-gray-900">£{item.price.toFixed(2)}</div>
                             )}
                           </div>
                           <Button
@@ -601,106 +690,104 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                             }}
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-5 h-5" />
                           </Button>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </Card>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
-                <Button 
-                  className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-white"
-                  onClick={handleAddToBasket}
-                  disabled={addingToBasket || loadingPrices || !connectedStores.some(s => s.name.toLowerCase() === activeStore)}
-                >
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  {addingToBasket ? 'Adding to basket...' : `Add to ${store.name} Basket`}
-                </Button>
-                <Button variant="outline" className="flex-1">
-                  Export Shopping List
-                </Button>
-              </div>
+                <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                  <Button 
+                    onClick={handleAddToBasket}
+                    disabled={addingToBasket || ingredients.length === 0}
+                    className="flex-1"
+                    size="lg"
+                  >
+                    {addingToBasket ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Adding to Basket...
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Add to {store.name} Basket
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </Card>
             </TabsContent>
           );
         })}
       </Tabs>
 
-      {/* AI Shopping Agent */}
-      <AIShoppingAgent 
-        ingredients={ingredients.map(ingredient => {
-          const priceData = ingredientPrices.get(ingredient.name.toLowerCase());
-          return {
-            name: ingredient.name,
-            amount: ingredient.amount,
-            prices: Object.keys(storeTotals).map(store => ({
+      {/* AI Shopping Agent Section */}
+      {storesWithCredentials.length > 0 ? (
+        <AIShoppingAgent 
+          ingredients={ingredients.map(ing => ({
+            name: ing.name,
+            amount: ing.amount,
+            prices: Object.entries(ingredientPrices.get(ing.name.toLowerCase()) || {}).map(([store, priceInfo]: [string, any]) => ({
               store,
-              price: priceData?.[store]?.price || 0,
-              title: ingredient.name,
-              url: `https://${store}.com/search?q=${encodeURIComponent(ingredient.name)}`
+              price: priceInfo.price,
+              url: priceInfo.url,
+              title: priceInfo.title
             }))
-          };
-        })}
-        connectedStores={connectedStores}
-        onShoppingComplete={(results) => {
-          console.log('AI Shopping completed:', results);
-          toast({
-            title: "AI Shopping Results",
-            description: `Completed shopping tasks for ${results.filter((r: any) => r.success).length} stores.`
-          });
-        }}
-      />
-
-      {/* Live Weekly Cost Comparison */}
-      {totalWeeklyCosts && (
-        <Card className="p-6 bg-gradient-to-r from-purple-50 to-pink-50">
-          <h3 className="font-semibold text-lg mb-4">Live Weekly Cost Comparison</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stores.map(store => {
-              const { logo, emoji } = getSupermarketLogo(store.id);
-              return (
-                <div key={store.id} className="text-center p-4 bg-white rounded-lg shadow-sm">
-                  <div className="w-16 h-10 mx-auto mb-3 flex items-center justify-center">
-                    <img 
-                      src={logo} 
-                      alt={store.name}
-                      loading="lazy"
-                      className="max-w-full max-h-full object-contain"
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        target.style.display = 'none';
-                        const fallback = target.nextElementSibling as HTMLElement;
-                        if (fallback) {
-                          fallback.style.display = 'block';
-                        }
-                      }}
-                    />
-                    <span 
-                      className="text-2xl hidden"
-                    >
-                      {emoji}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="font-medium text-sm">{store.name}</div>
-                    <div className="text-lg font-bold text-blue-600">
-                      £{store.total.toFixed(2)}
-                    </div>
-                    {store.savings > 0 && (
-                      <div className="text-xs text-green-600">
-                        Save £{store.savings.toFixed(2)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          }))}
+          connectedStores={storesWithCredentials}
+        />
+      ) : (
+        <Card className="p-6">
+          <div className="text-center space-y-4">
+            <AlertCircle className="h-12 w-12 mx-auto text-yellow-600" />
+            <div>
+              <h3 className="text-lg font-semibold mb-2">AI Shopping Unavailable</h3>
+              <p className="text-muted-foreground mb-4">
+                Connect your supermarket accounts to enable autonomous AI shopping
+              </p>
+              <Button onClick={() => setShowCredentialsModal(true)}>
+                Connect Stores Now
+              </Button>
+            </div>
           </div>
         </Card>
       )}
+
+      {/* AI Chat Interface */}
+      <AIChatInterface 
+        userProfile={userProfile}
+      />
+
+      {/* Supermarket Selection Modal */}
+      {priceComparisonResult && (
+        <SupermarketSelectionModal
+          isOpen={showSupermarketSelection}
+          onClose={() => setShowSupermarketSelection(false)}
+          supermarkets={Object.entries(priceComparisonResult).map(([name, data]: [string, any]) => ({
+            name,
+            totalCost: data.total || 0,
+            itemCount: data.itemCount || 0,
+            savings: 0
+          }))}
+          onSelectSupermarket={handleSupermarketSelection}
+        />
+      )}
+
+      {/* Supermarket Credentials Modal */}
+      <SupermarketCredentialsModal
+        isOpen={showCredentialsModal}
+        onClose={() => setShowCredentialsModal(false)}
+        onSave={(creds) => {
+          loadStores();
+          toast({
+            title: "Credentials saved",
+            description: "Your supermarket credentials have been saved successfully.",
+          });
+        }}
+      />
     </div>
   );
 };
