@@ -98,6 +98,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }));
   }, [recipes, removedIngredients]);
 
+  // Show empty state if no recipes or ingredients
+  if (recipes.length === 0 || ingredients.length === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <ShoppingCart className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+        <h3 className="text-xl font-semibold text-gray-700 mb-2">
+          No Shopping List Yet
+        </h3>
+        <p className="text-gray-600 mb-4">
+          Add recipes to your meal plan to generate a shopping list
+        </p>
+      </Card>
+    );
+  }
+
   // Fetch prices for all ingredients from unified-price-lookup
   useEffect(() => {
     const fetchPrices = async () => {
@@ -140,7 +155,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     };
 
     fetchPrices();
-  }, [ingredients.length]);
+  }, [ingredients]);
 
   // Calculate total costs per store from actual prices
   const storeTotals = React.useMemo(() => {

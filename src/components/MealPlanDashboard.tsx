@@ -200,7 +200,11 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
           </TabsContent>
 
           <TabsContent value="shopping">
-            <ShoppingList userProfile={userProfile} />
+            <ShoppingList 
+              userProfile={userProfile} 
+              recipes={recipes}
+              totalWeeklyCosts={totalWeeklyCosts}
+            />
           </TabsContent>
 
           <TabsContent value="favorites">
