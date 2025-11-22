@@ -33,16 +33,14 @@ export const RecipeSearchModal = ({ isOpen, onClose, onSelectRecipe, userProfile
 
     setIsSearching(true);
     try {
-      const { data, error } = await supabase.functions.invoke('spoonacular-meal-planner', {
+      const { data, error } = await supabase.functions.invoke('suggestic-meal-planner', {
         body: {
           action: 'search',
-          query: searchQuery,
-          userPreferences: {
-            dietaryPreferences: userProfile.dietary_preferences || [],
-            allergies: userProfile.allergies || [],
-            householdSize: userProfile.household_size || 2,
-            weeklyBudget: userProfile.weekly_budget || 80
-          }
+          searchQuery: searchQuery,
+          dietaryPreferences: userProfile.dietary_preferences || [],
+          allergies: userProfile.allergies || [],
+          householdSize: userProfile.household_size || 2,
+          maxPrepTime: 60
         }
       });
 
@@ -50,6 +48,13 @@ export const RecipeSearchModal = ({ isOpen, onClose, onSelectRecipe, userProfile
 
       if (data.success && data.recipes) {
         setSearchResults(data.recipes);
+        
+        if (data.recipes.length === 0) {
+          toast({
+            title: "No recipes found",
+            description: "Try a different search term or dietary preference",
+          });
+        }
       } else {
         throw new Error('No recipes found');
       }
@@ -99,14 +104,15 @@ export const RecipeSearchModal = ({ isOpen, onClose, onSelectRecipe, userProfile
               <Card key={index} className="p-4 cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => handleSelectRecipe(recipe)}>
                 <div className="flex gap-4">
                   {recipe.image && (
-                    <img src={recipe.image} alt={recipe.name} className="w-24 h-24 object-cover rounded" />
+                    <img src={recipe.image} alt={recipe.title} className="w-24 h-24 object-cover rounded" />
                   )}
                   <div className="flex-1">
-                    <h3 className="font-semibold">{recipe.name}</h3>
+                    <h3 className="font-semibold">{recipe.title}</h3>
                     <p className="text-sm text-muted-foreground line-clamp-2">{recipe.description}</p>
                     <div className="flex gap-4 mt-2 text-sm">
-                      <span>⏱️ {recipe.prepTime + recipe.cookTime} mins</span>
-                      <span>💷 £{recipe.estimatedCost?.toFixed(2) || '0.00'}</span>
+                      <span>⏱️ {(recipe.prepTime || 0) + (recipe.cookTime || 0)} mins</span>
+                      <span>🍽️ {recipe.servings} servings</span>
+                      {recipe.cuisine && <span>🌍 {recipe.cuisine}</span>}
                     </div>
                   </div>
                 </div>
