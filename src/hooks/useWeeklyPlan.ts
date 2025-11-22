@@ -55,19 +55,18 @@ export const useWeeklyPlan = (userProfile: any) => {
     setError(null);
     
     try {
-      console.log('🔄 Generating weekly recipes from Spoonacular with user preferences:', {
+      console.log('🔄 Generating weekly recipes from Suggestic with user preferences:', {
         userProfile
       });
       
-      const { data, error } = await supabase.functions.invoke('spoonacular-meal-planner', {
+      const { data, error } = await supabase.functions.invoke('suggestic-meal-planner', {
         body: { 
-          userPreferences: {
-            dietaryPreferences: userProfile?.dietaryPreferences || [],
-            allergies: userProfile?.allergies || [],
-            householdSize: userProfile?.householdSize || 2,
-            weeklyBudget: userProfile?.weeklyBudget || 50,
-            address: userProfile?.address
-          }
+          action: 'generate',
+          dietaryPreferences: userProfile?.dietary_preferences || [],
+          allergies: userProfile?.allergies || [],
+          householdSize: userProfile?.household_size || 2,
+          maxPrepTime: 45,
+          calorieTarget: 2000
         }
       });
 
@@ -76,68 +75,78 @@ export const useWeeklyPlan = (userProfile: any) => {
         throw new Error(`Failed to fetch weekly recipes: ${error.message}`);
       }
 
-      console.log('📊 Operator API response:', data);
+      console.log('📊 Suggestic API response:', data);
 
       let weeklyRecipes: Recipe[] = [];
 
-      if (data.meals && Array.isArray(data.meals)) {
-        console.log('✅ Processing meals array from Operator API:', data.meals.length, 'meals');
+      if (data.success && data.mealPlan?.days && Array.isArray(data.mealPlan.days)) {
+        console.log('✅ Processing Suggestic meal plan:', data.mealPlan.days.length, 'days');
         
-        weeklyRecipes = data.meals.map((meal: any, index: number) => {
-          // Use the cost structure from the API response
-          let estimatedPrice = meal.estimated_cost || meal.cost_per_meal || meal.estimated_price;
+        weeklyRecipes = data.mealPlan.days.flatMap((day: any, dayIndex: number) => {
+          const dayMeals = day.meals?.meal || [];
           
-          if (!estimatedPrice && meal.cost_by_supermarket) {
-            const prices = Object.values(meal.cost_by_supermarket) as number[];
-            estimatedPrice = Math.min(...prices);
-          }
-          
-          estimatedPrice = estimatedPrice || 5.00;
-          
-          const recipeName = meal.recipe_name || meal.name || 'Generated Recipe';
-          
-          // Enhanced image URL handling
-          let imageUrl = meal.picture_url || meal.image;
-          
-          // Always try to get a better image using our generator
-          if (!imageUrl || 
-              imageUrl.includes('unsplash') || 
-              imageUrl === 'https://images.unsplash.com/photo-1565299624946?w=400&h=300&fit=crop&auto=format' ||
-              !imageUrl.includes('spoonacular')) {
-            imageUrl = generateMealImage(recipeName);
-          }
-          
-          console.log(`🖼️ Image for ${recipeName}:`, imageUrl);
-          
-          return {
-            day: meal.day || DAYS_OF_WEEK[index],
-            recipe_name: recipeName,
-            ingredients: meal.ingredients || [],
-            instructions: meal.instructions || 'No instructions provided',
-            estimated_cost: estimatedPrice,
-            estimated_price: estimatedPrice,
-            cost_per_meal: estimatedPrice,
-            image: imageUrl,
-            picture_url: imageUrl,
-            description: meal.description || '',
-            nutritional_info: meal.nutritional_info || meal.nutrition || null,
-            nutrition: meal.nutrition || meal.nutritional_info || null,
-            cost_by_supermarket: meal.cost_by_supermarket || {
-              tesco: estimatedPrice,
-              sainsburys: estimatedPrice * 1.05,
-              asda: estimatedPrice * 0.95,
-              aldi: estimatedPrice * 0.90
-            }
-          };
+          return dayMeals.map((meal: any, mealIndex: number) => {
+            const recipeName = meal.title || meal.recipe_name || 'Generated Recipe';
+            
+            // Use Suggestic images directly - they're high quality
+            const imageUrl = meal.image || generateMealImage(recipeName);
+            
+            // Parse ingredients
+            const ingredients = (meal.ingredients || []).map((ing: any) => ({
+              name: ing.name || ing,
+              amount: ing.amount || '1',
+              unit: ing.unit || 'unit'
+            }));
+            
+            // Parse instructions
+            const instructions = Array.isArray(meal.instructions) 
+              ? meal.instructions.map((inst: any) => inst.instruction || inst).join('\n')
+              : meal.instructions || 'No instructions provided';
+            
+            // Parse nutrition
+            const nutrition = meal.nutrition || {};
+            const nutritional_info = {
+              calories: nutrition.calories || 0,
+              protein: nutrition.protein || '0g',
+              carbs: nutrition.carbs || '0g',
+              fat: nutrition.fat || '0g',
+              fiber: nutrition.fiber || '0g'
+            };
+            
+            const estimatedPrice = 5.00; // Default price, will be calculated later
+            
+            return {
+              day: DAYS_OF_WEEK[dayIndex] || `Day ${dayIndex + 1}`,
+              recipe_name: recipeName,
+              ingredients,
+              instructions,
+              estimated_cost: estimatedPrice,
+              estimated_price: estimatedPrice,
+              cost_per_meal: estimatedPrice,
+              image: imageUrl,
+              picture_url: imageUrl,
+              description: meal.description || `${recipeName} - ${meal.difficulty || 'Easy'}`,
+              nutritional_info,
+              nutrition: nutritional_info,
+              cost_by_supermarket: {
+                tesco: estimatedPrice,
+                sainsburys: estimatedPrice * 1.05,
+                asda: estimatedPrice * 0.95,
+                aldi: estimatedPrice * 0.90
+              },
+              tags: meal.tags || [],
+              cuisine: meal.cuisine || '',
+              prep_time: meal.prepTime,
+              cook_time: meal.cookTime,
+              difficulty: meal.difficulty || 'Easy',
+              servings: meal.servings || 2
+            };
+          });
         });
 
-        // Store the total weekly costs from the API response
-        if (data.total_week_cost) {
-          setTotalWeeklyCosts(data.total_week_cost);
-          console.log('💰 Total weekly costs from API:', data.total_week_cost);
-        }
+        console.log('✅ Processed Suggestic meals:', weeklyRecipes);
       } else {
-        console.log('⚠️ Single recipe response or no meals array, using fallback approach');
+        console.log('⚠️ Invalid Suggestic response, using fallback approach');
         
         // Enhanced fallback that considers user preferences
         const fallbackRecipes = await generateFallbackRecipes(userProfile);
