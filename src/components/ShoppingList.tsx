@@ -3,7 +3,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, Circle, ShoppingCart, MapPin, Clock, Trash2, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { CheckCircle, Circle, ShoppingCart, MapPin, Clock, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { WebhookResponse } from '@/utils/webhookService';
 import { getSupermarketLogo } from '@/utils/supermarketLogos';
 import { getIngredientImage } from '@/utils/recipeImageGenerator';
@@ -36,6 +38,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [ingredientPrices, setIngredientPrices] = useState<Map<string, any>>(new Map());
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [removedIngredients, setRemovedIngredients] = useState<Set<string>>(new Set());
+  const [useSuggesticList, setUseSuggesticList] = useState(false);
+  const [suggesticItems, setSuggesticItems] = useState<any[]>([]);
+  const [loadingSuggestic, setLoadingSuggestic] = useState(false);
   const {
     toast
   } = useToast();
@@ -52,8 +57,58 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     loadStores();
   }, []);
 
+  // Fetch Suggestic shopping list
+  const fetchSuggesticShoppingList = async () => {
+    setLoadingSuggestic(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('suggestic-meal-planner', {
+        body: { action: 'shopping-list' }
+      });
+
+      if (error) throw error;
+
+      if (data?.success && data?.shoppingList) {
+        setSuggesticItems(data.shoppingList);
+        console.log('✅ Fetched Suggestic shopping list:', data.shoppingList);
+        toast({
+          title: "Shopping list synced!",
+          description: `Loaded ${data.shoppingList.length} items from Suggestic`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error fetching Suggestic shopping list:', error);
+      toast({
+        title: "Failed to sync shopping list",
+        description: error.message || "Could not fetch shopping list from Suggestic",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingSuggestic(false);
+    }
+  };
+
+  // Fetch Suggestic shopping list when enabled
+  useEffect(() => {
+    if (useSuggesticList) {
+      fetchSuggesticShoppingList();
+    }
+  }, [useSuggesticList]);
+
   // Extract and consolidate ingredients from recipes (excluding removed ones)
   const ingredients = React.useMemo(() => {
+    // Use Suggestic shopping list if enabled
+    if (useSuggesticList && suggesticItems.length > 0) {
+      return suggesticItems.map((item: any) => ({
+        name: capitalizeWords(item.ingredient),
+        amount: `${item.quantity || ''} ${item.unit || ''}`.trim(),
+        image: getIngredientImage(item.ingredient),
+        aisle: item.aisleName,
+        isDone: item.isDone,
+        grams: item.grams
+      }));
+    }
+
+    // Otherwise extract from recipes
     const ingredientMap = new Map<string, {
       name: string;
       totalAmount: number;
@@ -95,7 +150,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       amount: item.count > 1 ? `${item.totalAmount}${item.unit} (${item.count} recipes)` : `${item.totalAmount}${item.unit}`,
       image: item.image
     }));
-  }, [recipes, removedIngredients]);
+  }, [recipes, removedIngredients, useSuggesticList, suggesticItems]);
 
   // Show empty state if no recipes or ingredients
   if (recipes.length === 0 || ingredients.length === 0) {
@@ -311,11 +366,37 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       {/* Shopping List Header */}
       <Card className="p-6 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-          <div>
+          <div className="flex-1">
             <h2 className="text-2xl font-bold text-gray-900">Smart Shopping List</h2>
             <p className="text-gray-600 mt-1">
-              {loadingPrices ? 'Fetching live prices...' : 'Optimized for your weekly meal plan with live price comparisons'}
+              {loadingPrices ? 'Fetching live prices...' : useSuggesticList ? 'Synced with Suggestic' : 'Optimized for your weekly meal plan with live price comparisons'}
             </p>
+            
+            {/* Suggestic Sync Toggle */}
+            <div className="flex items-center space-x-3 mt-4">
+              <Switch 
+                id="suggestic-sync" 
+                checked={useSuggesticList}
+                onCheckedChange={setUseSuggesticList}
+              />
+              <Label htmlFor="suggestic-sync" className="text-sm font-medium cursor-pointer">
+                Sync with Suggestic Shopping List
+              </Label>
+              {useSuggesticList && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={fetchSuggesticShoppingList}
+                  disabled={loadingSuggestic}
+                >
+                  {loadingSuggestic ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center space-x-6">
@@ -326,7 +407,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               <div className="text-sm text-gray-600">Items</div>
             </div>
             <div className="text-center">
-              {loadingPrices ? <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" /> : <div className="text-2xl font-bold text-blue-600">
+              {loadingPrices || loadingSuggestic ? <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" /> : <div className="text-2xl font-bold text-blue-600">
                   £{currentStore.total.toFixed(2)}
                 </div>}
               <div className="text-sm text-gray-600">Total Cost</div>
