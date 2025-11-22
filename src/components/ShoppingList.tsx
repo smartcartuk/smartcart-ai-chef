@@ -67,7 +67,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       if (error) throw error;
 
-      if (data?.success && data?.shoppingList) {
+      if (!data?.success) {
+        // Check if it's an authorization error
+        if (data?.error?.includes('Not authorized')) {
+          toast({
+            title: "Suggestic API Limitation",
+            description: "Your Suggestic API plan doesn't include shopping list access. Using recipe-based list instead.",
+            variant: "destructive"
+          });
+          setUseSuggesticList(false);
+          return;
+        }
+        throw new Error(data?.error || 'Failed to fetch shopping list');
+      }
+
+      if (data?.shoppingList) {
         setSuggesticItems(data.shoppingList);
         console.log('✅ Fetched Suggestic shopping list:', data.shoppingList);
         toast({
@@ -78,10 +92,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     } catch (error: any) {
       console.error('Error fetching Suggestic shopping list:', error);
       toast({
-        title: "Failed to sync shopping list",
-        description: error.message || "Could not fetch shopping list from Suggestic",
+        title: "Suggestic API Not Available",
+        description: "Using recipe-based shopping list instead.",
         variant: "destructive"
       });
+      setUseSuggesticList(false);
     } finally {
       setLoadingSuggestic(false);
     }
@@ -372,31 +387,33 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               {loadingPrices ? 'Fetching live prices...' : useSuggesticList ? 'Synced with Suggestic' : 'Optimized for your weekly meal plan with live price comparisons'}
             </p>
             
-            {/* Suggestic Sync Toggle */}
-            <div className="flex items-center space-x-3 mt-4">
-              <Switch 
-                id="suggestic-sync" 
-                checked={useSuggesticList}
-                onCheckedChange={setUseSuggesticList}
-              />
-              <Label htmlFor="suggestic-sync" className="text-sm font-medium cursor-pointer">
-                Sync with Suggestic Shopping List
-              </Label>
-              {useSuggesticList && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={fetchSuggesticShoppingList}
-                  disabled={loadingSuggestic}
-                >
-                  {loadingSuggestic ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4" />
-                  )}
-                </Button>
-              )}
-            </div>
+            {/* Suggestic Sync Toggle - Hidden for now due to API limitations */}
+            {false && (
+              <div className="flex items-center space-x-3 mt-4">
+                <Switch 
+                  id="suggestic-sync" 
+                  checked={useSuggesticList}
+                  onCheckedChange={setUseSuggesticList}
+                />
+                <Label htmlFor="suggestic-sync" className="text-sm font-medium cursor-pointer">
+                  Sync with Suggestic Shopping List
+                </Label>
+                {useSuggesticList && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={fetchSuggesticShoppingList}
+                    disabled={loadingSuggestic}
+                  >
+                    {loadingSuggestic ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="flex items-center space-x-6">
