@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface SuggesticMealPlanRequest {
-  action: 'generate' | 'search' | 'shopping-list';
+  action: 'generate' | 'search' | 'shopping-list' | 'add-to-shopping-list';
   dietaryPreferences?: string[];
   allergies?: string[];
   householdSize?: number;
@@ -15,6 +15,7 @@ interface SuggesticMealPlanRequest {
   weekStart?: string;
   searchQuery?: string;
   calorieTarget?: number;
+  recipeIds?: string[];
 }
 
 serve(async (req) => {
@@ -46,7 +47,7 @@ serve(async (req) => {
     }
 
     const requestBody: SuggesticMealPlanRequest = await req.json();
-    const { action, dietaryPreferences = [], allergies = [], householdSize = 2, maxPrepTime = 45, searchQuery, calorieTarget } = requestBody;
+    const { action, dietaryPreferences = [], allergies = [], householdSize = 2, maxPrepTime = 45, searchQuery, calorieTarget, recipeIds } = requestBody;
 
     console.log(`Suggestic API request - Action: ${action}, User: ${user.id}`);
 
@@ -69,6 +70,18 @@ serve(async (req) => {
         JSON.stringify({ success: true, shoppingList }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    } else if (action === 'add-to-shopping-list') {
+      // Add recipes to shopping list
+      if (!recipeIds || recipeIds.length === 0) {
+        throw new Error('No recipe IDs provided');
+      }
+      
+      const result = await addRecipesToShoppingList(SUGGESTIC_API_KEY, recipeIds);
+      
+      return new Response(
+        JSON.stringify({ success: true, ...result }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     } else if (action === 'generate') {
       // Generate a full weekly meal plan
       const mealPlan = await generateWeeklyMealPlan(
@@ -77,6 +90,23 @@ serve(async (req) => {
         householdSize,
         calorieTarget
       );
+      
+      // Automatically add all generated recipes to shopping list
+      const recipeIds = mealPlan.days
+        .flatMap((day: any) => Object.values(day.meals || {}))
+        .flat()
+        .map((recipe: any) => recipe.id)
+        .filter(Boolean);
+      
+      if (recipeIds.length > 0) {
+        console.log(`Adding ${recipeIds.length} recipes to shopping list:`, recipeIds);
+        try {
+          await addRecipesToShoppingList(SUGGESTIC_API_KEY, recipeIds);
+        } catch (error) {
+          console.error('Failed to add recipes to shopping list:', error);
+          // Don't fail the whole request if shopping list fails
+        }
+      }
       
       return new Response(
         JSON.stringify({ success: true, mealPlan }),
@@ -187,6 +217,54 @@ async function searchRecipes(
   
   console.log(`Found ${recipes.length} recipes for query: ${query}`);
   return recipes;
+}
+
+async function addRecipesToShoppingList(apiKey: string, recipeIds: string[]): Promise<any> {
+  console.log(`Adding ${recipeIds.length} recipes to shopping list`);
+
+  const graphqlQuery = `
+    mutation AddRecipesToShoppingList($recipeIds: [UUID!]!) {
+      addRecipesToShoppingList(recipeIds: $recipeIds) {
+        success
+        message
+      }
+    }
+  `;
+
+  const variables = {
+    recipeIds
+  };
+
+  const response = await fetch('https://production.suggestic.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Token ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query: graphqlQuery, variables })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Suggestic API error:', response.status, errorText);
+    throw new Error(`Suggestic API returned ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  if (data.errors) {
+    console.error('GraphQL errors:', JSON.stringify(data.errors));
+    throw new Error('Failed to add recipes to shopping list: ' + JSON.stringify(data.errors));
+  }
+
+  const result = data.data?.addRecipesToShoppingList;
+  
+  if (!result?.success) {
+    throw new Error(result?.message || 'Failed to add recipes to shopping list');
+  }
+  
+  console.log(`✅ Successfully added recipes to shopping list: ${result.message}`);
+  return result;
 }
 
 async function getShoppingList(apiKey: string): Promise<any> {

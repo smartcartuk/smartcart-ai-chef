@@ -102,17 +102,16 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }
   };
 
-  // Fetch Suggestic shopping list when enabled
+  // Always fetch Suggestic shopping list to sync with meal plan
   useEffect(() => {
-    if (useSuggesticList) {
-      fetchSuggesticShoppingList();
-    }
-  }, [useSuggesticList]);
+    fetchSuggesticShoppingList();
+  }, []);
 
   // Extract and consolidate ingredients from recipes (excluding removed ones)
   const ingredients = React.useMemo(() => {
-    // Use Suggestic shopping list if enabled
-    if (useSuggesticList && suggesticItems.length > 0) {
+    // Always prioritize Suggestic shopping list if available
+    if (suggesticItems.length > 0) {
+      console.log('🛒 Using Suggestic shopping list:', suggesticItems.length, 'items');
       return suggesticItems.map((item: any) => ({
         name: capitalizeWords(item.ingredient),
         amount: `${item.quantity || ''} ${item.unit || ''}`.trim(),
@@ -123,7 +122,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       }));
     }
 
-    // Otherwise extract from recipes
+    // Fallback: extract from recipes if Suggestic list is empty
     const ingredientMap = new Map<string, {
       name: string;
       totalAmount: number;
@@ -165,7 +164,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       amount: item.count > 1 ? `${item.totalAmount}${item.unit} (${item.count} recipes)` : `${item.totalAmount}${item.unit}`,
       image: item.image
     }));
-  }, [recipes, removedIngredients, useSuggesticList, suggesticItems]);
+  }, [recipes, removedIngredients, suggesticItems]);
 
   // Show empty state if no recipes or ingredients
   if (recipes.length === 0 || ingredients.length === 0) {
@@ -404,7 +403,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-gray-900">Smart Shopping List</h2>
             <p className="text-gray-600 mt-1">
-              {loadingPrices ? 'Fetching live prices...' : useSuggesticList ? 'Synced with Suggestic' : 'Optimized for your weekly meal plan with live price comparisons'}
+              {loadingPrices && 'Fetching live prices...'}
+              {!loadingPrices && suggesticItems.length > 0 && (
+                <span className="text-green-600">✓ Synced with Suggestic ({suggesticItems.length} items from your meal plan)</span>
+              )}
+              {!loadingPrices && suggesticItems.length === 0 && 'Optimized for your weekly meal plan with live price comparisons'}
             </p>
             
             {/* Suggestic Sync Toggle - Hidden for now due to API limitations */}
