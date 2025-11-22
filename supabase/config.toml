@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.suggestic-meal-planner]
 verify_jwt = false
+
+[functions.suggestic-test]
+verify_jwt = false
