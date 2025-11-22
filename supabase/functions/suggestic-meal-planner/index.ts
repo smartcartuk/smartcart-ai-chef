@@ -158,7 +158,7 @@ async function searchRecipes(
 
   const variables = {
     query,
-    tags: dietaryTags.length > 0 ? dietaryTags : undefined
+    ...(dietaryTags.length > 0 && { tags: dietaryTags })
   };
 
   const response = await fetch('https://production.suggestic.com/graphql', {
