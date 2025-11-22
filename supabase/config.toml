@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.spoonacular-meal-planner]
 verify_jwt = false
+
+[functions.suggestic-meal-planner]
+verify_jwt = false

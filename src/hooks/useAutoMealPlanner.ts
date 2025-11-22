@@ -15,16 +15,15 @@ export const useAutoMealPlanner = (userProfile: any) => {
     console.log('🤖 Auto-generating AI meal plan for user profile:', userProfile);
 
     try {
-      // Call Spoonacular meal planner for real recipe data
-      const { data, error } = await supabase.functions.invoke('spoonacular-meal-planner', {
+      // Call Suggestic meal planner for real recipe data
+      const { data, error } = await supabase.functions.invoke('suggestic-meal-planner', {
         body: {
-          userPreferences: {
-            dietaryPreferences: userProfile.dietary_preferences || [],
-            allergies: userProfile.allergies || [],
-            householdSize: userProfile.household_size || 2,
-            weeklyBudget: userProfile.weekly_budget || 80,
-            address: userProfile.address
-          }
+          action: 'generate',
+          dietaryPreferences: userProfile.dietary_preferences || [],
+          allergies: userProfile.allergies || [],
+          householdSize: userProfile.household_size || 2,
+          maxPrepTime: 45,
+          calorieTarget: (userProfile.household_size || 2) * 2000
         }
       });
 
@@ -32,20 +31,25 @@ export const useAutoMealPlanner = (userProfile: any) => {
         throw error;
       }
 
-      if (!data.success) {
+      if (!data.success || !data.mealPlan) {
         throw new Error(data.error || 'Failed to generate meal plan');
       }
 
-      console.log('✅ AI meal plan generated:', data.meals);
+      console.log('✅ Suggestic meal plan generated:', data.mealPlan);
+
+      // Format meal plan data for storage
+      const meals = data.mealPlan.days?.flatMap((day: any) => 
+        Object.values(day.meals || {}).filter(Boolean)
+      ) || [];
 
       // Save to database
-      await saveMealPlan(data.meals);
+      await saveMealPlan(meals);
 
-      setGeneratedMeals(data);
+      setGeneratedMeals({ meals });
 
       toast({
         title: "Meal Plan Generated! 🎉",
-        description: `Created ${data.meals.length} personalized recipes with prices`,
+        description: `Created ${meals.length} personalized recipes with Suggestic`,
       });
 
       return data;
