@@ -123,70 +123,26 @@ serve(async (req) => {
       throw new Error('No Suggestic user ID available. Call with action: create-user first.');
     }
 
-    // Get JWT token for the user
-    console.log('Generating JWT token for user:', suggesticUserId);
-    
-    const loginMutation = `
-      mutation Login($userId: String!) {
-        login(userId: $userId) {
-          jwt
-        }
-      }
-    `;
+    // Update profile with Suggestic user ID (no JWT needed)
+    console.log('Saving Suggestic user ID to profile:', suggesticUserId);
 
-    const loginResponse = await fetch('https://production.suggestic.com/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Token ${SUGGESTIC_API_KEY}`,
-      },
-      body: JSON.stringify({
-        query: loginMutation,
-        variables: {
-          userId: suggesticUserId,
-        },
-      }),
-    });
-
-    const loginData = await loginResponse.json();
-    
-    if (loginData.errors) {
-      console.error('Failed to get JWT token:', loginData.errors);
-      throw new Error(`Failed to authenticate with Suggestic: ${JSON.stringify(loginData.errors)}`);
-    }
-    
-    if (!loginData.data?.login?.jwt) {
-      console.error('Suggestic login unsuccessful:', loginData);
-      throw new Error('Failed to authenticate with Suggestic');
-    }
-
-    const jwt = loginData.data.login.jwt;
-    
-    // JWT tokens typically expire in 24 hours
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 23); // Set to 23 hours to be safe
-
-    // Update profile with Suggestic credentials
     const { error: updateError } = await supabaseClient
       .from('profiles')
       .update({
         suggestic_user_id: suggesticUserId,
-        suggestic_jwt_token: jwt,
-        suggestic_jwt_expires_at: expiresAt.toISOString(),
       })
       .eq('id', user.id);
 
     if (updateError) {
-      console.error('Failed to update profile:', updateError);
-      throw new Error('Failed to save Suggestic credentials');
+      console.error('Failed to update profile with Suggestic user ID:', updateError);
+      throw new Error('Failed to save Suggestic user ID');
     }
 
-    console.log('✓ Successfully authenticated and saved JWT token');
+    console.log('✓ Successfully saved Suggestic user ID');
 
     return new Response(
       JSON.stringify({
         success: true,
-        jwt,
         suggesticUserId,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
