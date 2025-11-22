@@ -73,10 +73,9 @@ serve(async (req) => {
       console.log('Creating new Suggestic user...');
       
       const createUserMutation = `
-        mutation CreateUser($email: String!, $name: String) {
+        mutation CreateUser($email: String!, $name: String!) {
           createUser(email: $email, name: $name) {
             success
-            errors
             user {
               id
               email
@@ -95,15 +94,20 @@ serve(async (req) => {
           query: createUserMutation,
           variables: {
             email: profile?.email || user.email,
-            name: profile?.full_name || 'User',
+            name: profile?.full_name || user.email?.split('@')[0] || 'User',
           },
         }),
       });
 
       const createUserData = await createUserResponse.json();
       
-      if (createUserData.errors || !createUserData.data?.createUser?.success) {
+      if (createUserData.errors) {
         console.error('Failed to create Suggestic user:', createUserData.errors);
+        throw new Error(`Failed to create Suggestic user: ${JSON.stringify(createUserData.errors)}`);
+      }
+      
+      if (!createUserData.data?.createUser?.success) {
+        console.error('Suggestic user creation unsuccessful:', createUserData);
         throw new Error('Failed to create Suggestic user');
       }
 
@@ -122,7 +126,6 @@ serve(async (req) => {
       mutation Login($email: String!) {
         login(email: $email) {
           success
-          errors
           jwt
         }
       }
@@ -144,8 +147,13 @@ serve(async (req) => {
 
     const loginData = await loginResponse.json();
     
-    if (loginData.errors || !loginData.data?.login?.success) {
+    if (loginData.errors) {
       console.error('Failed to get JWT token:', loginData.errors);
+      throw new Error(`Failed to authenticate with Suggestic: ${JSON.stringify(loginData.errors)}`);
+    }
+    
+    if (!loginData.data?.login?.success) {
+      console.error('Suggestic login unsuccessful:', loginData);
       throw new Error('Failed to authenticate with Suggestic');
     }
 
