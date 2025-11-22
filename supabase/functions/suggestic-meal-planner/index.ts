@@ -229,6 +229,15 @@ async function getShoppingList(apiKey: string): Promise<any> {
   
   if (data.errors) {
     console.error('GraphQL errors:', JSON.stringify(data.errors));
+    const unauthorized = Array.isArray(data.errors) && data.errors.some((err: any) =>
+      typeof err?.message === 'string' && err.message.includes('Not authorized')
+    );
+
+    if (unauthorized) {
+      console.warn('Suggestic shopping list not authorized for this API key; returning empty list');
+      return [];
+    }
+
     throw new Error('Failed to fetch shopping list: ' + JSON.stringify(data.errors));
   }
 
