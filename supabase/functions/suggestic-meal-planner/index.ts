@@ -131,7 +131,7 @@ async function searchRecipes(
 
   const graphqlQuery = `
     query RecipeSearch($query: String!, $tags: [String!]) {
-      recipeSearch(query: $query, first: 10) {
+      recipeSearch(query: $query, tags: $tags, first: 10) {
         edges {
           node {
             id
