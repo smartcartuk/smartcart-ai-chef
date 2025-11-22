@@ -329,9 +329,10 @@ async function getShoppingList(apiKey: string, suggesticUserId: string): Promise
   }
 
   const data = await response.json();
+  console.log('📋 Suggestic shoppingListAggregate response:', JSON.stringify(data, null, 2));
   
   if (data.errors) {
-    console.error('GraphQL errors:', JSON.stringify(data.errors));
+    console.error('❌ Shopping list query errors:', data.errors);
     throw new Error('Failed to fetch shopping list: ' + JSON.stringify(data.errors));
   }
 
@@ -375,6 +376,7 @@ async function generateWeeklyMealPlan(
   }
   
   const generateData = await generateResponse.json();
+  console.log('📋 Suggestic generateSimpleMealPlan response:', JSON.stringify(generateData, null, 2));
   
   if (generateData.errors) {
     console.error('GraphQL errors during generation:', generateData.errors);
@@ -441,6 +443,7 @@ async function generateWeeklyMealPlan(
   }
   
   const mealPlanData = await mealPlanResponse.json();
+  console.log('📋 Suggestic mealPlan query response:', JSON.stringify(mealPlanData, null, 2));
   
   if (mealPlanData.errors) {
     console.error('GraphQL errors fetching meal plan:', mealPlanData.errors);
@@ -466,6 +469,7 @@ async function generateWeeklyMealPlan(
     });
     
     const retryData = await retryResponse.json();
+    console.log('📋 Suggestic mealPlan retry response:', JSON.stringify(retryData, null, 2));
     const retryDays = retryData.data?.mealPlan || [];
     
     if (retryDays.length === 0) {
@@ -479,7 +483,37 @@ async function generateWeeklyMealPlan(
     console.log(`✓ Retrieved ${days.length}-day meal plan from Suggestic`);
   }
   
-  // Step 3: Format for frontend
+  // Step 3: Explicitly generate shopping list
+  console.log('🛒 Generating shopping list from meal plan...');
+  const generateShoppingListMutation = `
+    mutation {
+      generateShoppingList {
+        success
+        message
+      }
+    }
+  `;
+  
+  const shoppingListResponse = await fetch('https://production.suggestic.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Token ${apiKey}`,
+      'sg-user': suggesticUserId,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query: generateShoppingListMutation })
+  });
+  
+  const shoppingListData = await shoppingListResponse.json();
+  console.log('📋 Suggestic generateShoppingList response:', JSON.stringify(shoppingListData, null, 2));
+  
+  if (shoppingListData.data?.generateShoppingList?.success) {
+    console.log('✓ Shopping list generated successfully');
+  } else {
+    console.warn('⚠️ Shopping list generation may have failed:', shoppingListData.data?.generateShoppingList?.message);
+  }
+  
+  // Step 4: Format for frontend
   const formattedMealPlan = {
     id: `plan-${Date.now()}`,
     name: 'Weekly Meal Plan',
