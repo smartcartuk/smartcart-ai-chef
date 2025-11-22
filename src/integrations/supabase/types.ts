@@ -460,6 +460,9 @@ export type Database = {
           full_name: string | null
           household_size: number | null
           id: string
+          suggestic_jwt_expires_at: string | null
+          suggestic_jwt_token: string | null
+          suggestic_user_id: string | null
           updated_at: string
           weekly_budget: number | null
         }
@@ -472,6 +475,9 @@ export type Database = {
           full_name?: string | null
           household_size?: number | null
           id: string
+          suggestic_jwt_expires_at?: string | null
+          suggestic_jwt_token?: string | null
+          suggestic_user_id?: string | null
           updated_at?: string
           weekly_budget?: number | null
         }
@@ -484,6 +490,9 @@ export type Database = {
           full_name?: string | null
           household_size?: number | null
           id?: string
+          suggestic_jwt_expires_at?: string | null
+          suggestic_jwt_token?: string | null
+          suggestic_user_id?: string | null
           updated_at?: string
           weekly_budget?: number | null
         }

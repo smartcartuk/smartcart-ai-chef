@@ -54,6 +54,25 @@ serve(async (req) => {
     // Map dietary preferences to Suggestic tags
     const dietaryTags = mapDietaryPreferences(dietaryPreferences);
     
+    // Helper to get user's JWT token
+    const getUserJWT = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('suggestic_jwt_token, suggestic_jwt_expires_at')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.suggestic_jwt_token) {
+        throw new Error('No Suggestic authentication. Please refresh your meal plan to authenticate.');
+      }
+
+      if (profile.suggestic_jwt_expires_at && new Date(profile.suggestic_jwt_expires_at) < new Date()) {
+        throw new Error('Suggestic authentication expired. Please refresh your meal plan.');
+      }
+
+      return profile.suggestic_jwt_token;
+    };
+    
     if (action === 'search' && searchQuery) {
       // Search for specific recipes
       const recipes = await searchRecipes(SUGGESTIC_API_KEY, searchQuery, dietaryTags, maxPrepTime, householdSize);
@@ -63,20 +82,22 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'shopping-list') {
-      // Get shopping list from Suggestic
-      const shoppingList = await getShoppingList(SUGGESTIC_API_KEY);
+      // Get shopping list from Suggestic (requires JWT)
+      const jwt = await getUserJWT();
+      const shoppingList = await getShoppingList(jwt);
       
       return new Response(
         JSON.stringify({ success: true, shoppingList }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'add-to-shopping-list') {
-      // Add recipes to shopping list
+      // Add recipes to shopping list (requires JWT)
       if (!recipeIds || recipeIds.length === 0) {
         throw new Error('No recipe IDs provided');
       }
       
-      const result = await addRecipesToShoppingList(SUGGESTIC_API_KEY, recipeIds);
+      const jwt = await getUserJWT();
+      const result = await addRecipesToShoppingList(jwt, recipeIds);
       
       return new Response(
         JSON.stringify({ success: true, ...result }),
@@ -101,7 +122,8 @@ serve(async (req) => {
       if (recipeIds.length > 0) {
         console.log(`Adding ${recipeIds.length} recipes to shopping list:`, recipeIds);
         try {
-          await addRecipesToShoppingList(SUGGESTIC_API_KEY, recipeIds);
+          const jwt = await getUserJWT();
+          await addRecipesToShoppingList(jwt, recipeIds);
         } catch (error) {
           console.error('Failed to add recipes to shopping list:', error);
           // Don't fail the whole request if shopping list fails
@@ -157,70 +179,91 @@ async function searchRecipes(
   maxPrepTime: number,
   servings: number
 ): Promise<any[]> {
-  console.log(`Searching recipes for: ${query}`);
+  console.log(`Searching recipes with query: "${query}", tags: ${dietaryTags.join(', ')}`);
+  
+  // Progressive search: try with tags first, then without if no results
+  const searchStrategies = [
+    { tags: dietaryTags, label: 'all dietary tags' },
+    { tags: dietaryTags.slice(0, 1), label: 'primary tag only' },
+    { tags: [], label: 'no tags (broadest)' }
+  ];
 
-  const graphqlQuery = `
-    query RecipeSearch($query: String!, $tags: [String!]) {
-      recipeSearch(query: $query, tags: $tags, first: 10) {
-        edges {
-          node {
-            id
-            databaseId
-            name
-            mainImage
-            ingredientLines
-            instructions
-            numberOfServings
-            totalTime
-            cuisines
-            author
-            nutrientsPerServing {
-              calories
-              protein
-              carbs
-              fat
+  for (const strategy of searchStrategies) {
+    const graphqlQuery = `
+      query RecipeSearch($query: String!, $tags: [String!]) {
+        recipeSearch(query: $query, tags: $tags, first: 10) {
+          edges {
+            node {
+              id
+              databaseId
+              name
+              mainImage
+              ingredientLines
+              instructions
+              numberOfServings
+              totalTime
+              cuisines
+              author
+              nutrientsPerServing {
+                calories
+                protein
+                carbs
+                fat
+              }
             }
           }
         }
       }
+    `;
+
+    const variables = {
+      query,
+      ...(strategy.tags.length > 0 && { tags: strategy.tags })
+    };
+
+    try {
+      const response = await fetch('https://production.suggestic.com/graphql', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: graphqlQuery, variables })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Suggestic API error:', response.status, errorText);
+        continue;
+      }
+
+      const data = await response.json();
+      
+      if (data.errors) {
+        console.error('GraphQL errors:', data.errors);
+        continue;
+      }
+
+      const recipes = data.data?.recipeSearch?.edges?.map((edge: any) => formatRecipe(edge.node, servings)) || [];
+      
+      if (recipes.length > 0) {
+        console.log(`✓ Found ${recipes.length} recipes with ${strategy.label}`);
+        return recipes;
+      }
+      
+      console.log(`⚠️ No results with ${strategy.label}, trying next strategy...`);
+    } catch (error) {
+      console.error(`Error with ${strategy.label}:`, error);
+      continue;
     }
-  `;
-
-  const variables = {
-    query,
-    ...(dietaryTags.length > 0 && { tags: dietaryTags })
-  };
-
-  const response = await fetch('https://production.suggestic.com/graphql', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Token ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query: graphqlQuery, variables })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Suggestic API error:', response.status, errorText);
-    throw new Error(`Suggestic API returned ${response.status}`);
   }
 
-  const data = await response.json();
-  
-  if (data.errors) {
-    console.error('GraphQL errors:', data.errors);
-    throw new Error('Failed to search recipes: ' + JSON.stringify(data.errors));
-  }
-
-  const recipes = data.data?.recipeSearch?.edges?.map((edge: any) => formatRecipe(edge.node, servings)) || [];
-  
-  console.log(`Found ${recipes.length} recipes for query: ${query}`);
-  return recipes;
+  console.log(`❌ No recipes found for "${query}" after all search strategies`);
+  return [];
 }
 
-async function addRecipesToShoppingList(apiKey: string, recipeIds: string[]): Promise<any> {
-  console.log(`Adding ${recipeIds.length} recipes to shopping list`);
+async function addRecipesToShoppingList(jwt: string, recipeIds: string[]): Promise<any> {
+  console.log(`Adding ${recipeIds.length} recipes to shopping list with JWT auth`);
 
   const graphqlQuery = `
     mutation AddRecipesToShoppingList($recipeIds: [String]!) {
@@ -238,7 +281,7 @@ async function addRecipesToShoppingList(apiKey: string, recipeIds: string[]): Pr
   const response = await fetch('https://production.suggestic.com/graphql', {
     method: 'POST',
     headers: {
-      'Authorization': `Token ${apiKey}`,
+      'Authorization': `Bearer ${jwt}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query: graphqlQuery, variables })
@@ -267,8 +310,8 @@ async function addRecipesToShoppingList(apiKey: string, recipeIds: string[]): Pr
   return result;
 }
 
-async function getShoppingList(apiKey: string): Promise<any> {
-  console.log('Fetching shopping list from Suggestic');
+async function getShoppingList(jwt: string): Promise<any> {
+  console.log('Fetching shopping list from Suggestic with JWT auth');
 
   const graphqlQuery = `
     query GetShoppingList {
@@ -291,7 +334,7 @@ async function getShoppingList(apiKey: string): Promise<any> {
   const response = await fetch('https://production.suggestic.com/graphql', {
     method: 'POST',
     headers: {
-      'Authorization': `Token ${apiKey}`,
+      'Authorization': `Bearer ${jwt}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query: graphqlQuery })
@@ -307,21 +350,12 @@ async function getShoppingList(apiKey: string): Promise<any> {
   
   if (data.errors) {
     console.error('GraphQL errors:', JSON.stringify(data.errors));
-    const unauthorized = Array.isArray(data.errors) && data.errors.some((err: any) =>
-      typeof err?.message === 'string' && err.message.includes('Not authorized')
-    );
-
-    if (unauthorized) {
-      console.warn('Suggestic shopping list not authorized for this API key; returning empty list');
-      return [];
-    }
-
     throw new Error('Failed to fetch shopping list: ' + JSON.stringify(data.errors));
   }
 
   const items = data.data?.shoppingListAggregate?.edges?.map((edge: any) => edge.node) || [];
   
-  console.log(`Fetched ${items.length} shopping list items`);
+  console.log(`✓ Fetched ${items.length} shopping list items`);
   return items;
 }
 
@@ -333,16 +367,16 @@ async function generateWeeklyMealPlan(
 ): Promise<any> {
   console.log('Generating weekly meal plan using recipe search with dietary preferences:', dietaryTags);
 
-  // Diverse, specific meal queries that work well with common dietary preferences
-  // These are more targeted than generic terms and yield better Suggestic results
+  // Diverse, specific meal queries optimized for pescatarian and flexible diets
+  // More specific queries yield better results than generic terms
   const mealTypes = [
-    'grilled salmon with vegetables',
-    'shrimp stir fry',
-    'baked cod with herbs',
-    'tuna poke bowl',
-    'seafood pasta',
-    'greek salad with feta',
-    'lentil soup'
+    'grilled salmon',
+    'shrimp pasta',
+    'baked cod lemon',
+    'tuna bowl',
+    'fish tacos',
+    'seafood risotto',
+    'vegetable curry'
   ];
 
   const days = [];

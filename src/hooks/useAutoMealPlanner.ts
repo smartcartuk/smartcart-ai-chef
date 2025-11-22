@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getMealPlan, saveMealPlan } from '@/utils/mealPlanService';
+import { ensureSuggesticAuth } from '@/utils/suggesticAuthService';
 import { useToast } from '@/hooks/use-toast';
 
 export const useAutoMealPlanner = (userProfile: any) => {
@@ -15,6 +16,16 @@ export const useAutoMealPlanner = (userProfile: any) => {
     console.log('🤖 Auto-generating AI meal plan for user profile:', userProfile);
 
     try {
+      // Ensure Suggestic authentication first
+      console.log('🔑 Ensuring Suggestic authentication...');
+      const authResult = await ensureSuggesticAuth(userProfile);
+      
+      if (!authResult.success) {
+        throw new Error(authResult.error || 'Failed to authenticate with Suggestic');
+      }
+      
+      console.log('✓ Suggestic authentication successful');
+
       // Call Suggestic meal planner for real recipe data
       const { data, error } = await supabase.functions.invoke('suggestic-meal-planner', {
         body: {
@@ -49,7 +60,7 @@ export const useAutoMealPlanner = (userProfile: any) => {
 
       toast({
         title: "Meal Plan Generated! 🎉",
-        description: `Created ${meals.length} personalized recipes with Suggestic`,
+        description: `Created ${meals.length} personalized recipes from Suggestic`,
       });
 
       return data;
