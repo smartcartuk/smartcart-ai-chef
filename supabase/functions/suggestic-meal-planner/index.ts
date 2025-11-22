@@ -244,135 +244,66 @@ async function generateWeeklyMealPlan(
   servings: number,
   calorieTarget?: number
 ): Promise<any> {
-  console.log('Generating weekly meal plan with Suggestic');
+  console.log('Generating weekly meal plan using recipe search (fallback approach)');
 
-  // First, generate a new meal plan using the mutation
-  const generateMutation = `
-    mutation GenerateMealPlan {
-      generateMealPlan(ignoreLock: true) {
-        success
-        message
-      }
-    }
-  `;
+  // Meal categories to search for variety
+  const mealTypes = [
+    'chicken dinner',
+    'pasta dish', 
+    'fish recipe',
+    'vegetarian meal',
+    'beef dinner',
+    'salad',
+    'soup'
+  ];
 
-  const generateResponse = await fetch('https://production.suggestic.com/graphql', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Token ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query: generateMutation })
-  });
+  const days = [];
+  const today = new Date();
 
-  if (!generateResponse.ok) {
-    const errorText = await generateResponse.text();
-    console.error('Suggestic API error during generation:', generateResponse.status, errorText);
-    throw new Error(`Suggestic API returned ${generateResponse.status}`);
-  }
-
-  const generateData = await generateResponse.json();
-  
-  if (generateData.errors) {
-    console.error('GraphQL errors during generation:', JSON.stringify(generateData.errors));
-    throw new Error('Failed to generate meal plan: ' + JSON.stringify(generateData.errors));
-  }
-
-  if (!generateData.data?.generateMealPlan?.success) {
-    const message = generateData.data?.generateMealPlan?.message || 'Unknown error';
-    console.error('Meal plan generation failed:', message);
-    throw new Error(`Meal plan generation failed: ${message}`);
-  }
-
-  console.log('Meal plan generated successfully, now fetching...');
-
-  // Now fetch the generated meal plan
-  const graphqlQuery = `
-    query GetMealPlan {
-      mealPlan {
-        date
-        day
-        calories
-        protein
-        carbs
-        fat
-        meals {
-          id
-          recipe {
-            id
-            databaseId
-            name
-            mainImage
-            ingredientLines
-            instructions
-            numberOfServings
-            totalTime
-            cuisines
-            author
-            nutrientsPerServing {
-              calories
-              protein
-              carbs
-              fat
-            }
+  // Generate 7 days of meals
+  for (let i = 0; i < 7; i++) {
+    const currentDate = new Date(today);
+    currentDate.setDate(today.getDate() + i);
+    
+    // Pick a meal type for this day (cycle through them)
+    const searchQuery = mealTypes[i % mealTypes.length];
+    
+    try {
+      // Search for a recipe for this day
+      const recipes = await searchRecipes(apiKey, searchQuery, dietaryTags, 45, servings);
+      
+      if (recipes.length > 0) {
+        // Pick the first recipe from search results
+        const recipe = recipes[0];
+        
+        days.push({
+          date: currentDate.toISOString().split('T')[0],
+          dayNumber: i + 1,
+          calories: recipe.nutrition?.calories || 0,
+          meals: {
+            meal: [recipe]
           }
-        }
+        });
+      } else {
+        console.warn(`No recipes found for day ${i + 1}, query: ${searchQuery}`);
       }
+    } catch (error) {
+      console.error(`Error fetching recipe for day ${i + 1}:`, error);
+      // Continue to next day even if one fails
     }
-  `;
-
-  const response = await fetch('https://production.suggestic.com/graphql', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Token ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query: graphqlQuery })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Suggestic API error:', response.status, errorText);
-    throw new Error(`Suggestic API returned ${response.status}`);
   }
 
-  const data = await response.json();
-  
-  if (data.errors) {
-    console.error('GraphQL errors:', JSON.stringify(data.errors));
-    throw new Error('Failed to fetch meal plan: ' + JSON.stringify(data.errors));
+  if (days.length === 0) {
+    throw new Error('Failed to generate any meals. Please check your Suggestic API key permissions.');
   }
 
-  const mealPlanDays = data.data?.mealPlan;
-  
-  if (!mealPlanDays || !Array.isArray(mealPlanDays)) {
-    console.error('Invalid meal plan structure:', JSON.stringify(data.data));
-    throw new Error('No meal plan returned from Suggestic');
-  }
-
-  // Format the meal plan to match our structure
   const formattedMealPlan = {
     id: `plan-${Date.now()}`,
     name: 'Weekly Meal Plan',
-    days: mealPlanDays.map((day: any) => ({
-      date: day.date,
-      dayNumber: day.day,
-      calories: day.calories,
-      meals: day.meals
-        .filter((meal: any) => meal.recipe)
-        .reduce((acc: any, meal: any) => {
-          // Group by meal time (breakfast, lunch, dinner, snack)
-          const mealType = 'meal'; // Suggestic doesn't provide meal type in this query
-          if (!acc[mealType]) {
-            acc[mealType] = [];
-          }
-          acc[mealType].push(formatRecipe(meal.recipe, servings));
-          return acc;
-        }, {})
-    }))
+    days
   };
   
-  console.log(`Generated meal plan with ${formattedMealPlan.days.length} days`);
+  console.log(`Generated meal plan with ${formattedMealPlan.days.length} days using recipe search`);
   return formattedMealPlan;
 }
 
