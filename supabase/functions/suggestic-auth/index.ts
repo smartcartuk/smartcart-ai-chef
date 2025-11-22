@@ -111,12 +111,41 @@ serve(async (req) => {
       }
       
       if (!createUserData.data?.createUser?.success) {
-        console.error('Suggestic user creation unsuccessful:', createUserData);
-        throw new Error('Failed to create Suggestic user');
+        console.warn('Suggestic user creation returned false - user may already exist:', createUserData);
+        // Try to find existing user by email
+        const findUserQuery = `
+          query FindUser($email: String!) {
+            user(email: $email) {
+              id
+              email
+            }
+          }
+        `;
+        
+        const findUserResponse = await fetch('https://production.suggestic.com/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Token ${SUGGESTIC_API_KEY}`,
+          },
+          body: JSON.stringify({
+            query: findUserQuery,
+            variables: { email: profile?.email || user.email }
+          })
+        });
+        
+        const findUserData = await findUserResponse.json();
+        if (findUserData.data?.user?.id) {
+          suggesticUserId = findUserData.data.user.id;
+          console.log('✓ Found existing Suggestic user:', suggesticUserId);
+        } else {
+          console.error('Could not create or find Suggestic user');
+          throw new Error('Failed to create or find Suggestic user in system');
+        }
+      } else {
+        suggesticUserId = createUserData.data.createUser.user.id;
+        console.log('✓ Created Suggestic user:', suggesticUserId);
       }
-
-      suggesticUserId = createUserData.data.createUser.user.id;
-      console.log('✓ Created Suggestic user:', suggesticUserId);
     }
 
     if (!suggesticUserId) {

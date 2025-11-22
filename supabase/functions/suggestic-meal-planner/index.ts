@@ -450,10 +450,34 @@ async function generateWeeklyMealPlan(
   const days = mealPlanData.data?.mealPlan || [];
   
   if (days.length === 0) {
-    throw new Error('Suggestic generated an empty meal plan. This may be due to very restrictive dietary settings. Try adjusting your preferences.');
+    console.warn('⚠️ Suggestic returned empty meal plan on first attempt, retrying...');
+    
+    // Retry once more after a short delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const retryResponse = await fetch('https://production.suggestic.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${apiKey}`,
+        'sg-user': suggesticUserId,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query: mealPlanQuery })
+    });
+    
+    const retryData = await retryResponse.json();
+    const retryDays = retryData.data?.mealPlan || [];
+    
+    if (retryDays.length === 0) {
+      throw new Error('Suggestic generated an empty meal plan after retry. This may be due to very restrictive dietary settings or program not being properly configured. Try adjusting your preferences or regenerating.');
+    }
+    
+    days.length = 0;
+    days.push(...retryDays);
+    console.log(`✓ Retry successful - retrieved ${days.length}-day meal plan`);
+  } else {
+    console.log(`✓ Retrieved ${days.length}-day meal plan from Suggestic`);
   }
-  
-  console.log(`✓ Retrieved ${days.length}-day meal plan from Suggestic`);
   
   // Step 3: Format for frontend
   const formattedMealPlan = {
