@@ -68,8 +68,12 @@ serve(async (req) => {
 
     let suggesticUserId = existingProfile?.suggestic_user_id;
 
+    // If user already has a Suggestic user ID, use it
+    if (suggesticUserId) {
+      console.log('✓ Using existing Suggestic user ID:', suggesticUserId);
+    }
     // Create Suggestic user if doesn't exist
-    if (!suggesticUserId && action === 'create-user') {
+    else if (action === 'create-user') {
       console.log('Creating new Suggestic user...');
       
       const createUserMutation = `
