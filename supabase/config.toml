@@ -27,5 +27,8 @@ verify_jwt = false
 [functions.suggestic-meal-planner]
 verify_jwt = false
 
+[functions.suggestic-auth]
+verify_jwt = true
+
 [functions.suggestic-test]
 verify_jwt = false
