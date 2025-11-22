@@ -223,7 +223,7 @@ async function addRecipesToShoppingList(apiKey: string, recipeIds: string[]): Pr
   console.log(`Adding ${recipeIds.length} recipes to shopping list`);
 
   const graphqlQuery = `
-    mutation AddRecipesToShoppingList($recipeIds: [UUID!]!) {
+    mutation AddRecipesToShoppingList($recipeIds: [String]!) {
       addRecipesToShoppingList(recipeIds: $recipeIds) {
         success
         message
