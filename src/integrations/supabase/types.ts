@@ -401,10 +401,12 @@ export type Database = {
       }
       prices: {
         Row: {
+          barcode: string | null
           created_at: string | null
           currency: string
           id: string
           ingredient_name: string
+          last_api_source: string | null
           last_updated: string | null
           price: number
           product_image: string | null
@@ -415,10 +417,12 @@ export type Database = {
           unit: string | null
         }
         Insert: {
+          barcode?: string | null
           created_at?: string | null
           currency?: string
           id?: string
           ingredient_name: string
+          last_api_source?: string | null
           last_updated?: string | null
           price: number
           product_image?: string | null
@@ -429,10 +433,12 @@ export type Database = {
           unit?: string | null
         }
         Update: {
+          barcode?: string | null
           created_at?: string | null
           currency?: string
           id?: string
           ingredient_name?: string
+          last_api_source?: string | null
           last_updated?: string | null
           price?: number
           product_image?: string | null
@@ -531,6 +537,39 @@ export type Database = {
           ingredient_name?: string
           last_updated?: string | null
           product_url?: string | null
+        }
+        Relationships: []
+      }
+      security_audit_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: unknown
+          record_id: string | null
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: unknown
+          record_id?: string | null
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: unknown
+          record_id?: string | null
+          table_name?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -722,6 +761,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_budget_compliance: {
+        Args: { p_total_cost: number; p_user_id: string }
+        Returns: Json
+      }
+      decrypt_store_credentials: {
+        Args: { encrypted_creds: string; encryption_key: string }
+        Returns: Json
+      }
+      encrypt_store_credentials: {
+        Args: { creds: Json; encryption_key: string }
+        Returns: string
+      }
       get_latest_prices_by_store: {
         Args: { ingredient_name_param: string }
         Returns: {
@@ -742,6 +793,10 @@ export type Database = {
           price: number
           recorded_at: string
         }[]
+      }
+      get_user_store_credentials: {
+        Args: { p_store_name: string; p_user_id: string }
+        Returns: Json
       }
     }
     Enums: {
