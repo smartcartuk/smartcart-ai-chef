@@ -50,12 +50,12 @@ serve(async (req) => {
 
     console.log(`Suggestic API request - Action: ${action}, User: ${user.id}`);
 
-    // Map dietary preferences to Suggestic filters
+    // Map dietary preferences to Suggestic tags
     const dietaryTags = mapDietaryPreferences(dietaryPreferences);
     
     if (action === 'search' && searchQuery) {
       // Search for specific recipes
-      const recipes = await searchRecipes(SUGGESTIC_API_KEY, searchQuery, dietaryTags, allergies, maxPrepTime, householdSize);
+      const recipes = await searchRecipes(SUGGESTIC_API_KEY, searchQuery, dietaryTags, maxPrepTime, householdSize);
       
       return new Response(
         JSON.stringify({ success: true, recipes }),
@@ -66,9 +66,7 @@ serve(async (req) => {
       const mealPlan = await generateWeeklyMealPlan(
         SUGGESTIC_API_KEY,
         dietaryTags,
-        allergies,
         householdSize,
-        maxPrepTime,
         calorieTarget
       );
       
@@ -97,16 +95,16 @@ serve(async (req) => {
 
 function mapDietaryPreferences(preferences: string[]): string[] {
   const mapping: { [key: string]: string } = {
-    'vegetarian': 'vegetarian',
-    'vegan': 'vegan',
-    'gluten-free': 'gluten-free',
-    'dairy-free': 'dairy-free',
-    'keto': 'ketogenic',
-    'paleo': 'paleo',
-    'low-carb': 'low-carb',
-    'mediterranean': 'mediterranean',
-    'pescatarian': 'pescatarian',
-    'high-protein': 'high-protein',
+    'vegetarian': 'VEGETARIAN',
+    'vegan': 'VEGAN',
+    'gluten-free': 'GLUTEN_FREE',
+    'dairy-free': 'DAIRY_FREE',
+    'keto': 'KETO',
+    'paleo': 'PALEO',
+    'low-carb': 'LOW_CARB',
+    'mediterranean': 'MEDITERRANEAN',
+    'pescatarian': 'PESCATARIAN',
+    'high-protein': 'PROTEIN_DENSE',
   };
 
   return preferences
@@ -118,33 +116,32 @@ async function searchRecipes(
   apiKey: string,
   query: string,
   dietaryTags: string[],
-  allergies: string[],
   maxPrepTime: number,
   servings: number
 ): Promise<any[]> {
   console.log(`Searching recipes for: ${query}`);
 
   const graphqlQuery = `
-    query SearchRecipes($query: String!, $tags: [String!], $maxTime: Int) {
-      recipeSearch(query: $query, first: 10, filters: { tags: $tags, maxTotalTime: $maxTime }) {
+    query RecipeSearch($query: String!, $tags: [String!]) {
+      recipeSearch(query: $query, first: 10) {
         edges {
           node {
             id
+            databaseId
             name
-            description
             mainImage
-            totalTime
-            numberOfServings
             ingredientLines
             instructions
+            numberOfServings
+            totalTime
+            cuisines
+            author
             nutrientsPerServing {
               calories
               protein
               carbs
               fat
             }
-            cuisine
-            tags
           }
         }
       }
@@ -153,8 +150,7 @@ async function searchRecipes(
 
   const variables = {
     query,
-    tags: dietaryTags,
-    maxTime: maxPrepTime
+    tags: dietaryTags.length > 0 ? dietaryTags : undefined
   };
 
   const response = await fetch('https://production.suggestic.com/graphql', {
@@ -167,7 +163,8 @@ async function searchRecipes(
   });
 
   if (!response.ok) {
-    console.error('Suggestic API error:', response.status, await response.text());
+    const errorText = await response.text();
+    console.error('Suggestic API error:', response.status, errorText);
     throw new Error(`Suggestic API returned ${response.status}`);
   }
 
@@ -175,7 +172,7 @@ async function searchRecipes(
   
   if (data.errors) {
     console.error('GraphQL errors:', data.errors);
-    throw new Error('Failed to search recipes');
+    throw new Error('Failed to search recipes: ' + JSON.stringify(data.errors));
   }
 
   const recipes = data.data?.recipeSearch?.edges?.map((edge: any) => formatRecipe(edge.node, servings)) || [];
@@ -187,9 +184,7 @@ async function searchRecipes(
 async function generateWeeklyMealPlan(
   apiKey: string,
   dietaryTags: string[],
-  allergies: string[],
   servings: number,
-  maxPrepTime: number,
   calorieTarget?: number
 ): Promise<any> {
   console.log('Generating weekly meal plan');
@@ -197,33 +192,34 @@ async function generateWeeklyMealPlan(
   // Calculate calorie target based on servings if not provided
   const dailyCalories = calorieTarget || (2000 * servings);
 
+  // Suggestic mealPlan query - returns 7 days by default
   const graphqlQuery = `
-    query GetMealPlan($tags: [String!], $maxTime: Int, $calories: Int) {
-      mealPlan(filters: { tags: $tags, maxTotalTime: $maxTime, caloriesTarget: $calories }) {
-        id
-        name
-        days {
-          date
-          meals {
+    query GetMealPlan {
+      mealPlan {
+        date
+        day
+        calories
+        protein
+        carbs
+        fat
+        meals {
+          id
+          recipe {
             id
-            type
-            recipe {
-              id
-              name
-              description
-              mainImage
-              totalTime
-              numberOfServings
-              ingredientLines
-              instructions
-              nutrientsPerServing {
-                calories
-                protein
-                carbs
-                fat
-              }
-              cuisine
-              tags
+            databaseId
+            name
+            mainImage
+            ingredientLines
+            instructions
+            numberOfServings
+            totalTime
+            cuisines
+            author
+            nutrientsPerServing {
+              calories
+              protein
+              carbs
+              fat
             }
           }
         }
@@ -231,56 +227,75 @@ async function generateWeeklyMealPlan(
     }
   `;
 
-  const variables = {
-    tags: dietaryTags,
-    maxTime: maxPrepTime,
-    calories: dailyCalories
-  };
-
   const response = await fetch('https://production.suggestic.com/graphql', {
     method: 'POST',
     headers: {
       'Authorization': `Token ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ query: graphqlQuery, variables })
+    body: JSON.stringify({ query: graphqlQuery })
   });
 
   if (!response.ok) {
-    console.error('Suggestic API error:', response.status, await response.text());
+    const errorText = await response.text();
+    console.error('Suggestic API error:', response.status, errorText);
     throw new Error(`Suggestic API returned ${response.status}`);
   }
 
   const data = await response.json();
   
   if (data.errors) {
-    console.error('GraphQL errors:', data.errors);
-    throw new Error('Failed to generate meal plan');
+    console.error('GraphQL errors:', JSON.stringify(data.errors));
+    throw new Error('Failed to generate meal plan: ' + JSON.stringify(data.errors));
   }
 
-  const mealPlan = data.data?.mealPlan;
+  const mealPlanDays = data.data?.mealPlan;
   
-  if (!mealPlan) {
+  if (!mealPlanDays || !Array.isArray(mealPlanDays)) {
     throw new Error('No meal plan returned from Suggestic');
   }
 
   // Format the meal plan to match our structure
-  const formattedMealPlan = formatMealPlan(mealPlan, servings);
+  const formattedMealPlan = {
+    id: `plan-${Date.now()}`,
+    name: 'Weekly Meal Plan',
+    days: mealPlanDays.map((day: any) => ({
+      date: day.date,
+      dayNumber: day.day,
+      calories: day.calories,
+      meals: day.meals
+        .filter((meal: any) => meal.recipe)
+        .reduce((acc: any, meal: any) => {
+          // Group by meal time (breakfast, lunch, dinner, snack)
+          const mealType = 'meal'; // Suggestic doesn't provide meal type in this query
+          if (!acc[mealType]) {
+            acc[mealType] = [];
+          }
+          acc[mealType].push(formatRecipe(meal.recipe, servings));
+          return acc;
+        }, {})
+    }))
+  };
   
   console.log(`Generated meal plan with ${formattedMealPlan.days.length} days`);
   return formattedMealPlan;
 }
 
 function formatRecipe(recipe: any, servings: number): any {
+  // Parse total time (in minutes)
+  const totalTime = recipe.totalTime || 30;
+  const prepTime = Math.floor(totalTime / 2);
+  const cookTime = Math.ceil(totalTime / 2);
+
   return {
-    id: recipe.id,
+    id: recipe.databaseId || recipe.id,
     title: recipe.name,
-    description: recipe.description || '',
+    description: recipe.author ? `by ${recipe.author}` : '',
     image: recipe.mainImage || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800',
-    prepTime: Math.floor((recipe.totalTime || 30) / 2),
-    cookTime: Math.ceil((recipe.totalTime || 30) / 2),
+    prepTime,
+    cookTime,
     servings: servings,
-    difficulty: recipe.totalTime > 60 ? 'Hard' : recipe.totalTime > 30 ? 'Medium' : 'Easy',
+    difficulty: totalTime > 60 ? 'Hard' : totalTime > 30 ? 'Medium' : 'Easy',
     ingredients: Array.isArray(recipe.ingredientLines) 
       ? recipe.ingredientLines.map((line: string, idx: number) => ({
           id: `ing-${idx}`,
@@ -289,47 +304,25 @@ function formatRecipe(recipe: any, servings: number): any {
           unit: 'unit'
         }))
       : [],
-    instructions: typeof recipe.instructions === 'string'
+    instructions: Array.isArray(recipe.instructions)
+      ? recipe.instructions.map((step: string, idx: number) => ({
+          step: idx + 1,
+          instruction: step
+        }))
+      : typeof recipe.instructions === 'string'
       ? recipe.instructions.split('\n').filter(Boolean).map((step: string, idx: number) => ({
           step: idx + 1,
           instruction: step
         }))
-      : recipe.instructions?.map((step: any, idx: number) => ({
-          step: idx + 1,
-          instruction: typeof step === 'string' ? step : step.text || ''
-        })) || [],
+      : [],
     nutrition: {
-      calories: recipe.nutrientsPerServing?.calories || 0,
-      protein: `${recipe.nutrientsPerServing?.protein || 0}g`,
-      carbs: `${recipe.nutrientsPerServing?.carbs || 0}g`,
-      fat: `${recipe.nutrientsPerServing?.fat || 0}g`,
+      calories: Math.round(recipe.nutrientsPerServing?.calories || 0),
+      protein: `${Math.round(recipe.nutrientsPerServing?.protein || 0)}g`,
+      carbs: `${Math.round(recipe.nutrientsPerServing?.carbs || 0)}g`,
+      fat: `${Math.round(recipe.nutrientsPerServing?.fat || 0)}g`,
     },
-    cuisine: recipe.cuisine || 'International',
-    tags: recipe.tags || [],
+    cuisine: recipe.cuisines?.[0] || 'International',
+    tags: [],
     source: 'suggestic'
-  };
-}
-
-function formatMealPlan(mealPlan: any, servings: number): any {
-  const days = mealPlan.days?.map((day: any) => {
-    const meals: any = {};
-    
-    day.meals?.forEach((meal: any) => {
-      const mealType = meal.type.toLowerCase();
-      if (meal.recipe) {
-        meals[mealType] = formatRecipe(meal.recipe, servings);
-      }
-    });
-    
-    return {
-      date: day.date,
-      meals
-    };
-  }) || [];
-
-  return {
-    id: mealPlan.id,
-    name: mealPlan.name || 'Weekly Meal Plan',
-    days
   };
 }
