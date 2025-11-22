@@ -123,7 +123,7 @@ serve(async (req) => {
       throw new Error('No Suggestic user ID available. Call with action: create-user first.');
     }
 
-    // Update profile with Suggestic user ID (no JWT needed)
+    // Update profile with Suggestic user ID
     console.log('Saving Suggestic user ID to profile:', suggesticUserId);
 
     const { error: updateError } = await supabaseClient
@@ -139,6 +139,12 @@ serve(async (req) => {
     }
 
     console.log('✓ Successfully saved Suggestic user ID');
+
+    // Setup user program and restrictions with dietary preferences
+    if (action === 'create-user') {
+      console.log('Setting up Suggestic program and restrictions...');
+      await setupUserProgram(SUGGESTIC_API_KEY, suggesticUserId, profile);
+    }
 
     return new Response(
       JSON.stringify({
@@ -159,3 +165,143 @@ serve(async (req) => {
     );
   }
 });
+
+/**
+ * Setup user program and restrictions in Suggestic
+ */
+async function setupUserProgram(apiKey: string, suggesticUserId: string, profile: any) {
+  // Map dietary preferences to Suggestic program
+  const dietaryPreferences = profile?.dietary_preferences || [];
+  const allergies = profile?.allergies || [];
+  
+  // Determine program based on dietary preferences
+  let program = 'omnivore'; // Default
+  if (dietaryPreferences.includes('Vegan')) program = 'vegan';
+  else if (dietaryPreferences.includes('Vegetarian')) program = 'vegetarian';
+  else if (dietaryPreferences.includes('Pescatarian')) program = 'pescatarian';
+  else if (dietaryPreferences.includes('Keto')) program = 'keto';
+  else if (dietaryPreferences.includes('Paleo')) program = 'paleo';
+  
+  // Map allergies to restriction slugs
+  const allergyMapping: { [key: string]: string } = {
+    'Nuts': 'tree-nuts',
+    'Peanuts': 'peanuts',
+    'Shellfish': 'shellfish',
+    'Fish': 'fish',
+    'Eggs': 'eggs',
+    'Dairy': 'dairy',
+    'Soy': 'soy',
+    'Wheat': 'wheat',
+    'Gluten': 'gluten',
+    'Sesame': 'sesame'
+  };
+  
+  const restrictionSlugs = allergies
+    .map((allergy: string) => allergyMapping[allergy])
+    .filter(Boolean);
+  
+  // Add dietary restrictions
+  if (dietaryPreferences.includes('Gluten-Free') && !restrictionSlugs.includes('gluten')) {
+    restrictionSlugs.push('gluten');
+  }
+  if (dietaryPreferences.includes('Dairy-Free') && !restrictionSlugs.includes('dairy')) {
+    restrictionSlugs.push('dairy');
+  }
+  
+  try {
+    // Update user restrictions (allergies)
+    if (restrictionSlugs.length > 0) {
+      const updateRestrictionsQuery = `
+        mutation UpdateRestrictions($restrictions: [String]!) {
+          updateUserRestrictions(restrictions: $restrictions) {
+            success
+            message
+          }
+        }
+      `;
+      
+      const restrictionsResponse = await fetch('https://production.suggestic.com/graphql', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${apiKey}`,
+          'sg-user': suggesticUserId,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: updateRestrictionsQuery,
+          variables: { restrictions: restrictionSlugs }
+        })
+      });
+      
+      const restrictionsData = await restrictionsResponse.json();
+      if (restrictionsData.data?.updateUserRestrictions?.success) {
+        console.log(`✓ Set user restrictions: ${restrictionSlugs.join(', ')}`);
+      }
+    }
+    
+    // Set meal plan program
+    const updateProgramQuery = `
+      mutation UpdateProgram($program: String!) {
+        updateMyProgram(program: $program) {
+          success
+          message
+        }
+      }
+    `;
+    
+    const programResponse = await fetch('https://production.suggestic.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${apiKey}`,
+        'sg-user': suggesticUserId,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: updateProgramQuery,
+        variables: { program }
+      })
+    });
+    
+    const programData = await programResponse.json();
+    if (programData.data?.updateMyProgram?.success) {
+      console.log(`✓ Set user program: ${program}`);
+    }
+    
+    // Configure meal plan settings
+    const householdSize = profile?.household_size || 2;
+    const weeklyBudget = profile?.weekly_budget || 50;
+    const calorieTarget = Math.round(2000 * (householdSize / 2)); // Scale based on household
+    
+    const updateSettingsQuery = `
+      mutation UpdateSettings($caloriesTarget: Int) {
+        profileMealPlanSettings(caloriesTarget: $caloriesTarget) {
+          success
+          message
+        }
+      }
+    `;
+    
+    const settingsResponse = await fetch('https://production.suggestic.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${apiKey}`,
+        'sg-user': suggesticUserId,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: updateSettingsQuery,
+        variables: { caloriesTarget: calorieTarget }
+      })
+    });
+    
+    const settingsData = await settingsResponse.json();
+    if (settingsData.data?.profileMealPlanSettings?.success) {
+      console.log(`✓ Set meal plan settings: ${calorieTarget} cal/day target`);
+    }
+    
+    console.log('✅ Suggestic program setup complete');
+  } catch (error) {
+    console.error('⚠️ Failed to setup Suggestic program (non-critical):', error);
+    // Don't throw - this is not critical to user creation
+  }
+}
