@@ -66,13 +66,13 @@ serve(async (req) => {
       );
     }
 
-    let suggesticUserId = existingProfile?.suggestic_user_id;
+    let suggesticUserId = existingProfile?.suggestic_user_id || profile?.suggestic_user_id;
 
-    // If user already has a Suggestic user ID, use it
+    // If user already has a Suggestic user ID (in DB or request), use it
     if (suggesticUserId) {
       console.log('✓ Using existing Suggestic user ID:', suggesticUserId);
     }
-    // Create Suggestic user if doesn't exist
+    // Create Suggestic user if doesn't exist and action explicitly requests it
     else if (action === 'create-user') {
       console.log('Creating new Suggestic user...');
       
