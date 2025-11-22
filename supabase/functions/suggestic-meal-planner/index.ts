@@ -112,23 +112,9 @@ serve(async (req) => {
         calorieTarget
       );
       
-      // Automatically add all generated recipes to shopping list
-      const recipeIds = mealPlan.days
-        .flatMap((day: any) => Object.values(day.meals || {}))
-        .flat()
-        .map((recipe: any) => recipe.id)
-        .filter(Boolean);
-      
-      if (recipeIds.length > 0) {
-        console.log(`Adding ${recipeIds.length} recipes to shopping list:`, recipeIds);
-        try {
-          const jwt = await getUserJWT();
-          await addRecipesToShoppingList(jwt, recipeIds);
-        } catch (error) {
-          console.error('Failed to add recipes to shopping list:', error);
-          // Don't fail the whole request if shopping list fails
-        }
-      }
+      // Note: Shopping list addition requires JWT auth and should be done separately
+      // after user has been authenticated with Suggestic
+      console.log('✓ Meal plan generated successfully. Use add-to-shopping-list action to add recipes to shopping list.');
       
       return new Response(
         JSON.stringify({ success: true, mealPlan }),
