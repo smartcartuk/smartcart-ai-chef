@@ -20,6 +20,8 @@ import { RecipeFavorites } from '@/components/RecipeFavorites';
 import { WebhookResponse } from '@/utils/webhookService';
 import { useToast } from '@/hooks/use-toast';
 import { getConnectedStores } from '@/utils/profileService';
+import { ensureSuggesticAuth } from '@/utils/suggesticAuthService';
+import { supabase } from '@/integrations/supabase/client';
 interface MealPlanDashboardProps {
   userProfile: any;
   generatedData?: WebhookResponse | null;
@@ -41,12 +43,55 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
   }>({});
   const [userCredentials, setUserCredentials] = useState({});
   const [connectedStores, setConnectedStores] = useState<any[]>([]);
+  const [isTestingSuggestic, setIsTestingSuggestic] = useState(false);
+  const [suggesticShoppingList, setSuggesticShoppingList] = useState<any>(null);
   const {
     toast
   } = useToast();
   React.useEffect(() => {
     loadConnectedStores();
   }, []);
+
+  const testSuggesticIntegration = async () => {
+    setIsTestingSuggestic(true);
+    try {
+      console.log('🧪 Testing Suggestic integration...');
+      
+      // Step 1: Ensure authentication
+      const authResult = await ensureSuggesticAuth(userProfile);
+      if (!authResult.success) {
+        throw new Error(authResult.error || 'Authentication failed');
+      }
+      console.log('✅ Step 1: Authentication successful');
+      
+      // Step 2: Fetch shopping list
+      const { data, error } = await supabase.functions.invoke('suggestic-meal-planner', {
+        body: {
+          action: 'shopping-list'
+        }
+      });
+      
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Failed to fetch shopping list');
+      
+      console.log('✅ Step 2: Shopping list fetched:', data);
+      setSuggesticShoppingList(data);
+      
+      toast({
+        title: "Suggestic Integration Working! ✅",
+        description: `Shopping list has ${data.shoppingList?.items?.length || 0} items`,
+      });
+    } catch (error: any) {
+      console.error('❌ Suggestic integration test failed:', error);
+      toast({
+        title: "Integration Test Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsTestingSuggestic(false);
+    }
+  };
   const loadConnectedStores = async () => {
     const result = await getConnectedStores();
     if (result.success && result.data) {
@@ -156,6 +201,22 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
               <div className="text-2xl font-bold text-purple-700">{connectedStores.length}</div>
               <div className="text-sm text-purple-600">Stores Connected</div>
             </div>
+          </Card>
+
+          <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100">
+            <Button 
+              onClick={testSuggesticIntegration} 
+              disabled={isTestingSuggestic}
+              className="w-full"
+              variant="outline"
+            >
+              {isTestingSuggestic ? '🔄 Testing...' : '🧪 Test Suggestic'}
+            </Button>
+            {suggesticShoppingList && (
+              <div className="text-xs text-orange-600 mt-2">
+                {suggesticShoppingList.shoppingList?.items?.length || 0} items
+              </div>
+            )}
           </Card>
           
           
