@@ -10,6 +10,9 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { getUserProfile } from '@/utils/profileService';
 import { useAutoMealPlanner } from '@/hooks/useAutoMealPlanner';
+import { updateSuggesticUserId } from '@/utils/updateSuggesticUserId';
+import { useToast } from '@/hooks/use-toast';
+import { ensureSuggesticAuth } from '@/utils/suggesticAuthService';
 const Index = () => {
   const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
   const [userProfile, setUserProfile] = useState(null);
@@ -17,10 +20,55 @@ const Index = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { toast } = useToast();
   const {
     generatedMeals,
     isGenerating
   } = useAutoMealPlanner(userProfile);
+
+  // Auto-setup Suggestic user ID if missing
+  useEffect(() => {
+    const setupSuggesticId = async () => {
+      if (userProfile && !userProfile.suggestic_user_id) {
+        console.log('Setting up Suggestic user ID...');
+        const result = await updateSuggesticUserId('6fe68eca-d534-4297-9ccc-5c69cfd1ef5d');
+        if (result.success) {
+          console.log('✓ Suggestic user ID configured');
+          // Refresh profile
+          const profileResult = await getUserProfile();
+          if (profileResult.success && profileResult.data) {
+            setUserProfile(profileResult.data);
+          }
+        }
+      }
+    };
+    setupSuggesticId();
+  }, [userProfile]);
+
+  // Ensure Suggestic authentication on profile load
+  useEffect(() => {
+    const authenticateSuggestic = async () => {
+      if (userProfile && userProfile.suggestic_user_id && !userProfile.suggestic_jwt_token) {
+        console.log('🔑 Authenticating with Suggestic...');
+        const authResult = await ensureSuggesticAuth(userProfile);
+        if (authResult.success) {
+          console.log('✓ Suggestic authentication successful');
+          toast({
+            title: "Connected to Suggestic",
+            description: "Shopping list feature is now available",
+          });
+          // Refresh profile to get the JWT token
+          const profileResult = await getUserProfile();
+          if (profileResult.success && profileResult.data) {
+            setUserProfile(profileResult.data);
+          }
+        } else {
+          console.error('❌ Failed to authenticate with Suggestic:', authResult.error);
+        }
+      }
+    };
+    authenticateSuggestic();
+  }, [userProfile?.suggestic_user_id, userProfile?.suggestic_jwt_token]);
   useEffect(() => {
     const {
       data: {

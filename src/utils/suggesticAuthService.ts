@@ -15,9 +15,13 @@ export async function ensureSuggesticAuth(profile?: any): Promise<SuggesticAuthR
   try {
     console.log('Ensuring Suggestic authentication...');
     
+    // Check if user already has a Suggestic user ID
+    const hasUserId = profile?.suggestic_user_id;
+    
     const { data, error } = await supabase.functions.invoke('suggestic-auth', {
       body: {
-        action: 'create-user',
+        // Only send create-user action if we don't have a user ID yet
+        action: hasUserId ? undefined : 'create-user',
         profile,
       },
     });
