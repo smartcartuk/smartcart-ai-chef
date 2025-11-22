@@ -331,17 +331,18 @@ async function generateWeeklyMealPlan(
   servings: number,
   calorieTarget?: number
 ): Promise<any> {
-  console.log('Generating weekly meal plan using recipe search (fallback approach)');
+  console.log('Generating weekly meal plan using recipe search with dietary preferences:', dietaryTags);
 
-  // Meal categories to search for variety
+  // Diverse, specific meal queries that work well with common dietary preferences
+  // These are more targeted than generic terms and yield better Suggestic results
   const mealTypes = [
-    'chicken dinner',
-    'pasta dish', 
-    'fish recipe',
-    'vegetarian meal',
-    'beef dinner',
-    'salad',
-    'soup'
+    'grilled salmon with vegetables',
+    'shrimp stir fry',
+    'baked cod with herbs',
+    'tuna poke bowl',
+    'seafood pasta',
+    'greek salad with feta',
+    'lentil soup'
   ];
 
   const days = [];
@@ -356,12 +357,16 @@ async function generateWeeklyMealPlan(
     const searchQuery = mealTypes[i % mealTypes.length];
     
     try {
-      // Search for a recipe for this day
+      console.log(`Day ${i + 1}: Searching Suggestic for "${searchQuery}" with tags:`, dietaryTags);
+      
+      // Search for a recipe for this day with dietary preferences
       const recipes = await searchRecipes(apiKey, searchQuery, dietaryTags, 45, servings);
       
       if (recipes.length > 0) {
         // Pick the first recipe from search results
         const recipe = recipes[0];
+        
+        console.log(`✓ Day ${i + 1}: Found recipe "${recipe.title}" from Suggestic`);
         
         days.push({
           date: currentDate.toISOString().split('T')[0],
@@ -372,16 +377,16 @@ async function generateWeeklyMealPlan(
           }
         });
       } else {
-        console.warn(`No recipes found for day ${i + 1}, query: ${searchQuery}`);
+        console.warn(`⚠️ Day ${i + 1}: No recipes found for "${searchQuery}" with dietary tags ${dietaryTags.join(', ')}`);
       }
     } catch (error) {
-      console.error(`Error fetching recipe for day ${i + 1}:`, error);
+      console.error(`❌ Day ${i + 1}: Error fetching recipe for "${searchQuery}":`, error);
       // Continue to next day even if one fails
     }
   }
 
   if (days.length === 0) {
-    throw new Error('Failed to generate any meals. Please check your Suggestic API key permissions.');
+    throw new Error('Failed to generate any meals from Suggestic. This could be due to: 1) Limited recipe database access on your Suggestic plan, 2) Dietary restrictions being too specific, or 3) API key permissions. Please check your Suggestic plan tier and API key permissions.');
   }
 
   const formattedMealPlan = {
@@ -390,7 +395,7 @@ async function generateWeeklyMealPlan(
     days
   };
   
-  console.log(`Generated meal plan with ${formattedMealPlan.days.length} days using recipe search`);
+  console.log(`✅ Generated meal plan with ${formattedMealPlan.days.length}/7 days from Suggestic recipe search`);
   return formattedMealPlan;
 }
 
