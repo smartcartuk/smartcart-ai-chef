@@ -190,17 +190,28 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
         // Fetch prices for each ingredient
         for (const ingredient of ingredients) {
-          const {
-            data,
-            error
-          } = await supabase.functions.invoke('unified-price-lookup', {
-            body: {
-              ingredientName: ingredient.name,
-              quantity: 1,
-              stores: ['tesco', 'sainsburys', 'asda', 'aldi']
+          try {
+            const {
+              data,
+              error
+            } = await supabase.functions.invoke('unified-price-lookup', {
+              body: {
+                ingredientName: ingredient.name,
+                quantity: 1,
+                stores: ['tesco', 'sainsburys', 'asda', 'aldi']
+              }
+            });
+            
+            if (error) {
+              console.error(`❌ Price lookup error for ${ingredient.name}:`, error);
+              continue;
             }
-          });
-          if (!error && data?.results) {
+            
+            if (!data?.results || data.results.length === 0) {
+              console.warn(`⚠️ No prices returned for ${ingredient.name}`);
+              continue;
+            }
+            
             // Transform array results into store-keyed object
             const storeData: any = {};
             data.results.forEach((result: any) => {
@@ -211,11 +222,20 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
               };
             });
             pricesMap.set(ingredient.name.toLowerCase(), storeData);
+            console.log(`✓ Fetched prices for ${ingredient.name}:`, data.results.length, 'stores');
+          } catch (itemError) {
+            console.error(`❌ Failed to fetch price for ${ingredient.name}:`, itemError);
           }
         }
         setIngredientPrices(pricesMap);
+        console.log(`✅ Price fetch complete. Got prices for ${pricesMap.size}/${ingredients.length} ingredients`);
       } catch (error) {
-        console.error('Error fetching prices:', error);
+        console.error('❌ Error in fetchPrices:', error);
+        toast({
+          title: "Price Fetch Error",
+          description: "Some ingredient prices could not be loaded. Showing estimated prices.",
+          variant: "destructive"
+        });
       } finally {
         setLoadingPrices(false);
       }
@@ -554,7 +574,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                               </div>
                               
                               <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
-                                
+                                <div className="text-right">
+                                  {loadingPrices ? <Loader2 className="w-4 h-4 animate-spin" /> : <div className="font-medium text-gray-900">£{item.price.toFixed(2)}</div>}
+                                </div>
                                 <Button size="sm" variant="ghost" onClick={e => {
                         e.stopPropagation();
                         removeIngredient(item.name);
