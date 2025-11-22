@@ -54,23 +54,19 @@ serve(async (req) => {
     // Map dietary preferences to Suggestic tags
     const dietaryTags = mapDietaryPreferences(dietaryPreferences);
     
-    // Helper to get user's JWT token
-    const getUserJWT = async () => {
+    // Helper to get user's Suggestic user ID
+    const getSuggesticUserId = async () => {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('suggestic_jwt_token, suggestic_jwt_expires_at')
+        .select('suggestic_user_id')
         .eq('id', user.id)
         .single();
 
-      if (!profile?.suggestic_jwt_token) {
-        throw new Error('No Suggestic authentication. Please refresh your meal plan to authenticate.');
+      if (!profile?.suggestic_user_id) {
+        throw new Error('No Suggestic user ID configured. Please complete Suggestic setup first.');
       }
 
-      if (profile.suggestic_jwt_expires_at && new Date(profile.suggestic_jwt_expires_at) < new Date()) {
-        throw new Error('Suggestic authentication expired. Please refresh your meal plan.');
-      }
-
-      return profile.suggestic_jwt_token;
+      return profile.suggestic_user_id as string;
     };
     
     if (action === 'search' && searchQuery) {
@@ -82,22 +78,22 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'shopping-list') {
-      // Get shopping list from Suggestic (requires JWT)
-      const jwt = await getUserJWT();
-      const shoppingList = await getShoppingList(jwt);
+      // Get shopping list from Suggestic using API key + user ID
+      const suggesticUserId = await getSuggesticUserId();
+      const shoppingList = await getShoppingList(SUGGESTIC_API_KEY, suggesticUserId);
       
       return new Response(
         JSON.stringify({ success: true, shoppingList }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'add-to-shopping-list') {
-      // Add recipes to shopping list (requires JWT)
+      // Add recipes to shopping list
       if (!recipeIds || recipeIds.length === 0) {
         throw new Error('No recipe IDs provided');
       }
       
-      const jwt = await getUserJWT();
-      const result = await addRecipesToShoppingList(jwt, recipeIds);
+      const suggesticUserId = await getSuggesticUserId();
+      const result = await addRecipesToShoppingList(SUGGESTIC_API_KEY, suggesticUserId, recipeIds);
       
       return new Response(
         JSON.stringify({ success: true, ...result }),
@@ -248,8 +244,8 @@ async function searchRecipes(
   return [];
 }
 
-async function addRecipesToShoppingList(jwt: string, recipeIds: string[]): Promise<any> {
-  console.log(`Adding ${recipeIds.length} recipes to shopping list with JWT auth`);
+async function addRecipesToShoppingList(apiKey: string, suggesticUserId: string, recipeIds: string[]): Promise<any> {
+  console.log(`Adding ${recipeIds.length} recipes to shopping list for Suggestic user ${suggesticUserId}`);
 
   const graphqlQuery = `
     mutation AddRecipesToShoppingList($recipeIds: [String]!) {
@@ -267,7 +263,8 @@ async function addRecipesToShoppingList(jwt: string, recipeIds: string[]): Promi
   const response = await fetch('https://production.suggestic.com/graphql', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${jwt}`,
+      'Authorization': `Token ${apiKey}`,
+      'sg-user': suggesticUserId,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query: graphqlQuery, variables })
@@ -296,8 +293,8 @@ async function addRecipesToShoppingList(jwt: string, recipeIds: string[]): Promi
   return result;
 }
 
-async function getShoppingList(jwt: string): Promise<any> {
-  console.log('Fetching shopping list from Suggestic with JWT auth');
+async function getShoppingList(apiKey: string, suggesticUserId: string): Promise<any> {
+  console.log('Fetching shopping list from Suggestic for user', suggesticUserId);
 
   const graphqlQuery = `
     query GetShoppingList {
@@ -320,7 +317,8 @@ async function getShoppingList(jwt: string): Promise<any> {
   const response = await fetch('https://production.suggestic.com/graphql', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${jwt}`,
+      'Authorization': `Token ${apiKey}`,
+      'sg-user': suggesticUserId,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query: graphqlQuery })
