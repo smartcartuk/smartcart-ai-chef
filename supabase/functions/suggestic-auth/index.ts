@@ -127,9 +127,8 @@ serve(async (req) => {
     console.log('Generating JWT token for user:', suggesticUserId);
     
     const loginMutation = `
-      mutation Login($email: String!) {
-        login(email: $email) {
-          success
+      mutation Login($userId: String!) {
+        login(userId: $userId) {
           jwt
         }
       }
@@ -144,7 +143,7 @@ serve(async (req) => {
       body: JSON.stringify({
         query: loginMutation,
         variables: {
-          email: profile?.email || user.email,
+          userId: suggesticUserId,
         },
       }),
     });
@@ -156,7 +155,7 @@ serve(async (req) => {
       throw new Error(`Failed to authenticate with Suggestic: ${JSON.stringify(loginData.errors)}`);
     }
     
-    if (!loginData.data?.login?.success) {
+    if (!loginData.data?.login?.jwt) {
       console.error('Suggestic login unsuccessful:', loginData);
       throw new Error('Failed to authenticate with Suggestic');
     }
