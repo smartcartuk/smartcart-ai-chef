@@ -8,7 +8,7 @@ import { Plus, X } from 'lucide-react';
 
 interface DietaryPreferencesStepProps {
   profile: any;
-  onTogglePreference: (item: string, type: 'dietary' | 'allergies') => void;
+  onTogglePreference: (item: string, type: 'dietary' | 'allergies' | 'mealType') => void;
 }
 
 export const DietaryPreferencesStep: React.FC<DietaryPreferencesStepProps> = ({
@@ -65,6 +65,29 @@ export const DietaryPreferencesStep: React.FC<DietaryPreferencesStepProps> = ({
             </label>
           </div>
         ))}
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Which meals would you like planned?</h3>
+        <p className="text-sm text-gray-600">Select the meals you want AI to plan for each week</p>
+        <div className="grid grid-cols-3 gap-4">
+          {['breakfast', 'lunch', 'dinner'].map((mealType) => (
+            <div key={mealType} className="flex items-center space-x-3">
+              <Checkbox 
+                id={mealType}
+                checked={profile.mealTypes?.includes(mealType) ?? true}
+                onCheckedChange={() => onTogglePreference(mealType, 'mealType')}
+                className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+              />
+              <label 
+                htmlFor={mealType}
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer capitalize"
+              >
+                {mealType}
+              </label>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-4">

@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface SuggesticMealPlanRequest {
-  action: 'generate' | 'search' | 'shopping-list' | 'add-to-shopping-list';
+  action: 'generate' | 'search' | 'shopping-list' | 'add-to-shopping-list' | 'generate-meal-options';
   dietaryPreferences?: string[];
   allergies?: string[];
   householdSize?: number;
@@ -16,6 +16,9 @@ interface SuggesticMealPlanRequest {
   searchQuery?: string;
   calorieTarget?: number;
   recipeIds?: string[];
+  mealTypes?: string[];
+  budgetTier?: 'low' | 'medium' | 'high';
+  selectedRecipeIds?: string[];
 }
 
 serve(async (req) => {
@@ -47,7 +50,19 @@ serve(async (req) => {
     }
 
     const requestBody: SuggesticMealPlanRequest = await req.json();
-    const { action, dietaryPreferences = [], allergies = [], householdSize = 2, maxPrepTime = 45, searchQuery, calorieTarget, recipeIds } = requestBody;
+    const { 
+      action, 
+      dietaryPreferences = [], 
+      allergies = [], 
+      householdSize = 2, 
+      maxPrepTime = 45, 
+      searchQuery, 
+      calorieTarget, 
+      recipeIds,
+      mealTypes = ['breakfast', 'lunch', 'dinner'],
+      budgetTier = 'medium',
+      selectedRecipeIds
+    } = requestBody;
 
     console.log(`Suggestic API request - Action: ${action}, User: ${user.id}`);
 
@@ -77,6 +92,28 @@ serve(async (req) => {
         JSON.stringify({ success: true, recipes }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    } else if (action === 'generate-meal-options') {
+      // Generate meal options with cost estimates for user to select from
+      console.log(`🎯 Generating meal options - Budget: ${budgetTier}, Meal types: ${mealTypes.join(', ')}`);
+      
+      const mealOptions = await generateMealOptionsWithCosts(
+        SUGGESTIC_API_KEY,
+        supabase,
+        user.id,
+        mealTypes,
+        budgetTier,
+        householdSize,
+        dietaryTags,
+        allergies,
+        maxPrepTime
+      );
+      
+      console.log(`✓ Generated ${mealOptions.length} meal options`);
+      
+      return new Response(
+        JSON.stringify({ success: true, mealOptions }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     } else if (action === 'shopping-list') {
       // Get shopping list from Suggestic using API key + user ID
       const suggesticUserId = await getSuggesticUserId();
@@ -100,20 +137,41 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'generate') {
-      // Generate a full weekly meal plan using Suggestic's AI
-      const suggesticUserId = await getSuggesticUserId();
-      const mealPlan = await generateWeeklyMealPlan(
-        SUGGESTIC_API_KEY,
-        suggesticUserId,
-        householdSize
-      );
+      // Generate a full weekly meal plan from selected meal options
+      console.log(`📅 Confirming meal plan with ${selectedRecipeIds?.length || 0} selected recipes`);
       
-      console.log('✓ Meal plan generated successfully with automatic shopping list population.');
-      
-      return new Response(
-        JSON.stringify({ success: true, mealPlan }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (selectedRecipeIds && selectedRecipeIds.length > 0) {
+        // User has pre-selected recipes from meal options
+        const suggesticUserId = await getSuggesticUserId();
+        
+        // Add selected recipes to shopping list
+        await addRecipesToShoppingList(SUGGESTIC_API_KEY, suggesticUserId, selectedRecipeIds);
+        
+        // Retrieve the selected recipes to return
+        const mealPlan = await retrieveSelectedRecipes(supabase, user.id, selectedRecipeIds);
+        
+        console.log('✓ Meal plan confirmed with selected recipes and shopping list updated.');
+        
+        return new Response(
+          JSON.stringify({ success: true, mealPlan }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        // Legacy: Generate a full weekly meal plan using Suggestic's AI (old flow)
+        const suggesticUserId = await getSuggesticUserId();
+        const mealPlan = await generateWeeklyMealPlan(
+          SUGGESTIC_API_KEY,
+          suggesticUserId,
+          householdSize
+        );
+        
+        console.log('✓ Meal plan generated successfully with automatic shopping list population.');
+        
+        return new Response(
+          JSON.stringify({ success: true, mealPlan }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     } else {
       throw new Error('Invalid action');
     }
@@ -510,7 +568,7 @@ async function generateWeeklyMealPlan(
     
     try {
       const addToShoppingListMutation = `
-        mutation AddToShoppingList($recipeId: UUID!, $servings: Int) {
+        mutation AddToShoppingList($recipeId: String!, $servings: Int) {
           addToShoppingList(recipeId: $recipeId, servings: $servings) {
             success
             message
@@ -617,5 +675,183 @@ function formatRecipe(recipe: any, servings: number): any {
     cuisine: recipe.cuisines?.[0] || 'International',
     tags: [],
     source: 'suggestic'
+  };
+}
+
+// ============= Cost Estimation Functions =============
+
+const BASE_INGREDIENT_COSTS: Record<string, number> = {
+  'chicken breast': 2.50, 'chicken thigh': 2.00, 'beef mince': 2.80, 'beef steak': 4.50,
+  'pork chop': 2.20, 'salmon fillet': 3.50, 'cod fillet': 3.00, 'tuna': 1.50,
+  'prawns': 3.00, 'eggs': 0.20, 'tofu': 1.80, 'milk': 0.50, 'cheese': 1.80,
+  'cheddar cheese': 2.00, 'mozzarella': 1.50, 'butter': 1.50, 'cream': 1.20,
+  'yogurt': 1.00, 'tomatoes': 0.40, 'onions': 0.15, 'garlic': 0.10, 'peppers': 0.60,
+  'carrots': 0.30, 'broccoli': 0.80, 'cauliflower': 1.00, 'spinach': 0.70,
+  'lettuce': 0.60, 'cucumber': 0.50, 'potatoes': 0.40, 'sweet potato': 0.60,
+  'courgette': 0.50, 'aubergine': 0.80, 'rice': 0.50, 'pasta': 0.60,
+  'flour': 0.40, 'sugar': 0.30, 'salt': 0.05, 'pepper': 0.10,
+  'olive oil': 0.30, 'vegetable oil': 0.20, 'soy sauce': 0.15,
+  'tinned tomatoes': 0.50, 'coconut milk': 0.80, 'chickpeas': 0.50,
+  'black beans': 0.50, 'kidney beans': 0.50, 'unknown': 0.50
+};
+
+function normalizeIngredientName(ingredient: string): string {
+  return ingredient
+    .toLowerCase()
+    .replace(/\d+/g, '')
+    .replace(/\s*(g|kg|ml|l|oz|lb|cup|tbsp|tsp)\s*/gi, '')
+    .replace(/\s*(fresh|dried|frozen|canned|tinned)\s*/gi, '')
+    .replace(/[^a-z\s]/g, '')
+    .trim();
+}
+
+function estimateRecipeCost(ingredients: string[], householdSize: number): number {
+  let totalCost = 0;
+  
+  for (const ingredient of ingredients) {
+    const normalized = normalizeIngredientName(ingredient);
+    const matchingKey = Object.keys(BASE_INGREDIENT_COSTS).find(key => 
+      normalized.includes(key) || key.includes(normalized)
+    );
+    
+    const ingredientCost = matchingKey ? BASE_INGREDIENT_COSTS[matchingKey] : BASE_INGREDIENT_COSTS['unknown'];
+    totalCost += ingredientCost;
+  }
+  
+  const householdMultiplier = householdSize / 2;
+  totalCost *= householdMultiplier;
+  
+  return Math.round(totalCost * 100) / 100;
+}
+
+// ============= New Action Functions =============
+
+async function generateMealOptionsWithCosts(
+  apiKey: string,
+  supabase: any,
+  userId: string,
+  mealTypes: string[],
+  budgetTier: 'low' | 'medium' | 'high',
+  householdSize: number,
+  dietaryTags: string[],
+  allergies: string[],
+  maxPrepTime: number
+): Promise<any[]> {
+  const mealsPerDay = mealTypes.length;
+  const totalMealsNeeded = mealsPerDay * 7;
+  const mealsToGenerate = totalMealsNeeded * 2; // Generate 2x for choice
+  
+  console.log(`🔍 Generating ${mealsToGenerate} recipes (${totalMealsNeeded} needed * 2)`);
+  
+  // Get budget range
+  const budgetRanges = {
+    low: { min: 70, max: 90 },
+    medium: { min: 90, max: 120 },
+    high: { min: 120, max: 150 }
+  };
+  const budget = budgetRanges[budgetTier];
+  const avgMealBudget = budget.max / totalMealsNeeded;
+  
+  // Search for recipes from Suggestic
+  const allRecipes: any[] = [];
+  
+  // Search for each meal type
+  for (const mealType of mealTypes) {
+    const recipesNeeded = Math.ceil(mealsToGenerate / mealTypes.length);
+    const searchQuery = mealType === 'breakfast' ? 'breakfast' : 
+                       mealType === 'lunch' ? 'lunch' :
+                       'dinner';
+    
+    const recipes = await searchRecipes(apiKey, searchQuery, dietaryTags, maxPrepTime, householdSize);
+    
+    // Add meal type to each recipe
+    recipes.forEach(recipe => {
+      recipe.mealType = mealType;
+    });
+    
+    allRecipes.push(...recipes.slice(0, recipesNeeded));
+  }
+  
+  console.log(`📊 Found ${allRecipes.length} recipes, estimating costs...`);
+  
+  // Estimate cost for each recipe
+  const recipesWithCosts = allRecipes.map(recipe => {
+    const estimatedCost = estimateRecipeCost(recipe.ingredients.map((i: any) => i.name), householdSize);
+    return {
+      ...recipe,
+      estimatedCost,
+      costDifference: Math.abs(estimatedCost - avgMealBudget)
+    };
+  });
+  
+  // Sort by how close to budget (prefer slightly under)
+  recipesWithCosts.sort((a, b) => a.costDifference - b.costDifference);
+  
+  // Take the best matches (within reasonable budget range)
+  const selectedRecipes = recipesWithCosts
+    .filter(r => r.estimatedCost <= avgMealBudget * 1.3) // Allow 30% over
+    .slice(0, mealsToGenerate);
+  
+  console.log(`💾 Saving ${selectedRecipes.length} meal options to database...`);
+  
+  // Save to meal_options table
+  const weekStart = new Date().toISOString().split('T')[0];
+  
+  // Delete old options for this week
+  await supabase
+    .from('meal_options')
+    .delete()
+    .eq('user_id', userId)
+    .eq('week_start', weekStart);
+  
+  // Insert new options
+  const mealOptionsData = selectedRecipes.map(recipe => ({
+    user_id: userId,
+    week_start: weekStart,
+    recipe_data: recipe,
+    estimated_cost: recipe.estimatedCost,
+    meal_type: recipe.mealType
+  }));
+  
+  const { error } = await supabase
+    .from('meal_options')
+    .insert(mealOptionsData);
+  
+  if (error) {
+    console.error('Error saving meal options:', error);
+  } else {
+    console.log(`✅ Saved ${selectedRecipes.length} meal options`);
+  }
+  
+  return selectedRecipes;
+}
+
+async function retrieveSelectedRecipes(
+  supabase: any,
+  userId: string,
+  selectedRecipeIds: string[]
+): Promise<any> {
+  const weekStart = new Date().toISOString().split('T')[0];
+  
+  // Retrieve selected meal options
+  const { data: selectedOptions, error } = await supabase
+    .from('meal_options')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('week_start', weekStart)
+    .in('recipe_data->>id', selectedRecipeIds);
+  
+  if (error) {
+    console.error('Error retrieving selected recipes:', error);
+    return { recipes: [], totalCost: 0 };
+  }
+  
+  const recipes = selectedOptions.map(option => option.recipe_data);
+  const totalCost = selectedOptions.reduce((sum, opt) => sum + (opt.estimated_cost || 0), 0);
+  
+  return {
+    recipes,
+    totalCost,
+    weekStart
   };
 }

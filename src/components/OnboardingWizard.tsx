@@ -35,8 +35,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
     },
     householdSize: 2,
     weeklyBudget: 80,
+    budgetTier: 'medium' as 'low' | 'medium' | 'high',
     dietaryPreferences: [],
     allergies: [],
+    mealTypes: ['breakfast', 'lunch', 'dinner'],
     connectedStores: []
   });
 
@@ -195,8 +197,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
     setCurrentStep(prev => Math.max(prev - 1, 0));
   };
 
-  const handleTogglePreference = (item: string, type: 'dietary' | 'allergies') => {
+  const handleTogglePreference = (item: string, type: 'dietary' | 'allergies' | 'mealType') => {
     setProfile(prev => {
+      if (type === 'mealType') {
+        const currentList = prev.mealTypes || ['breakfast', 'lunch', 'dinner'];
+        const newList = currentList.includes(item)
+          ? currentList.filter(i => i !== item)
+          : [...currentList, item];
+        
+        return {
+          ...prev,
+          mealTypes: newList
+        };
+      }
+      
       const currentList = type === 'dietary' ? prev.dietaryPreferences : prev.allergies;
       const newList = currentList.includes(item)
         ? currentList.filter(i => i !== item)

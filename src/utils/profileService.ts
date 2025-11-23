@@ -13,6 +13,8 @@ export interface UserProfile {
   weekly_budget: number;
   dietary_preferences: string[];
   allergies: string[];
+  meal_types?: string[];
+  budget_tier?: 'low' | 'medium' | 'high';
 }
 
 export interface ConnectedStore {
@@ -57,6 +59,8 @@ export const saveUserProfile = async (profile: UserProfile): Promise<{ success: 
         weekly_budget: profile.weekly_budget,
         dietary_preferences: profile.dietary_preferences,
         allergies: profile.allergies,
+        meal_types: profile.meal_types || ['breakfast', 'lunch', 'dinner'],
+        budget_tier: profile.budget_tier || 'medium',
         updated_at: new Date().toISOString()
       })
       .select();

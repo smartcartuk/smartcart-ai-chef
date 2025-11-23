@@ -2,6 +2,7 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Eye, EyeOff, MapPin, Search } from 'lucide-react';
 
 interface PersonalDetailsStepProps {
@@ -163,16 +164,20 @@ export const PersonalDetailsStep: React.FC<PersonalDetailsStepProps> = ({
             </div>
             
             <div>
-              <Label htmlFor="budget">Weekly Budget (£)</Label>
-              <Input
-                id="budget"
-                type="number"
-                min="20"
-                max="200"
-                value={profile.weeklyBudget}
-                onChange={(e) => setProfile(prev => ({ ...prev, weeklyBudget: parseInt(e.target.value) }))}
-                className="mt-1"
-              />
+              <Label htmlFor="budget-tier">Weekly Budget Range</Label>
+              <Select 
+                value={profile.budgetTier || 'medium'} 
+                onValueChange={(value) => setProfile(prev => ({ ...prev, budgetTier: value }))}
+              >
+                <SelectTrigger id="budget-tier" className="mt-1">
+                  <SelectValue placeholder="Select budget range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">£70 - £90/week (Budget-friendly)</SelectItem>
+                  <SelectItem value="medium">£90 - £120/week (Balanced)</SelectItem>
+                  <SelectItem value="high">£120 - £150/week (Premium)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>

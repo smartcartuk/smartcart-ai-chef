@@ -232,6 +232,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ingredient_price_history: {
+        Row: {
+          id: string
+          ingredient_name: string
+          normalized_name: string
+          price: number
+          recorded_at: string | null
+          store_name: string
+          unit: string | null
+        }
+        Insert: {
+          id?: string
+          ingredient_name: string
+          normalized_name: string
+          price: number
+          recorded_at?: string | null
+          store_name: string
+          unit?: string | null
+        }
+        Update: {
+          id?: string
+          ingredient_name?: string
+          normalized_name?: string
+          price?: number
+          recorded_at?: string | null
+          store_name?: string
+          unit?: string | null
+        }
+        Relationships: []
+      }
       lidl_prices: {
         Row: {
           created_at: string | null
@@ -259,27 +289,66 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_options: {
+        Row: {
+          created_at: string | null
+          estimated_cost: number | null
+          id: string
+          meal_type: string | null
+          recipe_data: Json
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string | null
+          estimated_cost?: number | null
+          id?: string
+          meal_type?: string | null
+          recipe_data: Json
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string | null
+          estimated_cost?: number | null
+          id?: string
+          meal_type?: string | null
+          recipe_data?: Json
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       meal_plans: {
         Row: {
+          actual_cost: number | null
           created_at: string
           data: Json
           id: string
+          meal_type: string | null
+          status: string | null
           updated_at: string
           user_id: string
           week_start: string
         }
         Insert: {
+          actual_cost?: number | null
           created_at?: string
           data: Json
           id?: string
+          meal_type?: string | null
+          status?: string | null
           updated_at?: string
           user_id: string
           week_start: string
         }
         Update: {
+          actual_cost?: number | null
           created_at?: string
           data?: Json
           id?: string
+          meal_type?: string | null
+          status?: string | null
           updated_at?: string
           user_id?: string
           week_start?: string
@@ -454,12 +523,14 @@ export type Database = {
         Row: {
           address: Json | null
           allergies: string[] | null
+          budget_tier: string | null
           created_at: string
           dietary_preferences: string[] | null
           email: string | null
           full_name: string | null
           household_size: number | null
           id: string
+          meal_types: Json | null
           suggestic_jwt_expires_at: string | null
           suggestic_jwt_token: string | null
           suggestic_user_id: string | null
@@ -469,12 +540,14 @@ export type Database = {
         Insert: {
           address?: Json | null
           allergies?: string[] | null
+          budget_tier?: string | null
           created_at?: string
           dietary_preferences?: string[] | null
           email?: string | null
           full_name?: string | null
           household_size?: number | null
           id: string
+          meal_types?: Json | null
           suggestic_jwt_expires_at?: string | null
           suggestic_jwt_token?: string | null
           suggestic_user_id?: string | null
@@ -484,12 +557,14 @@ export type Database = {
         Update: {
           address?: Json | null
           allergies?: string[] | null
+          budget_tier?: string | null
           created_at?: string
           dietary_preferences?: string[] | null
           email?: string | null
           full_name?: string | null
           household_size?: number | null
           id?: string
+          meal_types?: Json | null
           suggestic_jwt_expires_at?: string | null
           suggestic_jwt_token?: string | null
           suggestic_user_id?: string | null

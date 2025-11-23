@@ -17,6 +17,8 @@ import { WeeklyPlanTester } from '@/components/WeeklyPlanTester';
 import { MealPlanConfirmationModal } from '@/components/MealPlanConfirmationModal';
 import { CheckoutSummary } from '@/components/CheckoutSummary';
 import { RecipeFavorites } from '@/components/RecipeFavorites';
+import { MealSelectionStep } from '@/components/MealSelectionStep';
+import { ShoppingListReview } from '@/components/ShoppingListReview';
 import { WebhookResponse } from '@/utils/webhookService';
 import { useToast } from '@/hooks/use-toast';
 import { getConnectedStores } from '@/utils/profileService';
@@ -224,13 +226,22 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="select">Select Meals</TabsTrigger>
+            <TabsTrigger value="review">Review List</TabsTrigger>
             <TabsTrigger value="plan">Meal Plan</TabsTrigger>
             <TabsTrigger value="shopping">Shopping</TabsTrigger>
             <TabsTrigger value="favorites">Favorites</TabsTrigger>
-            <TabsTrigger value="assistant">AI Assistant</TabsTrigger>
             <TabsTrigger value="checkout">Checkout</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="select">
+            <MealSelectionStep userProfile={userProfile} onComplete={() => setActiveTab('review')} />
+          </TabsContent>
+
+          <TabsContent value="review">
+            <ShoppingListReview userProfile={userProfile} onComparePrices={() => setActiveTab('shopping')} />
+          </TabsContent>
 
           <TabsContent value="plan">
             <WeeklyPlan userProfile={userProfile} generatedData={generatedData} onRecipesChange={handleRecipesChange} onWeeklyCostsChange={handleWeeklyCostsChange} />
@@ -242,10 +253,6 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
 
           <TabsContent value="favorites">
             <RecipeFavorites />
-          </TabsContent>
-
-          <TabsContent value="assistant">
-            <AIAssistant userProfile={userProfile} />
           </TabsContent>
 
           <TabsContent value="checkout">
