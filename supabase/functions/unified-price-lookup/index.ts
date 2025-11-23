@@ -181,6 +181,17 @@ serve(async (req) => {
                       onConflict: 'ingredient_name,store_name'
                     });
 
+                  // Record price in history for cost estimation improvements
+                  await supabase
+                    .from('ingredient_price_history')
+                    .insert({
+                      ingredient_name: ingredientName,
+                      normalized_name: normalizedName,
+                      store_name: storeName,
+                      price: priceData.price,
+                      unit: quantity
+                    });
+
                   console.log(`✓ RapidAPI: £${priceData.price} for ${ingredientName} at ${storeName}`);
                   results.push(priceData);
                 }
@@ -241,6 +252,17 @@ serve(async (req) => {
                     last_updated: new Date().toISOString()
                   }, {
                     onConflict: 'ingredient_name,store_name'
+                  });
+                
+                // Record price in history
+                await supabase
+                  .from('ingredient_price_history')
+                  .insert({
+                    ingredient_name: ingredientName,
+                    normalized_name: normalizedName,
+                    store_name: store,
+                    price: priceData.price,
+                    unit: quantity
                   });
                 
                 console.log(`✓ Operator API: £${priceData.price} for ${ingredientName} at ${store}`);
