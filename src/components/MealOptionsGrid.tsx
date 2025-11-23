@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, Users, DollarSign } from 'lucide-react';
+import { Clock, Users, Plus, Check } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface MealOption {
@@ -65,17 +65,6 @@ export const MealOptionsGrid: React.FC<MealOptionsGridProps> = ({
             alt={meal.name}
             className="w-full h-48 object-cover rounded-t-lg"
           />
-          <div className="absolute top-2 right-2">
-            <div 
-              className="bg-white rounded-full p-2 shadow-md"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleSelection(meal.id);
-              }}
-            >
-              <Checkbox checked={isSelected} />
-            </div>
-          </div>
           <div className="absolute bottom-2 left-2">
             <Badge variant="secondary" className="bg-white/90 text-primary font-semibold">
               £{meal.estimatedCost.toFixed(2)}
@@ -105,6 +94,27 @@ export const MealOptionsGrid: React.FC<MealOptionsGridProps> = ({
           <div className="mt-3 text-xs text-muted-foreground">
             {meal.ingredients.length} ingredients
           </div>
+
+          <Button
+            className="w-full mt-4"
+            variant={isSelected ? "default" : "outline"}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelection(meal.id);
+            }}
+          >
+            {isSelected ? (
+              <>
+                <Check className="mr-2 h-4 w-4" />
+                Added to Plan
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add to Plan
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
     );

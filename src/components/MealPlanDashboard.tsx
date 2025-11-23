@@ -32,7 +32,7 @@ export const MealPlanDashboard: React.FC<MealPlanDashboardProps> = ({
   userProfile,
   generatedData
 }) => {
-  const [activeTab, setActiveTab] = useState('plan');
+  const [activeTab, setActiveTab] = useState('select');
   const [recipes, setRecipes] = useState<any[]>([]);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [totalWeeklyCosts, setTotalWeeklyCosts] = useState<any>(null);
