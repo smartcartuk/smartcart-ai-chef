@@ -483,35 +483,73 @@ async function generateWeeklyMealPlan(
     console.log(`✓ Retrieved ${days.length}-day meal plan from Suggestic`);
   }
   
-  // Step 3: Explicitly generate shopping list
-  console.log('🛒 Generating shopping list from meal plan...');
-  const generateShoppingListMutation = `
-    mutation {
-      generateShoppingList {
-        success
-        message
+  // Step 3: Add recipes to shopping list
+  console.log('🛒 Adding recipes to shopping list...');
+  
+  // Extract all recipe IDs and servings from the meal plan
+  const recipesToAdd: Array<{ recipeId: string; servings: number }> = [];
+  for (const day of days) {
+    for (const meal of day.meals || []) {
+      if (meal.recipe?.databaseId) {
+        recipesToAdd.push({
+          recipeId: meal.recipe.databaseId,
+          servings: meal.numOfServings || servings
+        });
       }
     }
-  `;
-  
-  const shoppingListResponse = await fetch('https://production.suggestic.com/graphql', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Token ${apiKey}`,
-      'sg-user': suggesticUserId,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query: generateShoppingListMutation })
-  });
-  
-  const shoppingListData = await shoppingListResponse.json();
-  console.log('📋 Suggestic generateShoppingList response:', JSON.stringify(shoppingListData, null, 2));
-  
-  if (shoppingListData.data?.generateShoppingList?.success) {
-    console.log('✓ Shopping list generated successfully');
-  } else {
-    console.warn('⚠️ Shopping list generation may have failed:', shoppingListData.data?.generateShoppingList?.message);
   }
+  
+  console.log(`📦 Found ${recipesToAdd.length} recipes to add to shopping list`);
+  
+  // Add each recipe to shopping list with delays to avoid rate limiting
+  let addedCount = 0;
+  let failedCount = 0;
+  
+  for (const { recipeId, servings: recipeServings } of recipesToAdd) {
+    try {
+      const addToShoppingListMutation = `
+        mutation AddToShoppingList($recipeId: UUID!, $servings: Int) {
+          addToShoppingList(recipeId: $recipeId, servings: $servings) {
+            success
+            message
+          }
+        }
+      `;
+      
+      const addResponse = await fetch('https://production.suggestic.com/graphql', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${apiKey}`,
+          'sg-user': suggesticUserId,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          query: addToShoppingListMutation,
+          variables: { recipeId, servings: recipeServings }
+        })
+      });
+      
+      const addData = await addResponse.json();
+      
+      if (addData.data?.addToShoppingList?.success) {
+        addedCount++;
+        console.log(`✓ Added recipe ${recipeId} to shopping list (${addedCount}/${recipesToAdd.length})`);
+      } else {
+        failedCount++;
+        console.warn(`⚠️ Failed to add recipe ${recipeId}:`, addData.data?.addToShoppingList?.message || addData.errors);
+      }
+      
+      // Add delay between requests to avoid rate limiting (100ms)
+      if (recipesToAdd.indexOf({ recipeId, servings: recipeServings }) < recipesToAdd.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    } catch (error) {
+      failedCount++;
+      console.error(`❌ Error adding recipe ${recipeId}:`, error);
+    }
+  }
+  
+  console.log(`✅ Shopping list update complete: ${addedCount} recipes added, ${failedCount} failed`);
   
   // Step 4: Format for frontend
   const formattedMealPlan = {
