@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, Users, Plus, Check } from 'lucide-react';
+import { Clock, Users, Plus, Check, RefreshCw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface MealOption {
@@ -22,6 +22,7 @@ interface MealOptionsGridProps {
   mealOptions: MealOption[];
   selectedIds: string[];
   onToggleSelection: (id: string) => void;
+  onRegenerate?: (mealId: string, mealType: string) => void;
   mealTypes: string[];
 }
 
@@ -29,6 +30,7 @@ export const MealOptionsGrid: React.FC<MealOptionsGridProps> = ({
   mealOptions,
   selectedIds,
   onToggleSelection,
+  onRegenerate,
   mealTypes
 }) => {
   const [activeTab, setActiveTab] = useState<string>(mealTypes[0] || 'breakfast');
@@ -65,6 +67,19 @@ export const MealOptionsGrid: React.FC<MealOptionsGridProps> = ({
             alt={meal.name}
             className="w-full h-48 object-cover rounded-t-lg"
           />
+          {onRegenerate && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="absolute top-2 right-2 h-8 w-8 p-0 bg-white/90 hover:bg-white shadow-md"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRegenerate(meal.id, meal.mealType);
+              }}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          )}
           <div className="absolute bottom-2 left-2">
             <Badge variant="secondary" className="bg-white/90 text-primary font-semibold">
               £{meal.estimatedCost.toFixed(2)}

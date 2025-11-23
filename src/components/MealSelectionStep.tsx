@@ -20,6 +20,7 @@ export const MealSelectionStep: React.FC<MealSelectionStepProps> = ({ userProfil
     generateOptions,
     confirmSelection,
     toggleMealSelection,
+    regenerateMeal,
     calculateTotalCost,
     selectedCount
   } = useMealSelectionFlow(userProfile);
@@ -65,6 +66,7 @@ export const MealSelectionStep: React.FC<MealSelectionStepProps> = ({ userProfil
         mealOptions={mealOptions}
         selectedIds={selectedMealIds}
         onToggleSelection={toggleMealSelection}
+        onRegenerate={regenerateMeal}
         mealTypes={mealTypes}
       />
 
