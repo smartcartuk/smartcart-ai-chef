@@ -203,6 +203,63 @@ export const useMealSelectionFlow = (userProfile: any) => {
     );
   }, []);
 
+  // Regenerate a single meal option
+  const regenerateMeal = useCallback(async (mealId: string, mealType: string) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      console.log(`🔄 Regenerating ${mealType} meal...`);
+      
+      const { data, error: functionError } = await supabase.functions.invoke('suggestic-meal-planner', {
+        body: {
+          action: 'generate-meal-options',
+          mealTypes: [mealType],
+          budgetTier: userProfile.budget_tier || 'medium',
+          householdSize: userProfile.household_size || 2,
+          dietaryPreferences: userProfile.dietary_preferences || [],
+          allergies: userProfile.allergies || [],
+          maxPrepTime: 45,
+          count: 1 // Only generate 1 replacement meal
+        }
+      });
+
+      if (functionError) throw functionError;
+
+      if (data?.mealOptions && data.mealOptions.length > 0) {
+        const newMeal = data.mealOptions[0];
+        
+        // Replace the old meal with the new one
+        setMealOptions(prev => prev.map(meal => 
+          meal.id === mealId ? newMeal : meal
+        ));
+        
+        // If the meal was selected, update selection with new ID
+        setSelectedMealIds(prev => 
+          prev.includes(mealId) 
+            ? prev.map(id => id === mealId ? newMeal.id : id)
+            : prev
+        );
+        
+        toast({
+          title: "Meal Regenerated!",
+          description: `New ${mealType} option: ${newMeal.name}`,
+        });
+      } else {
+        throw new Error('No replacement meal generated');
+      }
+    } catch (err: any) {
+      console.error('Error regenerating meal:', err);
+      toast({
+        title: "Regeneration Failed",
+        description: err.message || 'Failed to regenerate meal',
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userProfile, toast]);
+
   // Helper: Calculate total cost of selected meals
   const calculateTotalCost = useCallback(() => {
     return selectedMealIds.reduce((total, mealId) => {
@@ -228,6 +285,7 @@ export const useMealSelectionFlow = (userProfile: any) => {
     loadShoppingList,
     comparePrices,
     toggleMealSelection,
+    regenerateMeal,
     setSelectedMealIds,
     
     // Helpers
