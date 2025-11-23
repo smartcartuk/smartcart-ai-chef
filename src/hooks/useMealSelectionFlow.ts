@@ -54,19 +54,33 @@ export const useMealSelectionFlow = (userProfile: any) => {
         setMealOptions(data.mealOptions);
         setCurrentStep('selecting');
         
-        toast({
-          title: "Meal Options Ready!",
-          description: `Generated ${data.mealOptions.length} meal options for you to choose from.`,
-        });
+        const mealsPerDay = userProfile.meal_types?.length || 3;
+        const totalMealsNeeded = mealsPerDay * 7;
+        
+        if (data.mealOptions.length < totalMealsNeeded) {
+          toast({
+            title: "Limited Options Available",
+            description: `Generated ${data.mealOptions.length} options (${totalMealsNeeded} recommended). Some dietary preferences may have limited recipe availability.`,
+            variant: "default"
+          });
+        } else {
+          toast({
+            title: "Meal Options Ready!",
+            description: `Generated ${data.mealOptions.length} meal options for you to choose from.`,
+          });
+        }
       } else {
         throw new Error('No meal options returned');
       }
     } catch (err: any) {
       console.error('Error generating options:', err);
-      setError(err.message || 'Failed to generate meal options');
+      const errorMessage = err.message || 'Failed to generate meal options';
+      setError(errorMessage);
       toast({
         title: "Generation Failed",
-        description: err.message || 'Failed to generate meal options',
+        description: errorMessage.includes('dietary preferences') 
+          ? "Try adjusting your dietary preferences for more options."
+          : errorMessage,
         variant: "destructive"
       });
     } finally {

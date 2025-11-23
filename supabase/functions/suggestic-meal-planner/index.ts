@@ -229,7 +229,7 @@ async function searchRecipes(
   for (const strategy of searchStrategies) {
     const graphqlQuery = `
       query RecipeSearch($query: String!, $tags: [String!]) {
-        recipeSearch(query: $query, tags: $tags, first: 10) {
+        recipeSearch(query: $query, tags: $tags, first: 20) {
           edges {
             node {
               id
@@ -758,11 +758,30 @@ async function generateMealOptionsWithCosts(
   // Search for each meal type
   for (const mealType of mealTypes) {
     const recipesNeeded = Math.ceil(mealsToGenerate / mealTypes.length);
-    const searchQuery = mealType === 'breakfast' ? 'breakfast' : 
-                       mealType === 'lunch' ? 'lunch' :
-                       'dinner';
     
-    const recipes = await searchRecipes(apiKey, searchQuery, dietaryTags, maxPrepTime, householdSize);
+    // Try multiple search queries for better results
+    const searchQueries = [
+      mealType,
+      mealType === 'breakfast' ? 'morning meal' : mealType === 'lunch' ? 'midday meal' : 'evening meal',
+      'healthy meal' // Fallback generic query
+    ];
+    
+    let recipes: any[] = [];
+    
+    for (const searchQuery of searchQueries) {
+      recipes = await searchRecipes(apiKey, searchQuery, dietaryTags, maxPrepTime, householdSize);
+      
+      if (recipes.length >= recipesNeeded / 2) { // Accept if we get at least half what we need
+        break;
+      }
+      
+      console.log(`⚠️ Only found ${recipes.length} recipes for "${searchQuery}", trying alternative...`);
+    }
+    
+    if (recipes.length === 0) {
+      console.warn(`❌ No recipes found for ${mealType} after all attempts. This meal type will be skipped.`);
+      continue;
+    }
     
     // Add meal type to each recipe
     recipes.forEach(recipe => {
@@ -772,7 +791,11 @@ async function generateMealOptionsWithCosts(
     allRecipes.push(...recipes.slice(0, recipesNeeded));
   }
   
-  console.log(`📊 Found ${allRecipes.length} recipes, estimating costs...`);
+  if (allRecipes.length === 0) {
+    throw new Error('Could not generate any meal options. Please try adjusting your dietary preferences or try again.');
+  }
+  
+  console.log(`📊 Found ${allRecipes.length} recipes total, estimating costs...`);
   
   // Estimate cost for each recipe
   const recipesWithCosts = allRecipes.map(recipe => {
@@ -790,7 +813,11 @@ async function generateMealOptionsWithCosts(
   // Take the best matches (within reasonable budget range)
   const selectedRecipes = recipesWithCosts
     .filter(r => r.estimatedCost <= avgMealBudget * 1.3) // Allow 30% over
-    .slice(0, mealsToGenerate);
+    .slice(0, Math.min(mealsToGenerate, recipesWithCosts.length));
+  
+  if (selectedRecipes.length < totalMealsNeeded) {
+    console.warn(`⚠️ Only generated ${selectedRecipes.length} meal options (needed ${totalMealsNeeded}). Some meal types may have limited options.`);
+  }
   
   console.log(`💾 Saving ${selectedRecipes.length} meal options to database...`);
   
