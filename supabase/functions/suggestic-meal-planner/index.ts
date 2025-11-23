@@ -505,7 +505,9 @@ async function generateWeeklyMealPlan(
   let addedCount = 0;
   let failedCount = 0;
   
-  for (const { recipeId, servings: recipeServings } of recipesToAdd) {
+  for (let i = 0; i < recipesToAdd.length; i++) {
+    const { recipeId, servings: recipeServings } = recipesToAdd[i];
+    
     try {
       const addToShoppingListMutation = `
         mutation AddToShoppingList($recipeId: UUID!, $servings: Int) {
@@ -539,8 +541,8 @@ async function generateWeeklyMealPlan(
         console.warn(`⚠️ Failed to add recipe ${recipeId}:`, addData.data?.addToShoppingList?.message || addData.errors);
       }
       
-      // Add delay between requests to avoid rate limiting (100ms)
-      if (recipesToAdd.indexOf({ recipeId, servings: recipeServings }) < recipesToAdd.length - 1) {
+      // Add delay between requests to avoid rate limiting (skip delay after last recipe)
+      if (i < recipesToAdd.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (error) {
