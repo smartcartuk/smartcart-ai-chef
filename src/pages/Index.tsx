@@ -2,163 +2,146 @@ import React, { useEffect, useState } from 'react';
 import { Header } from '@/components/Header';
 import { Hero } from '@/components/Hero';
 import { OnboardingWizard } from '@/components/OnboardingWizard';
-import { MealPlanDashboard } from '@/components/MealPlanDashboard';
-import { AIChatInterface } from '@/components/AIChatInterface';
+import { DashboardFlow } from '@/components/dashboard/DashboardFlow';
 import { Toaster } from '@/components/ui/toaster';
-import { WebhookResponse } from '@/utils/webhookService';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { getUserProfile } from '@/utils/profileService';
-import { useAutoMealPlanner } from '@/hooks/useAutoMealPlanner';
-import { updateSuggesticUserId } from '@/utils/updateSuggesticUserId';
 import { useToast } from '@/hooks/use-toast';
-import { ensureSuggesticAuth } from '@/utils/suggesticAuthService';
+
 const Index = () => {
   const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
-  const [userProfile, setUserProfile] = useState(null);
-  const [generatedData, setGeneratedData] = useState<WebhookResponse | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
-  const {
-    generatedMeals,
-    isGenerating
-  } = useAutoMealPlanner(userProfile);
 
-  // Auto-setup Suggestic user ID if missing
+  // Check auth state on mount
   useEffect(() => {
-    const setupSuggesticId = async () => {
-      if (userProfile && !userProfile.suggestic_user_id) {
-        console.log('Setting up Suggestic user ID...');
-        const result = await updateSuggesticUserId('6fe68eca-d534-4297-9ccc-5c69cfd1ef5d');
-        if (result.success) {
-          console.log('✓ Suggestic user ID configured');
-          // Refresh profile
-          const profileResult = await getUserProfile();
-          if (profileResult.success && profileResult.data) {
-            setUserProfile(profileResult.data);
-          }
-        }
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setIsAuthenticated(true);
+        await loadProfile(session.user.id);
+        setCurrentView('dashboard');
       }
     };
-    setupSuggesticId();
-  }, [userProfile]);
+    checkAuth();
 
-  // Ensure Suggestic authentication on profile load
-  useEffect(() => {
-    const authenticateSuggestic = async () => {
-      if (userProfile && userProfile.suggestic_user_id && !userProfile.suggestic_jwt_token) {
-        console.log('🔑 Authenticating with Suggestic...');
-        const authResult = await ensureSuggesticAuth(userProfile);
-        if (authResult.success) {
-          console.log('✓ Suggestic authentication successful');
-          toast({
-            title: "Connected to Suggestic",
-            description: "Shopping list feature is now available",
-          });
-          // Refresh profile to get the JWT token
-          const profileResult = await getUserProfile();
-          if (profileResult.success && profileResult.data) {
-            setUserProfile(profileResult.data);
-          }
-        } else {
-          console.error('❌ Failed to authenticate with Suggestic:', authResult.error);
-        }
-      }
-    };
-    authenticateSuggestic();
-  }, [userProfile?.suggestic_user_id, userProfile?.suggestic_jwt_token]);
-  useEffect(() => {
-    const {
-      data: {
-        subscription
-      }
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session);
-
-      // Defer Supabase calls to prevent deadlock
-      if (session) {
-        setTimeout(async () => {
-          const profileResult = await getUserProfile();
-          if (profileResult.success && profileResult.data) {
-            // User has a profile - go to dashboard
-            setUserProfile(profileResult.data);
-            setCurrentView('dashboard');
-          } else if (profileResult.success && !profileResult.data) {
-            // User is authenticated but has no profile - show onboarding
-            console.log('New user detected - opening onboarding wizard');
-            setShowOnboarding(true);
-            setCurrentView('onboarding');
-          }
-        }, 0);
-      }
-    });
-    supabase.auth.getSession().then(async ({
-      data
-    }) => {
-      setIsAuthenticated(!!data.session);
-
-      // Load profile on initial mount if authenticated
-      if (data.session) {
-        const profileResult = await getUserProfile();
-        if (profileResult.success && profileResult.data) {
-          // User has a profile - go to dashboard
-          setUserProfile(profileResult.data);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session?.user) {
+          setIsAuthenticated(true);
+          await loadProfile(session.user.id);
           setCurrentView('dashboard');
-        } else if (profileResult.success && !profileResult.data) {
-          // User is authenticated but has no profile - show onboarding
-          console.log('New user detected - opening onboarding wizard');
-          setShowOnboarding(true);
-          setCurrentView('onboarding');
+        } else {
+          setIsAuthenticated(false);
+          setUserProfile(null);
+          setCurrentView('landing');
         }
       }
-    });
+    );
+
     return () => subscription.unsubscribe();
   }, []);
-  const handleGetStarted = () => {
-    // Always open onboarding wizard - it handles signup internally
-    setShowOnboarding(true);
-    setCurrentView('onboarding');
+
+  const loadProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (data) {
+        setUserProfile(data);
+      }
+    } catch (err) {
+      console.error('Failed to load profile:', err);
+    }
   };
-  const handleSignIn = () => {
-    navigate('/auth');
-  };
-  const handleOnboardingComplete = async (profile: any, webhookData?: WebhookResponse) => {
-    setUserProfile(profile);
-    setShowOnboarding(false);
+
+  // "Try it free" — show dashboard with sample data, no signup
+  const handleQuickStart = (postcode: string, householdSize: number) => {
+    setUserProfile({
+      name: '',
+      postcode,
+      householdSize,
+      household_size: householdSize,
+      weeklyBudget: 50,
+      weekly_budget: 50,
+      dietaryPreferences: [],
+      dietary_preferences: [],
+      allergies: [],
+      preferred_supermarkets: ['tesco', 'asda', 'sainsburys', 'morrisons', 'waitrose'],
+      isGuest: true,
+    });
     setCurrentView('dashboard');
-    // The MealPlanDashboard will automatically trigger meal generation via useWeeklyPlan
+    toast({
+      title: 'Generating your meal plan...',
+      description: 'Finding the best meals for your household',
+    });
   };
-  const handleBackToLanding = () => {
-    setCurrentView('landing');
+
+  const handleGetStarted = () => {
+    setShowOnboarding(true);
   };
-  return <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
-      <Header currentView={currentView} onBackToLanding={handleBackToLanding} onGetStarted={handleGetStarted} onSignIn={handleSignIn} userProfile={userProfile} />
-      
-      {currentView === 'landing' && <>
-          <Hero onGetStarted={handleGetStarted} onSignIn={handleSignIn} />
-        </>}
-      
-      <OnboardingWizard isOpen={showOnboarding} onClose={() => {
-      setShowOnboarding(false);
-      setCurrentView('landing');
-    }} onComplete={handleOnboardingComplete} />
-      
-      {currentView === 'dashboard' && <div className="container mx-auto p-4">
-          {isGenerating && <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
-              <div className="text-lg font-semibold text-blue-700">🤖 AI is generating your personalized meal plan...</div>
-              <div className="text-sm text-blue-600 mt-1">Creating recipes, images, and finding the best prices</div>
-            </div>}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <MealPlanDashboard userProfile={userProfile} generatedData={generatedMeals || generatedData} />
-            </div>
-            
-          </div>
-        </div>}
-      
+
+  const handleSignIn = async () => {
+    // For MVP: use magic link or show a sign-in form
+    const email = window.prompt('Enter your email to sign in:');
+    if (email) {
+      const { error } = await supabase.auth.signInWithOtp({ email });
+      if (error) {
+        toast({
+          title: 'Sign in failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Check your email',
+          description: 'We sent you a magic link to sign in',
+        });
+      }
+    }
+  };
+
+  const handleOnboardingComplete = async (data: any) => {
+    setShowOnboarding(false);
+    setUserProfile(data);
+    setCurrentView('dashboard');
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header
+        currentView={currentView}
+        onBackToLanding={() => setCurrentView('landing')}
+        onGetStarted={handleGetStarted}
+        onSignIn={handleSignIn}
+        userProfile={userProfile}
+      />
+
+      {currentView === 'landing' && (
+        <Hero
+          onGetStarted={handleGetStarted}
+          onSignIn={handleSignIn}
+          onQuickStart={handleQuickStart}
+        />
+      )}
+
+      {currentView === 'dashboard' && userProfile && (
+        <DashboardFlow userProfile={userProfile} />
+      )}
+
+      <OnboardingWizard
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onComplete={handleOnboardingComplete}
+      />
+
       <Toaster />
-    </div>;
+    </div>
+  );
 };
+
 export default Index;

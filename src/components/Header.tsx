@@ -1,7 +1,5 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 
 interface HeaderProps {
   currentView: 'landing' | 'onboarding' | 'dashboard';
@@ -11,58 +9,52 @@ interface HeaderProps {
   userProfile: any;
 }
 
-export const Header: React.FC<HeaderProps> = ({ 
-  currentView, 
-  onBackToLanding, 
+export const Header: React.FC<HeaderProps> = ({
+  currentView,
+  onBackToLanding,
   onGetStarted,
   onSignIn,
-  userProfile 
+  userProfile
 }) => {
   return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-emerald-100 sticky top-0 z-50">
-      <div className="container mx-auto px-4 py-4">
+    <header className="bg-background/80 backdrop-blur-md border-b sticky top-0 z-50">
+      <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
-          <div 
-            className="flex items-center space-x-2 cursor-pointer"
+          <button
+            className="flex items-center gap-2"
             onClick={onBackToLanding}
           >
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">🛒</span>
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">SC</span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+              <h1 className="text-lg font-semibold text-foreground leading-tight">
                 SmartCart
               </h1>
-              <p className="text-xs text-gray-500">AI-Powered Meal Planning</p>
+              {currentView === 'dashboard' && (
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Your weekly shop, sorted
+                </p>
+              )}
             </div>
-          </div>
+          </button>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-2">
             {currentView === 'dashboard' && userProfile && (
-              <>
-                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
-                  Premium
-                </Badge>
-                <div className="text-right">
-                  <p className="text-sm font-medium">{userProfile.name || 'User'}</p>
-                  <p className="text-xs text-gray-500">Weekly savings: £12.50</p>
-                </div>
-              </>
+              <span className="text-xs text-muted-foreground hidden sm:inline">
+                {userProfile.name || userProfile.email || 'Account'}
+              </span>
             )}
-            
+
             {currentView === 'landing' && (
-              <div className="flex items-center space-x-2">
+              <>
                 <Button variant="ghost" size="sm" onClick={onSignIn}>
-                  Sign In
+                  Sign in
                 </Button>
-                <Button 
-                  size="sm" 
-                  className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700"
-                  onClick={onGetStarted}
-                >
-                  Get Started
+                <Button size="sm" onClick={onGetStarted}>
+                  Get started
                 </Button>
-              </div>
+              </>
             )}
           </div>
         </div>

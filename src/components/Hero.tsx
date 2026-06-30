@@ -1,112 +1,161 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { ArrowRight, ShoppingCart, Clock, PiggyBank } from 'lucide-react';
 
 interface HeroProps {
   onGetStarted: () => void;
   onSignIn: () => void;
+  onQuickStart: (postcode: string, householdSize: number) => void;
 }
 
-export const Hero: React.FC<HeroProps> = ({ onGetStarted, onSignIn }) => {
+export const Hero: React.FC<HeroProps> = ({ onGetStarted, onSignIn, onQuickStart }) => {
+  const [postcode, setPostcode] = useState('');
+  const [householdSize, setHouseholdSize] = useState(2);
+  const [showQuickStart, setShowQuickStart] = useState(false);
+
+  const handleTryFree = () => {
+    if (postcode.trim().length >= 5) {
+      onQuickStart(postcode.trim(), householdSize);
+    } else {
+      setShowQuickStart(true);
+    }
+  };
+
+  const stores = [
+    { name: 'Tesco', color: '#00539F' },
+    { name: "Sainsbury's", color: '#F06C00' },
+    { name: 'Asda', color: '#78BE20' },
+    { name: 'Waitrose', color: '#006B3A' },
+    { name: 'Morrisons', color: '#006836' },
+  ];
+
   return (
-    <div className="container mx-auto px-4 py-16">
-      <div className="max-w-4xl mx-auto text-center space-y-8">
-        {/* Hero Header */}
-        <div className="space-y-6">
-          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 px-4 py-2">
-            🚀 AI-Powered Meal Planning
-          </Badge>
-          
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight">
-            Save Money & Time on
-            <span className="bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent block">
-              Weekly Groceries
-            </span>
-          </h1>
-          
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            AI creates personalized meal plans, compares prices across supermarkets, and optimizes your shopping list to save you £50+ every week.
-          </p>
-        </div>
+    <div className="min-h-[85vh] flex flex-col justify-center">
+      <div className="container mx-auto px-4">
+        <div className="max-w-3xl mx-auto text-center space-y-8">
 
-        {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Button
-            size="lg"
-            className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-lg px-8 py-6 h-auto"
-            onClick={onGetStarted}
-          >
-            Get Started →
-          </Button>
-          <Button 
-            variant="outline" 
-            size="lg" 
-            className="text-lg px-8 py-6 h-auto"
-            onClick={onSignIn}
-          >
-            Sign In
-          </Button>
-        </div>
+          {/* Headline — plain, specific, human */}
+          <div className="space-y-4">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-foreground tracking-tight leading-[1.1]">
+              Plan your meals.
+              <br />
+              <span className="text-primary">Find the cheapest store.</span>
+              <br />
+              Shop in one click.
+            </h1>
 
-        {/* Social Proof */}
-        <div className="pt-8">
-          <p className="text-sm text-gray-500 mb-4">Trusted by 10,000+ families across the UK</p>
-          <div className="flex justify-center items-center flex-wrap gap-6 opacity-60">
-            <span className="text-2xl">🛒 Tesco</span>
-            <span className="text-2xl">🛍️ Sainsbury's</span>
-            <span className="text-2xl">🏪 Asda</span>
-            <span className="text-2xl">🥬 Morrisons</span>
-            <span className="text-2xl">🌟 Waitrose</span>
-            <span className="text-2xl">📦 Amazon Fresh</span>
-            <span className="text-2xl">🚚 Ocado</span>
-            <span className="text-2xl">🛍️ M&S Food</span>
-            <span className="text-2xl">🥕 Aldi</span>
-            <span className="text-2xl">💝 Lidl</span>
-            <span className="text-2xl">🏪 Co-op</span>
-            <span className="text-2xl">🌟 Iceland</span>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto leading-relaxed">
+              SmartCart plans your week's dinners, compares prices across the UK's Big 5 supermarkets, and sends you straight to checkout.
+            </p>
           </div>
-        </div>
 
-        {/* Feature Preview Cards */}
-        <div className="grid md:grid-cols-3 gap-6 pt-16">
-          <Card className="p-6 border border-emerald-100 bg-emerald-50/50">
-            <div className="text-3xl mb-4">🤖</div>
-            <h3 className="font-semibold text-lg mb-2">AI Recipe Curation</h3>
-            <p className="text-gray-600 text-sm">Personalized weekly meal plans matching your dietary preferences and budget</p>
-          </Card>
-          
-          <Card className="p-6 border border-blue-100 bg-blue-50/50">
-            <div className="text-3xl mb-4">💰</div>
-            <h3 className="font-semibold text-lg mb-2">Smart Price Comparison</h3>
-            <p className="text-gray-600 text-sm">Compare prices across all major UK supermarkets and apply loyalty discounts</p>
-          </Card>
-          
-          <Card className="p-6 border border-purple-100 bg-purple-50/50">
-            <div className="text-3xl mb-4">📱</div>
-            <h3 className="font-semibold text-lg mb-2">One-Click Shopping</h3>
-            <p className="text-gray-600 text-sm">Auto-fill baskets and schedule deliveries across multiple stores</p>
-          </Card>
-        </div>
+          {/* Quick Start — value before signup */}
+          <div className="max-w-md mx-auto">
+            {!showQuickStart ? (
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  size="lg"
+                  className="flex-1 h-13 text-base font-medium"
+                  onClick={() => setShowQuickStart(true)}
+                >
+                  Plan your first week free
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-13 text-base"
+                  onClick={onSignIn}
+                >
+                  Sign in
+                </Button>
+              </div>
+            ) : (
+              <div className="bg-card border rounded-2xl p-6 space-y-4 shadow-sm">
+                <p className="text-sm font-medium text-foreground">
+                  Try it now — no account needed
+                </p>
+                <div className="flex gap-3">
+                  <Input
+                    placeholder="Your postcode"
+                    value={postcode}
+                    onChange={(e) => setPostcode(e.target.value.toUpperCase())}
+                    className="flex-1 h-11"
+                    autoFocus
+                  />
+                  <select
+                    value={householdSize}
+                    onChange={(e) => setHouseholdSize(Number(e.target.value))}
+                    className="h-11 px-3 rounded-md border border-input bg-background text-sm"
+                  >
+                    {[1, 2, 3, 4, 5, 6].map(n => (
+                      <option key={n} value={n}>{n} {n === 1 ? 'person' : 'people'}</option>
+                    ))}
+                  </select>
+                </div>
+                <Button
+                  className="w-full h-11 text-base font-medium"
+                  onClick={handleTryFree}
+                  disabled={postcode.trim().length < 5}
+                >
+                  Show me a meal plan
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-16 border-t border-gray-200">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-emerald-600">£50+</div>
-            <div className="text-sm text-gray-600">Average Weekly Savings</div>
+          {/* Supported stores — real names, no emojis, understated */}
+          <div className="pt-4">
+            <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wider">
+              Comparing prices across
+            </p>
+            <div className="flex justify-center items-center gap-6 flex-wrap">
+              {stores.map(store => (
+                <span
+                  key={store.name}
+                  className="text-sm font-medium"
+                  style={{ color: store.color }}
+                >
+                  {store.name}
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">2hrs</div>
-            <div className="text-sm text-gray-600">Time Saved Per Week</div>
+
+          {/* How it works — three-step flow, not feature cards */}
+          <div className="grid md:grid-cols-3 gap-8 pt-16 max-w-2xl mx-auto">
+            <div className="text-center space-y-2">
+              <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                <ShoppingCart className="h-5 w-5" />
+              </div>
+              <p className="text-sm font-medium text-foreground">Tell us your diet & budget</p>
+              <p className="text-xs text-muted-foreground">Allergies, household size, weekly budget — we plan around you</p>
+            </div>
+            <div className="text-center space-y-2">
+              <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
+                <PiggyBank className="h-5 w-5" />
+              </div>
+              <p className="text-sm font-medium text-foreground">We find the cheapest store</p>
+              <p className="text-xs text-muted-foreground">Real daily prices from all 5 supermarkets, compared automatically</p>
+            </div>
+            <div className="text-center space-y-2">
+              <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto">
+                <Clock className="h-5 w-5" />
+              </div>
+              <p className="text-sm font-medium text-foreground">Checkout or get it delivered</p>
+              <p className="text-xs text-muted-foreground">Redirect to store, Uber courier, or export your list</p>
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">7</div>
-            <div className="text-sm text-gray-600">Personalized Recipes</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">12</div>
-            <div className="text-sm text-gray-600">Connected Stores</div>
+
+          {/* Honest single stat */}
+          <div className="pt-8 border-t">
+            <p className="text-sm text-muted-foreground">
+              The average UK family spends <span className="font-semibold text-foreground">£118/week</span> on groceries.
+              <br />
+              SmartCart finds the store where your exact basket costs least.
+            </p>
           </div>
         </div>
       </div>
