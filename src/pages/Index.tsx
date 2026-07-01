@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Header } from '@/components/Header';
 import { Hero } from '@/components/Hero';
+import { AuthModal } from '@/components/AuthModal';
 import { OnboardingWizard } from '@/components/OnboardingWizard';
 import { DashboardFlow } from '@/components/dashboard/DashboardFlow';
 import { Toaster } from '@/components/ui/toaster';
@@ -8,30 +9,40 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'dashboard'>('landing');
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
 
-  // Check auth state on mount
+  // Check auth state on mount and handle OAuth redirects
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setIsAuthenticated(true);
         await loadProfile(session.user.id);
-        setCurrentView('dashboard');
       }
     };
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        console.log('[Auth] Event:', event, 'User:', session?.user?.id);
+
         if (session?.user) {
           setIsAuthenticated(true);
-          await loadProfile(session.user.id);
-          setCurrentView('dashboard');
+          setShowAuth(false);
+          const profile = await loadProfile(session.user.id);
+
+          // If new user or onboarding not completed, show onboarding
+          if (event === 'SIGNED_IN' && (!profile || !profile.onboarding_completed)) {
+            setShowOnboarding(true);
+          } else if (profile) {
+            setCurrentView('dashboard');
+          }
         } else {
           setIsAuthenticated(false);
           setUserProfile(null);
@@ -43,7 +54,7 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const loadProfile = async (userId: string) => {
+  const loadProfile = async (userId: string): Promise<any> => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -53,69 +64,76 @@ const Index = () => {
 
       if (data) {
         setUserProfile(data);
+        if (data.onboarding_completed) {
+          setCurrentView('dashboard');
+        }
+        return data;
       }
+      return null;
     } catch (err) {
       console.error('Failed to load profile:', err);
+      return null;
     }
   };
 
-  // "Try it free" — show dashboard with sample data, no signup
+  // "Try it free" — show dashboard with sample data, no signup needed
   const handleQuickStart = (postcode: string, householdSize: number) => {
+    // Show onboarding to collect dietary preferences & budget
+    // but pre-fill what we already have
     setUserProfile({
-      name: '',
+      full_name: '',
       postcode,
-      householdSize,
       household_size: householdSize,
-      weeklyBudget: 50,
       weekly_budget: 50,
-      dietaryPreferences: [],
       dietary_preferences: [],
       allergies: [],
+      meal_types: ['breakfast', 'lunch', 'dinner'],
       preferred_supermarkets: ['tesco', 'asda', 'sainsburys', 'morrisons', 'waitrose'],
+      preferred_fulfilment: 'delivery',
       isGuest: true,
     });
-    setCurrentView('dashboard');
-    toast({
-      title: 'Generating your meal plan...',
-      description: 'Finding the best meals for your household',
-    });
-  };
-
-  const handleGetStarted = () => {
     setShowOnboarding(true);
   };
 
-  const handleSignIn = async () => {
-    // For MVP: use magic link or show a sign-in form
-    const email = window.prompt('Enter your email to sign in:');
-    if (email) {
-      const { error } = await supabase.auth.signInWithOtp({ email });
-      if (error) {
-        toast({
-          title: 'Sign in failed',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Check your email',
-          description: 'We sent you a magic link to sign in',
-        });
-      }
-    }
+  // "Get Started" button → show signup modal
+  const handleGetStarted = () => {
+    setAuthMode('signup');
+    setShowAuth(true);
   };
 
-  const handleOnboardingComplete = async (data: any) => {
+  // "Sign In" button → show signin modal
+  const handleSignIn = () => {
+    setAuthMode('signin');
+    setShowAuth(true);
+  };
+
+  // Onboarding completed → go to dashboard
+  const handleOnboardingComplete = (data: any) => {
     setShowOnboarding(false);
-    setUserProfile(data);
+    const mergedProfile = { ...userProfile, ...data, onboarding_completed: true };
+    setUserProfile(mergedProfile);
     setCurrentView('dashboard');
+  };
+
+  // Sign out
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
+    setUserProfile(null);
+    setCurrentView('landing');
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Header
         currentView={currentView}
-        onBackToLanding={() => setCurrentView('landing')}
+        onBackToLanding={() => {
+          if (isAuthenticated) {
+            // Stay on dashboard if signed in
+            return;
+          }
+          setCurrentView('landing');
+        }}
         onGetStarted={handleGetStarted}
         onSignIn={handleSignIn}
         userProfile={userProfile}
@@ -133,9 +151,23 @@ const Index = () => {
         <DashboardFlow userProfile={userProfile} />
       )}
 
+      {/* Auth Modal — Google / Apple / Email */}
+      <AuthModal
+        isOpen={showAuth}
+        onClose={() => setShowAuth(false)}
+        defaultMode={authMode}
+      />
+
+      {/* Onboarding — preferences, budget, stores */}
       <OnboardingWizard
         isOpen={showOnboarding}
-        onClose={() => setShowOnboarding(false)}
+        onClose={() => {
+          setShowOnboarding(false);
+          // If guest, still show dashboard with defaults
+          if (userProfile?.isGuest) {
+            setCurrentView('dashboard');
+          }
+        }}
         onComplete={handleOnboardingComplete}
       />
 
