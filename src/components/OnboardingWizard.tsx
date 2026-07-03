@@ -115,7 +115,46 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
     }
   };
 
+  // Validate current step before allowing next
+  const canProceed = (): boolean => {
+    switch (currentStep) {
+      case 0: // Household — name and postcode required
+        return profile.full_name.trim().length >= 2 && profile.postcode.trim().length >= 5;
+      case 1: // Dietary — optional, always can proceed
+        return true;
+      case 2: // Budget — always valid (has defaults)
+        return true;
+      case 3: // Stores — at least one store selected
+        return profile.preferred_supermarkets.length > 0;
+      default:
+        return true;
+    }
+  };
+
+  const getValidationMessage = (): string => {
+    switch (currentStep) {
+      case 0:
+        if (profile.full_name.trim().length < 2) return 'Please enter your name';
+        if (profile.postcode.trim().length < 5) return 'Please enter a valid postcode';
+        return '';
+      case 3:
+        if (profile.preferred_supermarkets.length === 0) return 'Select at least one store';
+        return '';
+      default:
+        return '';
+    }
+  };
+
   const handleNext = () => {
+    if (!canProceed()) {
+      toast({
+        title: 'Missing information',
+        description: getValidationMessage(),
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (currentStep === steps.length - 1) {
       handleComplete();
     } else {
@@ -375,7 +414,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
               ))}
             </div>
 
-            <Button onClick={handleNext} disabled={isSaving}>
+            <Button
+              onClick={handleNext}
+              disabled={isSaving || !canProceed()}
+            >
               {isSaving
                 ? 'Saving...'
                 : currentStep === steps.length - 1

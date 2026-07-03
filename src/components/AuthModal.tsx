@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  // Sync mode when defaultMode prop changes (fixes signup vs signin bug)
+  useEffect(() => {
+    setMode(defaultMode);
+  }, [defaultMode, isOpen]);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -133,7 +138,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-4 pt-2">
-          {/* OAuth buttons */}
           <Button
             variant="outline"
             className="w-full h-11 font-medium"
@@ -168,7 +172,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </span>
           </div>
 
-          {/* Email form */}
           {mode === 'signup' && (
             <div>
               <Label htmlFor="auth-name" className="text-xs">Full name</Label>

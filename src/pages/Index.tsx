@@ -37,10 +37,10 @@ const Index = () => {
           setShowAuth(false);
           const profile = await loadProfile(session.user.id);
 
-          // If new user or onboarding not completed, show onboarding
-          if (event === 'SIGNED_IN' && (!profile || !profile.onboarding_completed)) {
+          // New user or onboarding not completed → show onboarding
+          if (!profile || !profile.onboarding_completed) {
             setShowOnboarding(true);
-          } else if (profile) {
+          } else {
             setCurrentView('dashboard');
           }
         } else {
@@ -76,32 +76,13 @@ const Index = () => {
     }
   };
 
-  // "Try it free" — show dashboard with sample data, no signup needed
-  const handleQuickStart = (postcode: string, householdSize: number) => {
-    // Show onboarding to collect dietary preferences & budget
-    // but pre-fill what we already have
-    setUserProfile({
-      full_name: '',
-      postcode,
-      household_size: householdSize,
-      weekly_budget: 50,
-      dietary_preferences: [],
-      allergies: [],
-      meal_types: ['breakfast', 'lunch', 'dinner'],
-      preferred_supermarkets: ['tesco', 'asda', 'sainsburys', 'morrisons', 'waitrose'],
-      preferred_fulfilment: 'delivery',
-      isGuest: true,
-    });
-    setShowOnboarding(true);
-  };
-
-  // "Get Started" button → show signup modal
+  // "Plan your first week free" → signup flow → onboarding → dashboard
   const handleGetStarted = () => {
     setAuthMode('signup');
     setShowAuth(true);
   };
 
-  // "Sign In" button → show signin modal
+  // "Sign In" → signin flow → dashboard (or onboarding if not completed)
   const handleSignIn = () => {
     setAuthMode('signin');
     setShowAuth(true);
@@ -115,24 +96,12 @@ const Index = () => {
     setCurrentView('dashboard');
   };
 
-  // Sign out
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setIsAuthenticated(false);
-    setUserProfile(null);
-    setCurrentView('landing');
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Header
         currentView={currentView}
         onBackToLanding={() => {
-          if (isAuthenticated) {
-            // Stay on dashboard if signed in
-            return;
-          }
-          setCurrentView('landing');
+          if (!isAuthenticated) setCurrentView('landing');
         }}
         onGetStarted={handleGetStarted}
         onSignIn={handleSignIn}
@@ -143,7 +112,6 @@ const Index = () => {
         <Hero
           onGetStarted={handleGetStarted}
           onSignIn={handleSignIn}
-          onQuickStart={handleQuickStart}
         />
       )}
 
@@ -158,16 +126,10 @@ const Index = () => {
         defaultMode={authMode}
       />
 
-      {/* Onboarding — preferences, budget, stores */}
+      {/* Onboarding — preferences, budget, stores (shown after auth) */}
       <OnboardingWizard
         isOpen={showOnboarding}
-        onClose={() => {
-          setShowOnboarding(false);
-          // If guest, still show dashboard with defaults
-          if (userProfile?.isGuest) {
-            setCurrentView('dashboard');
-          }
-        }}
+        onClose={() => setShowOnboarding(false)}
         onComplete={handleOnboardingComplete}
       />
 
