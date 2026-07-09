@@ -2,127 +2,110 @@
 @tailwind components;
 @tailwind utilities;
 
+/* SmartCart design system — Crav-inspired: warm cream + deep green, editorial type */
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Warm cream canvas (Crav: #f5e3cd → ours slightly lighter for UI legibility) */
+    --background: 36 45% 94%;
+    --foreground: 150 25% 12%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 36 45% 97%;
+    --card-foreground: 150 25% 12%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 36 45% 97%;
+    --popover-foreground: 150 25% 12%;
 
-    --primary: 159 67% 48%;
-    --primary-foreground: 0 0% 98%;
+    /* Deep market green — fresh, savings, trust */
+    --primary: 152 55% 26%;
+    --primary-foreground: 36 45% 96%;
 
-    --secondary: 160 60% 96%;
-    --secondary-foreground: 159 67% 18%;
+    --secondary: 36 30% 88%;
+    --secondary-foreground: 150 25% 15%;
 
-    --muted: 160 20% 96%;
-    --muted-foreground: 160 10% 46%;
+    --muted: 36 25% 88%;
+    --muted-foreground: 150 10% 38%;
 
-    --accent: 160 40% 94%;
-    --accent-foreground: 159 67% 18%;
+    /* Tomato red accent — appetite, urgency (Crav: #f91814, tempered) */
+    --accent: 4 88% 55%;
+    --accent-foreground: 36 45% 96%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 55%;
+    --destructive-foreground: 36 45% 96%;
 
-    --border: 160 20% 91%;
-    --input: 160 20% 91%;
-    --ring: 159 67% 48%;
+    --border: 36 20% 82%;
+    --input: 36 20% 82%;
+    --ring: 152 55% 26%;
 
     --radius: 0.75rem;
-
-    /* Enhanced design tokens */
-    --primary-glow: 159 67% 65%;
-    --success: 160 60% 45%;
-    --warning: 43 96% 56%;
-    --info: 217 91% 60%;
-
-    /* Gradient definitions */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(160 60% 55%));
-    --gradient-hero: linear-gradient(135deg, hsl(159 67% 48%), hsl(217 91% 60%));
-
-    /* Shadows */
-    --shadow-elegant: 0 4px 20px -2px hsl(var(--primary) / 0.1);
-    --shadow-glow: 0 0 30px hsl(var(--primary-glow) / 0.3);
-
-    /* Transitions */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 159 67% 48%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 160 40% 94%;
-    --sidebar-accent-foreground: 159 67% 18%;
-    --sidebar-border: 160 20% 91%;
-    --sidebar-ring: 159 67% 48%;
   }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 159 67% 55%;
-    --primary-foreground: 222.2 84% 4.9%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 159 67% 75%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 159 67% 75%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 159 67% 55%;
-
-    /* Enhanced dark mode tokens */
-    --primary-glow: 159 67% 70%;
-    --success: 160 60% 50%;
-    --warning: 43 96% 65%;
-    --info: 217 91% 70%;
-
-    /* Dark gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(160 60% 60%));
-    --gradient-hero: linear-gradient(135deg, hsl(159 67% 55%), hsl(217 91% 70%));
-
-    /* Dark shadows */
-    --shadow-elegant: 0 4px 20px -2px hsl(0 0% 0% / 0.3);
-    --shadow-glow: 0 0 30px hsl(var(--primary-glow) / 0.2);
-
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 159 67% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 159 67% 75%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 159 67% 55%;
-  }
-}
-
-@layer base {
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
+}
+
+@layer utilities {
+  /* Display type — Anton, condensed caps, Crav-style */
+  .font-display {
+    font-family: 'Anton', 'Arial Narrow', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    line-height: 0.92;
+  }
+
+  /* Marquee band — continuous horizontal scroll */
+  .marquee {
+    overflow: hidden;
+    white-space: nowrap;
+    display: flex;
+  }
+  .marquee-content {
+    display: inline-flex;
+    align-items: center;
+    animation: marquee-scroll 28s linear infinite;
+    flex-shrink: 0;
+    min-width: 100%;
+  }
+  @keyframes marquee-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-100%); }
+  }
+
+  /* Scroll reveal */
+  .reveal-up {
+    animation: reveal-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(28px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .reveal-delay-1 { animation-delay: 0.08s; }
+  .reveal-delay-2 { animation-delay: 0.16s; }
+  .reveal-delay-3 { animation-delay: 0.24s; }
+
+  /* Gentle float for food elements */
+  .float-slow {
+    animation: float-slow 5s ease-in-out infinite;
+  }
+  @keyframes float-slow {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateY(-10px) rotate(2deg); }
+  }
+
+  /* Section tag — small uppercase label */
+  .section-tag {
+    @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-accent;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0.5rem); }
 }

@@ -1,44 +1,62 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, ShoppingCart, Clock, PiggyBank } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 interface HeroProps {
   onGetStarted: () => void;
   onSignIn: () => void;
 }
 
+const MARQUEE_ITEMS = [
+  'TESCO', "SAINSBURY'S", 'ASDA', 'WAITROSE', 'MORRISONS',
+  'COMPARED DAILY', 'REAL PRICES', 'ONE BASKET',
+];
+
+const FOOD_FLOATS = [
+  { emoji: '🍅', className: 'top-[12%] left-[6%] text-5xl md:text-6xl', delay: '0s' },
+  { emoji: '🥦', className: 'top-[22%] right-[8%] text-4xl md:text-5xl', delay: '1.2s' },
+  { emoji: '🧀', className: 'bottom-[30%] left-[10%] text-4xl md:text-5xl', delay: '0.6s' },
+  { emoji: '🥕', className: 'bottom-[18%] right-[12%] text-5xl md:text-6xl', delay: '1.8s' },
+];
+
 export const Hero: React.FC<HeroProps> = ({ onGetStarted, onSignIn }) => {
-  const stores = [
-    { name: 'Tesco', color: '#00539F' },
-    { name: "Sainsbury's", color: '#F06C00' },
-    { name: 'Asda', color: '#78BE20' },
-    { name: 'Waitrose', color: '#006B3A' },
-    { name: 'Morrisons', color: '#006836' },
-  ];
-
   return (
-    <div className="min-h-[85vh] flex flex-col justify-center">
-      <div className="container mx-auto px-4">
-        <div className="max-w-3xl mx-auto text-center space-y-8">
+    <div className="relative overflow-hidden">
 
-          <div className="space-y-4">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-foreground tracking-tight leading-[1.1]">
-              Plan your meals.
-              <br />
-              <span className="text-primary">Find the cheapest store.</span>
-              <br />
-              Shop in one click.
-            </h1>
+      {/* Floating food elements */}
+      {FOOD_FLOATS.map((f, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className={`absolute float-slow select-none pointer-events-none opacity-90 ${f.className}`}
+          style={{ animationDelay: f.delay }}
+        >
+          {f.emoji}
+        </span>
+      ))}
 
-            <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto leading-relaxed">
-              SmartCart plans your week's dinners, compares prices across the UK's Big 5 supermarkets, and sends you straight to checkout.
-            </p>
-          </div>
+      <div className="container mx-auto px-4 pt-16 md:pt-24 pb-10">
+        <div className="max-w-5xl mx-auto text-center">
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto">
+          {/* Heritage line — Crav's "Est. 1997" move */}
+          <p className="section-tag reveal-up">Built for UK families — London to Leeds</p>
+
+          {/* Massive editorial display type */}
+          <h1 className="font-display text-[17vw] md:text-[7.5rem] lg:text-[9rem] text-foreground mt-4 reveal-up reveal-delay-1">
+            Plan.
+            <span className="block text-primary">Compare.</span>
+            <span className="block text-accent">Save.</span>
+          </h1>
+
+          <p className="text-base md:text-xl text-muted-foreground max-w-xl mx-auto mt-6 leading-relaxed reveal-up reveal-delay-2">
+            Your week's meals planned, priced across the Big&nbsp;5 supermarkets,
+            and sent straight to checkout. Zero spreadsheets. Zero guesswork.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto mt-8 reveal-up reveal-delay-3">
             <Button
               size="lg"
-              className="flex-1 h-13 text-base font-medium"
+              className="flex-1 h-13 text-base font-semibold rounded-full"
               onClick={onGetStarted}
             >
               Plan your first week free
@@ -47,61 +65,79 @@ export const Hero: React.FC<HeroProps> = ({ onGetStarted, onSignIn }) => {
             <Button
               variant="outline"
               size="lg"
-              className="h-13 text-base"
+              className="h-13 text-base rounded-full border-foreground/20"
               onClick={onSignIn}
             >
               Sign in
             </Button>
           </div>
+        </div>
+      </div>
 
-          <div className="pt-4">
-            <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wider">
-              Comparing prices across
-            </p>
-            <div className="flex justify-center items-center gap-6 flex-wrap">
-              {stores.map(store => (
-                <span
-                  key={store.name}
-                  className="text-sm font-medium"
-                  style={{ color: store.color }}
-                >
-                  {store.name}
-                </span>
-              ))}
-            </div>
+      {/* Marquee band — supermarkets + promises */}
+      <div className="marquee bg-primary text-primary-foreground py-3 mt-8" aria-hidden>
+        {[0, 1].map(copy => (
+          <div key={copy} className="marquee-content">
+            {MARQUEE_ITEMS.map((item, i) => (
+              <span key={i} className="font-display text-lg md:text-xl px-6 flex items-center gap-6">
+                {item} <span className="text-accent">✦</span>
+              </span>
+            ))}
           </div>
+        ))}
+      </div>
 
-          <div className="grid md:grid-cols-3 gap-8 pt-16 max-w-2xl mx-auto">
-            <div className="text-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
-                <ShoppingCart className="h-5 w-5" />
+      {/* Three-step flow — editorial numbered sections */}
+      <div className="container mx-auto px-4 py-16 md:py-24">
+        <div className="max-w-4xl mx-auto space-y-14">
+          {[
+            {
+              n: '01',
+              tag: 'YOUR TASTE',
+              title: 'Tell us how you eat',
+              body: 'Allergies, diets, household size, weekly budget. Thirty seconds, once.',
+            },
+            {
+              n: '02',
+              tag: 'OUR MATHS',
+              title: 'We price your exact basket',
+              body: "Every ingredient matched at Tesco, Sainsbury's, Asda, Waitrose and Morrisons — real shelf prices, refreshed daily.",
+            },
+            {
+              n: '03',
+              tag: 'ONE CLICK',
+              title: 'Checkout, courier, or list',
+              body: 'Pre-filled basket at the cheapest store, an Uber courier who shops for you, or a list for your pocket.',
+            },
+          ].map((step) => (
+            <div key={step.n} className="grid md:grid-cols-[100px_1fr] gap-4 md:gap-8 items-start border-t border-foreground/10 pt-8">
+              <span className="font-display text-4xl md:text-5xl text-accent">{step.n}</span>
+              <div>
+                <p className="section-tag mb-2">{step.tag}</p>
+                <h2 className="font-display text-3xl md:text-5xl text-foreground">{step.title}</h2>
+                <p className="text-muted-foreground mt-3 max-w-lg leading-relaxed">{step.body}</p>
               </div>
-              <p className="text-sm font-medium text-foreground">Tell us your diet & budget</p>
-              <p className="text-xs text-muted-foreground">Allergies, household size, weekly budget — we plan around you</p>
             </div>
-            <div className="text-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
-                <PiggyBank className="h-5 w-5" />
-              </div>
-              <p className="text-sm font-medium text-foreground">We find the cheapest store</p>
-              <p className="text-xs text-muted-foreground">Real daily prices from all 5 supermarkets, compared automatically</p>
-            </div>
-            <div className="text-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto">
-                <Clock className="h-5 w-5" />
-              </div>
-              <p className="text-sm font-medium text-foreground">Checkout or get it delivered</p>
-              <p className="text-xs text-muted-foreground">Redirect to store, Uber courier, or export your list</p>
-            </div>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          <div className="pt-8 border-t">
-            <p className="text-sm text-muted-foreground">
-              The average UK family spends <span className="font-semibold text-foreground">£118/week</span> on groceries.
-              <br />
-              SmartCart finds the store where your exact basket costs least.
-            </p>
-          </div>
+      {/* Honest stat — big editorial closer */}
+      <div className="bg-foreground text-background py-16 md:py-20">
+        <div className="container mx-auto px-4 text-center">
+          <p className="section-tag">The cost-of-living maths</p>
+          <p className="font-display text-4xl md:text-6xl mt-4 max-w-3xl mx-auto">
+            £118 a week on groceries.
+            <span className="text-accent block mt-2">We find where it costs less.</span>
+          </p>
+          <Button
+            size="lg"
+            className="mt-8 h-13 px-8 text-base font-semibold rounded-full bg-accent hover:bg-accent/90 text-accent-foreground"
+            onClick={onGetStarted}
+          >
+            Start saving this week
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>
